@@ -1,0 +1,14 @@
+openapi: "3.0.0"
+info:
+  version: 1.0.0
+  title: Slotify Backend API
+paths:
+  /healthcheck:
+    get:
+      responses:
+        "200":
+          description: healthcheck route
+          content:
+            application/json:
+              schema:
+                type: string

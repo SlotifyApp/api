@@ -1,0 +1,18 @@
+repos:
+  - repo: local
+    hooks:
+      - id: generate
+        name: Run go generate and mod tidy
+        entry: make generate
+        language: system
+        pass_filenames: false
+      - id: golangci-lint
+        name: Run golangci-lint in Docker
+        entry: make lint
+        language: system
+        pass_filenames: false
+      - id: API documentation
+        name: Regenerate API documentation
+        entry: make generate_api_docs
+        language: system
+        pass_filenames: false
