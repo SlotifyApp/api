@@ -8,4 +8,4 @@ run:
 	go generate ./... && go mod tidy && go run cmd/server/main.go
 
 generate_api_docs:
-	docker run --rm  -v $(shell pwd):/local openapitools/openapi-generator-cli generate -i /local/openapi.yaml -g markdown     -o /local/api_docs
+	docker run --rm  -v $(shell pwd):/local openapitools/openapi-generator-cli generate -i /local/shared/openapi/openapi.yaml -g markdown     -o /local/api_docs
