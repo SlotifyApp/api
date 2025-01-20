@@ -2,13 +2,21 @@
 
 ## Set up
 
-1. Install `pre-commit`:
+1. Clone repo, there is a submodule so you must use:
+
+```bash
+git clone --recurse-submodules
+```
+
+2. Install `make`
+
+3. Install `pre-commit`:
 
 ```bash
     pip install pre-commit
 ```
 
-2. Install the hooks:
+4. Install the hooks:
 
 ```bash
     pre-commit install
@@ -17,11 +25,14 @@
 This will make sure that golang ci lint is ran before you commit so we don't need to
 fix errors after pushing.
 
-3. Make sure Go is installed
-4. Run the app through:
+5. Install Golang (Go is still needed for go generate ./..., if this is a problem we can dockerise)
+6. Run the app through:
 
 ```bash
-    make run
+    make generate # locally runs go and generates files needed, must be run
+    make run # runs docker compose up, starts up golang server and db in containers
+    make stop # docker compose down, stops the above containers
+
 ```
 
 (See other options in the Makefile)

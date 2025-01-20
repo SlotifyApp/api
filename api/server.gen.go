@@ -15,13 +15,95 @@ import (
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/gorilla/mux"
+	"github.com/oapi-codegen/runtime"
+	openapi_types "github.com/oapi-codegen/runtime/types"
 )
+
+// Team defines model for Team.
+type Team struct {
+	Id   int    `json:"id"`
+	Name string `json:"name"`
+}
+
+// TeamCreate defines model for TeamCreate.
+type TeamCreate struct {
+	Name string `json:"name"`
+}
+
+// User defines model for User.
+type User struct {
+	Email     openapi_types.Email `json:"email"`
+	FirstName string              `json:"firstName"`
+	Id        int                 `json:"id"`
+	LastName  string              `json:"lastName"`
+}
+
+// UserCreate defines model for UserCreate.
+type UserCreate struct {
+	Email     openapi_types.Email `json:"email"`
+	FirstName string              `json:"firstName"`
+	LastName  string              `json:"lastName"`
+}
+
+// GetTeamsParams defines parameters for GetTeams.
+type GetTeamsParams struct {
+	// Name Team name
+	Name *string `form:"name,omitempty" json:"name,omitempty"`
+}
+
+// GetUsersParams defines parameters for GetUsers.
+type GetUsersParams struct {
+	// Email Email of user
+	Email *openapi_types.Email `form:"email,omitempty" json:"email,omitempty"`
+
+	// FirstName First name of user
+	FirstName *string `form:"firstName,omitempty" json:"firstName,omitempty"`
+
+	// LastName Last name of user
+	LastName *string `form:"lastName,omitempty" json:"lastName,omitempty"`
+}
+
+// PostTeamsJSONRequestBody defines body for PostTeams for application/json ContentType.
+type PostTeamsJSONRequestBody = TeamCreate
+
+// PostUsersJSONRequestBody defines body for PostUsers for application/json ContentType.
+type PostUsersJSONRequestBody = UserCreate
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
-
+	// Healthcheck route
 	// (GET /healthcheck)
 	GetHealthcheck(w http.ResponseWriter, r *http.Request)
+	// Get a team by query params
+	// (GET /teams)
+	GetTeams(w http.ResponseWriter, r *http.Request, params GetTeamsParams)
+	// Create a new team
+	// (POST /teams)
+	PostTeams(w http.ResponseWriter, r *http.Request)
+	// Delete a team by id
+	// (DELETE /teams/{teamID})
+	DeleteTeamsTeamID(w http.ResponseWriter, r *http.Request, teamID int)
+	// Get a team by id
+	// (GET /teams/{teamID})
+	GetTeamsTeamID(w http.ResponseWriter, r *http.Request, teamID int)
+	// Get all members of a team
+	// (GET /teams/{teamID}/users)
+	GetTeamsTeamIDUsers(w http.ResponseWriter, r *http.Request, teamID int)
+	// Add a user to a team
+	// (POST /teams/{teamID}/users/{userID})
+	PostTeamsTeamIDUsersUserID(w http.ResponseWriter, r *http.Request, teamID int, userID int)
+	// Get a user by query params
+	// (GET /users)
+	GetUsers(w http.ResponseWriter, r *http.Request, params GetUsersParams)
+	// Create a new user
+	// (POST /users)
+	PostUsers(w http.ResponseWriter, r *http.Request)
+	// Delete a user by id
+	// (DELETE /users/{userID})
+	DeleteUsersUserID(w http.ResponseWriter, r *http.Request, userID int)
+	// Get a user by id
+	// (GET /users/{userID})
+	GetUsersUserID(w http.ResponseWriter, r *http.Request, userID int)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -38,6 +120,263 @@ func (siw *ServerInterfaceWrapper) GetHealthcheck(w http.ResponseWriter, r *http
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetHealthcheck(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetTeams operation middleware
+func (siw *ServerInterfaceWrapper) GetTeams(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetTeamsParams
+
+	// ------------- Optional query parameter "name" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "name", r.URL.Query(), &params.Name)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "name", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetTeams(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PostTeams operation middleware
+func (siw *ServerInterfaceWrapper) PostTeams(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PostTeams(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteTeamsTeamID operation middleware
+func (siw *ServerInterfaceWrapper) DeleteTeamsTeamID(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "teamID" -------------
+	var teamID int
+
+	err = runtime.BindStyledParameterWithOptions("simple", "teamID", mux.Vars(r)["teamID"], &teamID, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "teamID", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteTeamsTeamID(w, r, teamID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetTeamsTeamID operation middleware
+func (siw *ServerInterfaceWrapper) GetTeamsTeamID(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "teamID" -------------
+	var teamID int
+
+	err = runtime.BindStyledParameterWithOptions("simple", "teamID", mux.Vars(r)["teamID"], &teamID, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "teamID", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetTeamsTeamID(w, r, teamID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetTeamsTeamIDUsers operation middleware
+func (siw *ServerInterfaceWrapper) GetTeamsTeamIDUsers(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "teamID" -------------
+	var teamID int
+
+	err = runtime.BindStyledParameterWithOptions("simple", "teamID", mux.Vars(r)["teamID"], &teamID, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "teamID", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetTeamsTeamIDUsers(w, r, teamID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PostTeamsTeamIDUsersUserID operation middleware
+func (siw *ServerInterfaceWrapper) PostTeamsTeamIDUsersUserID(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "teamID" -------------
+	var teamID int
+
+	err = runtime.BindStyledParameterWithOptions("simple", "teamID", mux.Vars(r)["teamID"], &teamID, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "teamID", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "userID" -------------
+	var userID int
+
+	err = runtime.BindStyledParameterWithOptions("simple", "userID", mux.Vars(r)["userID"], &userID, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "userID", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PostTeamsTeamIDUsersUserID(w, r, teamID, userID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetUsers operation middleware
+func (siw *ServerInterfaceWrapper) GetUsers(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetUsersParams
+
+	// ------------- Optional query parameter "email" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "email", r.URL.Query(), &params.Email)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "email", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "firstName" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "firstName", r.URL.Query(), &params.FirstName)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "firstName", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "lastName" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "lastName", r.URL.Query(), &params.LastName)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "lastName", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetUsers(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PostUsers operation middleware
+func (siw *ServerInterfaceWrapper) PostUsers(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PostUsers(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteUsersUserID operation middleware
+func (siw *ServerInterfaceWrapper) DeleteUsersUserID(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "userID" -------------
+	var userID int
+
+	err = runtime.BindStyledParameterWithOptions("simple", "userID", mux.Vars(r)["userID"], &userID, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "userID", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteUsersUserID(w, r, userID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetUsersUserID operation middleware
+func (siw *ServerInterfaceWrapper) GetUsersUserID(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "userID" -------------
+	var userID int
+
+	err = runtime.BindStyledParameterWithOptions("simple", "userID", mux.Vars(r)["userID"], &userID, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "userID", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetUsersUserID(w, r, userID)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -162,16 +501,49 @@ func HandlerWithOptions(si ServerInterface, options GorillaServerOptions) http.H
 
 	r.HandleFunc(options.BaseURL+"/healthcheck", wrapper.GetHealthcheck).Methods("GET")
 
+	r.HandleFunc(options.BaseURL+"/teams", wrapper.GetTeams).Methods("GET")
+
+	r.HandleFunc(options.BaseURL+"/teams", wrapper.PostTeams).Methods("POST")
+
+	r.HandleFunc(options.BaseURL+"/teams/{teamID}", wrapper.DeleteTeamsTeamID).Methods("DELETE")
+
+	r.HandleFunc(options.BaseURL+"/teams/{teamID}", wrapper.GetTeamsTeamID).Methods("GET")
+
+	r.HandleFunc(options.BaseURL+"/teams/{teamID}/users", wrapper.GetTeamsTeamIDUsers).Methods("GET")
+
+	r.HandleFunc(options.BaseURL+"/teams/{teamID}/users/{userID}", wrapper.PostTeamsTeamIDUsersUserID).Methods("POST")
+
+	r.HandleFunc(options.BaseURL+"/users", wrapper.GetUsers).Methods("GET")
+
+	r.HandleFunc(options.BaseURL+"/users", wrapper.PostUsers).Methods("POST")
+
+	r.HandleFunc(options.BaseURL+"/users/{userID}", wrapper.DeleteUsersUserID).Methods("DELETE")
+
+	r.HandleFunc(options.BaseURL+"/users/{userID}", wrapper.GetUsersUserID).Methods("GET")
+
 	return r
 }
 
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"H4sIAAAAAAAC/0yOwU4DMQxEf2U151W7wC03uEBvSHxBlHUb08W2EoNUrfLvKOmlp5Gtmae3g+WsCDuc",
-	"fSMEfG3qfL5NbzFdSdbp9fOEGX9UKqsg4OmwHBa0GWok0RgBL+M1w6Ln2lnHTHHznDKla78v5D3UqERn",
-	"ldOKgHfyj4fajELVVCoNxPOy9EgqTjLW0WzjNPbH79pddtSU6ScO/Zt1++qF5YLW2oyVaipsfvd+UJqK",
-	"/jr1UmvtPwAA//+niJdLAgEAAA==",
+	"H4sIAAAAAAAC/9RYTY/bNhD9KwTbQwsI1m6bk27Zbrs1UAQBunsKcuCKI5sbkVRIKq1h6L8XQ0q2ZEuW",
+	"bKvJ5hI5Evk4M28++HZLUy0LrUA5S5MttekaJPM/H4FJfBZGF2CcAP9WcPxXCiVkKWlyG1G3KYAmVCgH",
+	"KzC0iqhiEnBV/cU6I9SKVlVEDXwuhQFOkw+IVC/9uAPRzy+QOsTA038zwBwc2zANfxD6yYI5BgXJRI4/",
+	"Mm0kczSp30SHx0Q0E8a6d/1GRJMilLNBgL4oNZbsD25BDLk4FL3ZHJ3uxJn243ahMu2Bhcvx29+5diLb",
+	"kDuWfgLFydv3SxrRL2Cs0Iom9HZxs7hBq3QBihWCJvRX/yqiBXNr73m8Bpa7dbqG9BP+fwUOHxgc5oRW",
+	"S04T+gDuz9YydMQWWtkQvF9ubvCRauVA+d2sKHKR+v3xi0Vbmirqi0sVUQ42NaJwwe7WWcSWaQrWZmXu",
+	"I2hLKZnZHCwyunTgv8cOmLSnHHn0CzAChklwYCxNPmwPLMBFRAVSBL74XILZNLWZ0PrTsE8fr4yRcBDc",
+	"+NFARhP6Q7zvSXHdkGLfjapdqjBj2KYvng/aEYxLK5j5Bje+CVZ1V98xTjBRwTryEyxWi4gI9YXlggcQ",
+	"9P3nsPvN8e4QOe1IpkvFDzh7AEdYQHneEB9T4nmwiFdo20PZe213nNVm3Wm+OSuaY0Gs20LVrVFnSqiO",
+	"eLyd9eQ+unwIU28Sn5WyDhfBZ8KIgn/8qlb9xFt8LO+rcFQOoWd2ibn37z01j371WFG9KyUYkZLlPdEZ",
+	"cWsIxjlN6iPqWsPetC8112B3iWkX36m5cnUljnarEAc+Y4UJfmF9BVNaJSY4Ap1shddyh+CvkrhLSm/e",
+	"Tnkxj90+KXhfacal9VRtp9D75NeOcNzl9nWSOmku+svshLnoo9KhumHjQsKX98OE42FEm7ohnyI+z4kE",
+	"+Yy26azOg+EMiLf4qHv1yAhtJcOT3zQ9JfCQ/pQoG6QLUyL6HvOwKx8kWMtWfkbCv0wW/nbuCe8k14sW",
+	"CgdF7dniWF5Uvff+nkTq4DLOEVbvY3ZBAiONvr2bmXL5LeeEBVinO2k82rkmtavfUUBhprRT8+Ce3ois",
+	"PXFjAu84Hf9AgeavUCOHtZXc8P3hCP8vNg1+Jw6/ue44p7+SlXbzTNPRhDw9TX0inqU6miz8P1RH648R",
+	"X1l1BPIGyJpVdXjChjVHGQxp+kFnjp3WHGcMsON7a9OQTmmOa0faV9Mc5eEsuKLzX1hdO83RFNhpzTEL",
+	"d4Oa41sTd0nhoeaYhcc5u6TXHFX1XwAAAP//04GY9gsXAAA=",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file

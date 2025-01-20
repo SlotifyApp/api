@@ -1,2 +1,7 @@
 Apis/DefaultApi.md
+Models/PostTeamsTeamIDUsersUserID_200_response.md
+Models/Team.md
+Models/TeamCreate.md
+Models/User.md
+Models/UserCreate.md
 README.md
