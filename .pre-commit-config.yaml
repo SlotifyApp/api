@@ -16,3 +16,8 @@ repos:
         entry: make generate_api_docs
         language: system
         pass_filenames: false
+      - id: Test
+        name: Running tests
+        entry: make test
+        language: system
+        pass_filenames: false

@@ -25,3 +25,8 @@ run:
 stop:
 	# Docker compose down- stop API and DB containers
 	docker compose -f ./shared/docker/compose.local.yml down
+
+test:
+	# Docker compose up- start DB and run API tests
+	# Also shuts down after tests are finished (--abort-on-container-exit)
+	go generate ./... && go mod tidy && docker compose -f ./shared/docker/compose.test.yml up --build --abort-on-container-exit 
