@@ -18,6 +18,23 @@ const (
 // ensure that we've conformed to the `ServerInterface` with a compile-time check.
 var _ ServerInterface = (*Server)(nil)
 
+// sendError wraps sending of an error in the Error format, and
+// handling the failure to marshal that.
+func sendError(w http.ResponseWriter, code int, message string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(code)
+	_ = json.NewEncoder(w).Encode(message)
+}
+
+// Set JSON content-type header and send response.
+func SetHeaderAndWriteResponse(w http.ResponseWriter, code int, encode any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(code)
+	if err := json.NewEncoder(w).Encode(encode); err != nil {
+		sendError(w, http.StatusInternalServerError, "failed to encode JSON")
+	}
+}
+
 // Closes SQL stmt.
 func CloseStmt(stmt *sql.Stmt, logger *zap.SugaredLogger) {
 	if stmt != nil {
@@ -26,20 +43,6 @@ func CloseStmt(stmt *sql.Stmt, logger *zap.SugaredLogger) {
 			logger.Error("failed to close rows", zap.Error(err))
 		}
 	}
-}
-
-// sendError wraps sending of an error in the Error format, and
-// handling the failure to marshal that.
-func sendError(w http.ResponseWriter, code int, message string) {
-	err := struct {
-		Code    int    `json:"code"`
-		Message string `json:"message"`
-	}{
-		Code:    code,
-		Message: message,
-	}
-	w.WriteHeader(code)
-	_ = json.NewEncoder(w).Encode(err)
 }
 
 type (

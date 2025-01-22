@@ -70,3 +70,5 @@ gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c h1:Hei/4ADfdWqJk1ZMxUNpqntN
 gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c/go.mod h1:JHkPIbrfpd72SG/EVd6muEfDQjcINNoR0C8j2r3qZ4Q=
 gopkg.in/yaml.v3 v3.0.1 h1:fxVm/GzAzEWqLHuvctI91KS9hhNmmWOoWu0XTYJS7CA=
 gopkg.in/yaml.v3 v3.0.1/go.mod h1:K4uyk7z7BCEPqu6E+C64Yfv1cQ7kz7rIZviUmN+EgEM=
+openapi.tanna.dev/go/validator v0.4.0 h1:UYkfh6uZSXREHxB/dQ/ys3S9LfMdiECh2ibHR2mL3bo=
+openapi.tanna.dev/go/validator v0.4.0/go.mod h1:DKbsh408YpUt9hHgLjfSqmmPDMrxVDZgGV1sqbk5qOE=

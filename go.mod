@@ -33,4 +33,5 @@ require (
 	github.com/gorilla/mux v1.8.1
 	github.com/oapi-codegen/nethttp-middleware v1.0.2
 	go.uber.org/multierr v1.10.0 // indirect
+	openapi.tanna.dev/go/validator v0.4.0
 )

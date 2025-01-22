@@ -26,6 +26,11 @@ stop:
 	# Docker compose down- stop API and DB containers
 	docker compose -f ./shared/docker/compose.local.yml down
 
+stop_test:
+	# Unless down is called, some data can be persisted in the db which can 
+	# cause test fails
+	docker compose -f ./shared/docker/compose.test.yml down
+
 test:
 	# Docker compose up- start DB and run API tests
 	# Also shuts down after tests are finished (--abort-on-container-exit)

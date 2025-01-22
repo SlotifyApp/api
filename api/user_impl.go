@@ -1,7 +1,9 @@
 package api
 
 import (
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strings"
 
@@ -190,13 +192,17 @@ func (s Server) GetUsersUserID(w http.ResponseWriter, _ *http.Request, userID in
 	}
 	var user User
 	if err = stmt.QueryRow(userID).Scan(&user.Id, &user.Email, &user.FirstName, &user.LastName); err != nil {
-		errMsg := "failed to get user"
-		s.Logger.Error(errMsg, zap.Int("userID", userID), zap.Error(err))
-		sendError(w, http.StatusBadRequest, errMsg)
+		if errors.Is(err, sql.ErrNoRows) {
+			errMsg := "user doesn't exist"
+			s.Logger.Error(errMsg, zap.Int("userID", userID), zap.Error(err))
+			sendError(w, http.StatusNotFound, errMsg)
+		} else {
+			errMsg := "failed to get user"
+			s.Logger.Error(errMsg, zap.Int("userID", userID), zap.Error(err))
+			sendError(w, http.StatusBadRequest, errMsg)
+		}
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(user)
+	SetHeaderAndWriteResponse(w, http.StatusOK, user)
 }
