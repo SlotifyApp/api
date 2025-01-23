@@ -1,4 +1,4 @@
-module github.com/saths008/slotify-backend
+module github.com/SlotifyApp/slotify-backend
 
 go 1.23.1
 

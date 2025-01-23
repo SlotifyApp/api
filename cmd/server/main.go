@@ -6,13 +6,13 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/SlotifyApp/slotify-backend/api"
+	"github.com/SlotifyApp/slotify-backend/database"
 	"github.com/getkin/kin-openapi/openapi3"
 	chi_middleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/httprate"
 	"github.com/gorilla/mux"
 	oapi_middleware "github.com/oapi-codegen/nethttp-middleware"
-	"github.com/saths008/slotify-backend/api"
-	"github.com/saths008/slotify-backend/database"
 )
 
 const (
