@@ -3,6 +3,7 @@ module github.com/SlotifyApp/slotify-backend
 go 1.23.1
 
 require (
+	github.com/VividCortex/mysqlerr v1.0.0
 	github.com/getkin/kin-openapi v0.128.0
 	github.com/oapi-codegen/runtime v1.1.1
 	github.com/stretchr/testify v1.9.0

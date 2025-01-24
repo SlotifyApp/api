@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"log"
 
 	"go.uber.org/zap"
 )
@@ -25,9 +26,10 @@ func WithLogger(logger *zap.SugaredLogger) ServerOption {
 }
 
 type Server struct {
-	Logger      *zap.SugaredLogger
-	DB          *sql.DB
-	TeamService TeamService
+	Logger         *zap.SugaredLogger
+	DB             *sql.DB
+	TeamRepository TeamRepository
+	UserRepository UserRepository
 }
 
 func NewServerWithContext(_ context.Context, db *sql.DB, serverOpts ...ServerOption) (*Server, error) {
@@ -41,8 +43,11 @@ func NewServerWithContext(_ context.Context, db *sql.DB, serverOpts ...ServerOpt
 	var serverLogger *zap.SugaredLogger
 	if opts.logger == nil {
 		logger, _ := zap.NewProduction()
-		//nolint:errcheck // This is taken from zap's docs
-		defer logger.Sync()
+		defer func() {
+			if err := logger.Sync(); err != nil {
+				log.Printf("failed to sync zap logger: %s", err.Error())
+			}
+		}()
 		serverLogger = logger.Sugar()
 	} else {
 		serverLogger = opts.logger
@@ -52,14 +57,19 @@ func NewServerWithContext(_ context.Context, db *sql.DB, serverOpts ...ServerOpt
 		return nil, errors.New("db must be provided")
 	}
 
-	teamService := TeamService{
+	teamRepository := TeamRepository{
+		db:     db,
+		logger: serverLogger,
+	}
+	userRepository := UserRepository{
 		db:     db,
 		logger: serverLogger,
 	}
 
 	return &Server{
-		Logger:      serverLogger,
-		DB:          db,
-		TeamService: teamService,
+		Logger:         serverLogger,
+		DB:             db,
+		TeamRepository: teamRepository,
+		UserRepository: userRepository,
 	}, nil
 }

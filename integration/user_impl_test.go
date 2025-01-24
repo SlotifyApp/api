@@ -44,7 +44,7 @@ func TestUser_GetUsersUserID(t *testing.T) {
 			require.Equal(t, http.StatusNotFound, rr.Result().StatusCode)
 			err = json.NewDecoder(rr.Result().Body).Decode(&errMsg)
 			require.NoError(t, err, "response body can be decoded into string")
-			require.Equal(t, "user doesn't exist", errMsg, "json body has correct message")
+			require.Equal(t, "user api: user with id(1) doesn't exist", errMsg, "json body has correct message")
 		})
 
 		testutil.OpenAPIValidateTest(t, rr, req)
@@ -149,7 +149,7 @@ func TestUser_PostUsers(t *testing.T) {
 		var respBody string
 		err = json.NewDecoder(rr.Result().Body).Decode(&respBody)
 		require.NoError(t, err, "response body can be decoded into a User")
-		require.Equal(t, "failed to insert user", respBody, "response body correct")
+		require.Equal(t, "user with email sally.doe@gmail.com already exists", respBody, "response body correct")
 	})
 }
 
@@ -321,7 +321,7 @@ func TestUser_DeleteUsersUserID(t *testing.T) {
 		var body string
 		err = json.NewDecoder(rr.Result().Body).Decode(&body)
 		require.NoError(t, err, "decode returns error")
-		require.Equal(t, "user not deleted from db", body, "correct response body")
+		require.Equal(t, "user api: user with id(1000) doesn't exist", body, "correct response body")
 	})
 
 	t.Run("delete user that exists", func(t *testing.T) {

@@ -1,7 +1,6 @@
 package api
 
 import (
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -35,16 +34,6 @@ func SetHeaderAndWriteResponse(w http.ResponseWriter, code int, encode any) {
 	}
 }
 
-// Closes SQL stmt.
-func CloseStmt(stmt *sql.Stmt, logger *zap.SugaredLogger) {
-	if stmt != nil {
-		err := stmt.Close()
-		if err != nil {
-			logger.Error("failed to close rows", zap.Error(err))
-		}
-	}
-}
-
 type (
 	Users []User
 	Teams []Team
@@ -61,6 +50,7 @@ func (u Users) MarshalLogArray(arr zapcore.ArrayEncoder) error {
 }
 
 // MarshalLogObject implements zapcore.ObjectMarshaler.
+
 func (u UserCreate) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 	enc.AddString("email", string(u.Email))
 	enc.AddString("firstName", u.FirstName)
@@ -105,6 +95,15 @@ func (t Team) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 		return fmt.Errorf("failed to marshal Team obj: %v", err.Error())
 	}
 	enc.AddInt("id", t.Id)
+	return nil
+}
+
+func (tp GetTeamsParams) MarshalLogObject(enc zapcore.ObjectEncoder) error {
+	name := ""
+	if tp.Name != nil {
+		name = *tp.Name
+	}
+	enc.AddString("name", name)
 	return nil
 }
 
