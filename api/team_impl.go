@@ -42,7 +42,7 @@ func (s Server) GetTeams(w http.ResponseWriter, _ *http.Request, params GetTeams
 		}
 	}()
 
-	var teams Teams
+	teams := Teams{}
 	for rows.Next() {
 		var team Team
 		err = rows.Scan(&team.Id, &team.Name)
@@ -60,13 +60,7 @@ func (s Server) GetTeams(w http.ResponseWriter, _ *http.Request, params GetTeams
 		return
 	}
 
-	w.WriteHeader(http.StatusCreated)
-	w.Header().Set("Content-Type", "application/json")
-	if err = json.NewEncoder(w).Encode(teams); err != nil {
-		s.Logger.Error("Failed to encode JSON", zap.Array("teams", teams))
-		sendError(w, http.StatusInternalServerError, "Failed to encode JSON")
-		return
-	}
+	SetHeaderAndWriteResponse(w, http.StatusOK, teams)
 }
 
 // (POST /teams) Create a new team.
@@ -79,49 +73,13 @@ func (s Server) PostTeams(w http.ResponseWriter, r *http.Request) {
 		sendError(w, http.StatusBadRequest, errMsg)
 		return
 	}
-
-	stmt, err := s.DB.Prepare("INSERT INTO Team (name) VALUES (?)")
-	defer CloseStmt(stmt, s.Logger)
-
+	team, err := s.TeamService.InsertTeam(teamBody)
 	if err != nil {
-		errMsg := PrepareStmtFail
-		s.Logger.Error(errMsg, zap.Object("reqBody", teamBody), zap.Error(err))
-		sendError(w, http.StatusInternalServerError, errMsg)
+		s.Logger.Error("failed to create team", zap.Object("body", teamBody), zap.Error(err))
+		sendError(w, http.StatusBadRequest, "team creation unsuccessful")
 		return
 	}
-	res, err := stmt.Exec(teamBody.Name)
-	if err != nil {
-		errMsg := "failed to insert team"
-		s.Logger.Error(errMsg, zap.Object("reqBody", teamBody), zap.Error(err))
-		sendError(w, http.StatusBadRequest, errMsg)
-		return
-	}
-	rows, err := res.RowsAffected()
-	if err != nil {
-		s.Logger.Error("cant get rows affected", zap.Object("body", teamBody), zap.Error(err))
-		sendError(w, http.StatusBadRequest, "team not inserted into db")
-		return
-	}
-	if rows != 1 {
-		s.Logger.Error("rows affected was not equal to 1",
-			zap.Int64("rowsAffected", rows), zap.Object("body", teamBody), zap.Error(err))
-		sendError(w, http.StatusBadRequest, "team not inserted into db")
-		return
-	}
-
-	id, err := res.LastInsertId()
-	if err != nil {
-		s.Logger.Error("cant get last insert id", zap.Object("body", teamBody), zap.Error(err))
-		sendError(w, http.StatusBadRequest, "cant get last insert id")
-		return
-	}
-	team := Team{
-		Id:   int(id),
-		Name: teamBody.Name,
-	}
-	w.WriteHeader(http.StatusCreated)
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(team)
+	SetHeaderAndWriteResponse(w, http.StatusCreated, team)
 }
 
 // (DELETE /teams/{teamID}) Delete a team by id.

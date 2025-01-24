@@ -1,6 +1,6 @@
 # yaml-language-server: $schema=../oapi_codegen_cfg_schema.json
 package: api
-output: server.gen.go
+output: ../api/server.gen.go
 generate:
   models: true
   gorilla-server: true

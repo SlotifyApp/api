@@ -3,46 +3,43 @@ package testutil
 import (
 	"database/sql"
 	"fmt"
-	"log"
+	"testing"
 
 	"github.com/SlotifyApp/slotify-backend/api"
+	"github.com/stretchr/testify/require"
 )
 
 // GetCount gets the row count of a given SQL table.
-func GetCount(dbh *sql.DB, table string) (int, error) {
-	var count int
+func GetCount(t *testing.T, db *sql.DB, table string) int {
 	//nolint: gosec //This is a test helper, not used in actual production.
 	query := fmt.Sprintf("SELECT COUNT(*) FROM %s", table)
-	if err := dbh.QueryRow(query).Scan(&count); err != nil {
-		return 0, err
-	}
-	return count, nil
+
+	var count int
+	err := db.QueryRow(query).Scan(&count)
+	require.NoError(t, err, "unable to query row")
+
+	return count
 }
 
 // GetUserRows returns all rows in the User table.
-func GetUserRows(dbh *sql.DB) (api.Users, error) {
-	query := "SELECT * FROM User"
-	rows, err := dbh.Query(query)
-	if err != nil {
-		return api.Users{}, nil
-	}
+func GetUserRows(t *testing.T, db *sql.DB) api.Users {
+	rows, err := db.Query("SELECT * FROM User")
+	require.NoError(t, err, "unable to form query: %s", err.Error())
 	defer func() {
-		if err = rows.Close(); err != nil {
-			log.Printf("failed to close sql rows: %s", err.Error())
-		}
+		err = rows.Close()
+		require.NoError(t, err, "unable to close rows")
 	}()
 
 	var users api.Users
 	for rows.Next() {
 		var user api.User
-		if err = rows.Scan(&user.Id, &user.Email, &user.FirstName, &user.LastName); err != nil {
-			return api.Users{}, nil
-		}
+		err = rows.Scan(&user.Id, &user.Email, &user.FirstName, &user.LastName)
+		require.NoError(t, err, "unable to scan rows")
 		users = append(users, user)
 	}
 
-	if err = rows.Err(); err != nil {
-		return api.Users{}, nil
-	}
-	return users, nil
+	err = rows.Err()
+	require.NoError(t, err, "sql rows error")
+
+	return users
 }

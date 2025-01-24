@@ -25,8 +25,9 @@ func WithLogger(logger *zap.SugaredLogger) ServerOption {
 }
 
 type Server struct {
-	Logger *zap.SugaredLogger
-	DB     *sql.DB
+	Logger      *zap.SugaredLogger
+	DB          *sql.DB
+	TeamService TeamService
 }
 
 func NewServerWithContext(_ context.Context, db *sql.DB, serverOpts ...ServerOption) (*Server, error) {
@@ -51,8 +52,14 @@ func NewServerWithContext(_ context.Context, db *sql.DB, serverOpts ...ServerOpt
 		return nil, errors.New("db must be provided")
 	}
 
+	teamService := TeamService{
+		db:     db,
+		logger: serverLogger,
+	}
+
 	return &Server{
-		Logger: serverLogger,
-		DB:     db,
+		Logger:      serverLogger,
+		DB:          db,
+		TeamService: teamService,
 	}, nil
 }

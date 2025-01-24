@@ -57,7 +57,7 @@ func (s Server) GetUsers(w http.ResponseWriter, _ *http.Request, params GetUsers
 		}
 	}()
 
-	var users Users
+	users := Users{}
 	for rows.Next() {
 		var user User
 		err = rows.Scan(&user.Id, &user.Email, &user.FirstName, &user.LastName)

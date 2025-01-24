@@ -59,11 +59,11 @@ func WithPassword(password string) Option {
 func openAndPingDBContext(ctx context.Context, dsn string) (*sql.DB, error) {
 	db, err := sql.Open("mysql", dsn)
 	if err != nil {
-		return nil, fmt.Errorf("db: failed to open: %s", err.Error())
+		return nil, fmt.Errorf("unable to open database: %w", err)
 	}
 
 	if err = db.PingContext(ctx); err != nil {
-		return nil, fmt.Errorf("db: failed to ping db: %s", err.Error())
+		return nil, fmt.Errorf("unable to ping database: %w", err)
 	}
 
 	return db, nil
@@ -141,7 +141,7 @@ func NewDatabaseWithContext(ctx context.Context, dbOpts ...Option) (*sql.DB, err
 	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=utf8&parseTime=True&loc=Local", uname, password, dbHost, port, dbName)
 	var db *sql.DB
 	if db, err = openAndPingDBContext(ctx, dsn); err != nil {
-		return nil, fmt.Errorf("db: error opening and pinging db: %s", err.Error())
+		return nil, fmt.Errorf("unable to init database: %w", err)
 	}
 
 	return db, nil

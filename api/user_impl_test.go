@@ -47,7 +47,7 @@ func TestUser_GetUsersUserID(t *testing.T) {
 			require.Equal(t, "user doesn't exist", errMsg, "json body has correct message")
 		})
 
-		testutil.OpenAPIValidateTestHelper(t, rr, req)
+		testutil.OpenAPIValidateTest(t, rr, req)
 	})
 
 	t.Run("user found", func(t *testing.T) {
@@ -81,21 +81,21 @@ func TestUser_GetUsersUserID(t *testing.T) {
 			require.Equal(t, user, responseUser, "response body matches expected user")
 		})
 
-		testutil.OpenAPIValidateTestHelper(t, rr, req)
+		testutil.OpenAPIValidateTest(t, rr, req)
 	})
 }
 
 func TestUser_PostUsers(t *testing.T) {
 	ctx := context.Background()
-	dbh, err := database.NewDatabaseWithContext(ctx)
+	db, err := database.NewDatabaseWithContext(ctx)
 	defer func() {
-		err = dbh.Close()
+		err = db.Close()
 		require.NoError(t, err, "dbh closed")
 	}()
 	require.NoError(t, err, "NewDatabaseWithContext doesn't return error")
 
 	var server *api.Server
-	server, err = api.NewServerWithContext(ctx, dbh)
+	server, err = api.NewServerWithContext(ctx, db)
 	require.NoError(t, err, "NewServerWithContext doesn't return error")
 
 	userCreate := api.UserCreate{
@@ -103,9 +103,7 @@ func TestUser_PostUsers(t *testing.T) {
 		FirstName: "Sally",
 		LastName:  "Doe",
 	}
-	var count int
-	count, err = testutil.GetCount(dbh, "User")
-	require.NoError(t, err, "GetCount doesn't return error")
+	count := testutil.GetCount(t, db, "User")
 	user := api.User{
 		Id:        count + 1,
 		Email:     userCreate.Email,
@@ -125,7 +123,7 @@ func TestUser_PostUsers(t *testing.T) {
 		server.PostUsers(rr, req)
 		// Reset the request body for openapi validate
 		req.Body = io.NopCloser(bytes.NewBuffer(body))
-		testutil.OpenAPIValidateTestHelper(t, rr, req)
+		testutil.OpenAPIValidateTest(t, rr, req)
 
 		t.Run("returns 201 on successful insert", func(t *testing.T) {
 			var respUser api.User
@@ -145,7 +143,7 @@ func TestUser_PostUsers(t *testing.T) {
 		server.PostUsers(rr, req)
 
 		req.Body = io.NopCloser(bytes.NewBuffer(body))
-		testutil.OpenAPIValidateTestHelper(t, rr, req)
+		testutil.OpenAPIValidateTest(t, rr, req)
 
 		require.Equal(t, http.StatusBadRequest, rr.Result().StatusCode)
 		var respBody string
@@ -180,7 +178,7 @@ func TestUser_GetUsers(t *testing.T) {
 
 		server.GetUsers(rr, req, params)
 
-		testutil.OpenAPIValidateTestHelper(t, rr, req)
+		testutil.OpenAPIValidateTest(t, rr, req)
 
 		t.Run("returns 200 with users", func(t *testing.T) {
 			var respUsers api.Users
@@ -211,7 +209,7 @@ func TestUser_GetUsers(t *testing.T) {
 
 			server.GetUsers(rr, req, params)
 
-			testutil.OpenAPIValidateTestHelper(t, rr, req)
+			testutil.OpenAPIValidateTest(t, rr, req)
 
 			t.Run("returns 200 with users", func(t *testing.T) {
 				var respUsers api.Users
@@ -236,7 +234,7 @@ func TestUser_GetUsers(t *testing.T) {
 
 			server.GetUsers(rr, req, params)
 
-			testutil.OpenAPIValidateTestHelper(t, rr, req)
+			testutil.OpenAPIValidateTest(t, rr, req)
 
 			t.Run("returns 200 with users", func(t *testing.T) {
 				var respUsers api.Users
@@ -265,7 +263,7 @@ func TestUser_GetUsers(t *testing.T) {
 
 		server.GetUsers(rr, req, api.GetUsersParams{})
 
-		testutil.OpenAPIValidateTestHelper(t, rr, req)
+		testutil.OpenAPIValidateTest(t, rr, req)
 
 		var respUsers api.Users
 		require.Equal(t, http.StatusOK, rr.Result().StatusCode)
@@ -273,19 +271,38 @@ func TestUser_GetUsers(t *testing.T) {
 		require.NoError(t, err, "response body can be decoded into a User")
 		require.Len(t, respUsers, 2, "all users got")
 	})
+
+	t.Run("get non-existing users", func(t *testing.T) {
+		// Doesnt exist
+		firstName := "blah"
+		rr := httptest.NewRecorder()
+
+		req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/users?firstName=%s", firstName), nil)
+		req.Header.Add("Content-Type", "application/json")
+
+		server.GetUsers(rr, req, api.GetUsersParams{FirstName: &firstName})
+
+		testutil.OpenAPIValidateTest(t, rr, req)
+
+		var respUsers api.Users
+		require.Equal(t, http.StatusOK, rr.Result().StatusCode)
+		err = json.NewDecoder(rr.Result().Body).Decode(&respUsers)
+		require.NoError(t, err, "response body can be decoded into a User")
+		require.Empty(t, respUsers, "no users with such first name are returned")
+	})
 }
 
 func TestUser_DeleteUsersUserID(t *testing.T) {
 	ctx := context.Background()
-	dbh, err := database.NewDatabaseWithContext(ctx)
+	db, err := database.NewDatabaseWithContext(ctx)
 	defer func() {
-		err = dbh.Close()
+		err = db.Close()
 		require.NoError(t, err, "dbh closed")
 	}()
 	require.NoError(t, err, "NewDatabaseWithContext doesn't return error")
 
 	var server *api.Server
-	server, err = api.NewServerWithContext(ctx, dbh)
+	server, err = api.NewServerWithContext(ctx, db)
 	require.NoError(t, err, "NewServerWithContext doesn't return error")
 
 	t.Run("delete user that doesn't exist", func(t *testing.T) {
@@ -297,7 +314,7 @@ func TestUser_DeleteUsersUserID(t *testing.T) {
 		req.Header.Add("Content-Type", "application/json")
 
 		server.DeleteUsersUserID(rr, req, userID)
-		testutil.OpenAPIValidateTestHelper(t, rr, req)
+		testutil.OpenAPIValidateTest(t, rr, req)
 
 		require.Equal(t, http.StatusBadRequest, rr.Result().StatusCode)
 
@@ -314,12 +331,11 @@ func TestUser_DeleteUsersUserID(t *testing.T) {
 		req.Header.Add("Content-Type", "application/json")
 
 		server.DeleteUsersUserID(rr, req, userID)
-		testutil.OpenAPIValidateTestHelper(t, rr, req)
+		testutil.OpenAPIValidateTest(t, rr, req)
 
 		require.Equal(t, http.StatusOK, rr.Result().StatusCode)
 
-		var count int
-		count, err = testutil.GetCount(dbh, "User")
+		count := testutil.GetCount(t, db, "User")
 		require.NoError(t, err, "GetCount returns error")
 		require.Equal(t, 1, count, "user deleted from db")
 
