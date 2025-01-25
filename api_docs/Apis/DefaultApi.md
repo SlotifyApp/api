@@ -166,7 +166,7 @@ No authorization required
 
 <a name="postTeamsTeamIDUsersUserID"></a>
 # **postTeamsTeamIDUsersUserID**
-> PostTeamsTeamIDUsersUserID_200_response postTeamsTeamIDUsersUserID(userID, teamID)
+> String postTeamsTeamIDUsersUserID(userID, teamID)
 
 Add a user to a team
 
@@ -179,7 +179,7 @@ Add a user to a team
 
 ### Return type
 
-[**PostTeamsTeamIDUsersUserID_200_response**](../Models/PostTeamsTeamIDUsersUserID_200_response.md)
+**String**
 
 ### Authorization
 

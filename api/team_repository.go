@@ -12,6 +12,7 @@ type TeamRepositoryInterface interface {
 	AddTeam(TeamCreate) (Team, error)
 	// AddUserToTeam takes in a teamID and a userID.
 	AddUserToTeam(int, int) error
+	CheckTeamExistsByID(int) (bool, error)
 	DeleteTeamByID(int) error
 	GetAllTeamMembers(int) (Users, error)
 	GetTeamByID(int) (Team, error)
@@ -36,10 +37,10 @@ var _ TeamRepositoryInterface = (*TeamRepository)(nil)
 func (tr TeamRepository) AddUserToTeam(teamID int, userID int) error {
 	// TODO: What error is returned when teamID or userID don't exist? Make this a 400, and the rest 500
 	stmt, err := tr.db.Prepare("INSERT INTO UserToTeam (user_id, team_id) VALUES (?, ?)")
-	defer database.CloseStmt(stmt, tr.logger)
 	if err != nil {
 		return fmt.Errorf("team repository failed to add team member: %s: %w", PrepareStmtFail, err)
 	}
+	defer database.CloseStmt(stmt, tr.logger)
 	res, err := stmt.Exec(userID, teamID)
 	if err != nil {
 		return fmt.Errorf("team repository failed to execute insert stmt: %w", err)
@@ -50,13 +51,30 @@ func (tr TeamRepository) AddUserToTeam(teamID int, userID int) error {
 	}
 
 	if rows != 1 {
-		return fmt.Errorf("team repository affected rows after adding member is %d, should be 1: %w", rows, err)
+		return fmt.Errorf("team repository: %w", database.WrongNumberSQLRowsError{ActualRows: rows, ExpectedRows: 1})
 	}
 
 	return nil
 }
 
+func (tr TeamRepository) CheckTeamExistsByID(teamID int) (bool, error) {
+	var exists bool
+	if err := tr.db.QueryRow("SELECT EXISTS(SELECT 1 FROM Team WHERE id=?)", teamID).Scan(&exists); err != nil {
+		return false, fmt.Errorf("team repository: error checking team existence: %w", err)
+	}
+	return exists, nil
+}
+
 func (tr TeamRepository) GetAllTeamMembers(teamID int) (Users, error) {
+	// Check team exists first, the below join won't throw a FK error
+	exists, err := tr.CheckTeamExistsByID(teamID)
+	if err != nil {
+		return Users{}, fmt.Errorf("team repository: %w", err)
+	}
+	if !exists {
+		return Users{}, fmt.Errorf("team repository: %w: ", database.ErrTeamIDInvalid)
+	}
+
 	query := "SELECT u.* FROM Team t JOIN UserToTeam utt ON t.id=utt.team_id JOIN User u ON u.id=utt.user_id WHERE t.id=?"
 	stmt, err := tr.db.Prepare(query)
 	if err != nil {
@@ -71,7 +89,7 @@ func (tr TeamRepository) GetAllTeamMembers(teamID int) (Users, error) {
 
 	defer database.CloseRows(rows, tr.logger)
 
-	var users Users
+	users := Users{}
 	for rows.Next() {
 		var user User
 		if err = rows.Scan(&user.Id, &user.Email, &user.FirstName, &user.LastName); err != nil {
@@ -93,7 +111,7 @@ func (tr TeamRepository) GetTeamByID(teamID int) (Team, error) {
 	}
 	defer database.CloseStmt(stmt, tr.logger)
 	var team Team
-	if err = stmt.QueryRow(teamID).Scan(&team); err != nil {
+	if err = stmt.QueryRow(teamID).Scan(&team.Id, &team.Name); err != nil {
 		return Team{}, fmt.Errorf("team repository failed to get team by id, query row error, %w", err)
 	}
 	return team, nil
@@ -117,7 +135,7 @@ func (tr TeamRepository) DeleteTeamByID(teamID int) error {
 	}
 
 	if rows != 1 {
-		return fmt.Errorf("team repository affected rows after delete is %d, should be 1: %w", rows, err)
+		return fmt.Errorf("team repository: %w", database.WrongNumberSQLRowsError{ActualRows: rows, ExpectedRows: 1})
 	}
 	return nil
 }
@@ -178,7 +196,7 @@ func (tr TeamRepository) AddTeam(teamCreate TeamCreate) (Team, error) {
 		return Team{}, fmt.Errorf("team repository: %w", err)
 	}
 	if rows != 1 {
-		return Team{}, fmt.Errorf("team repository: %w", database.ErrWrongNumberRows)
+		return Team{}, fmt.Errorf("team repository: %w", database.WrongNumberSQLRowsError{ActualRows: rows, ExpectedRows: 1})
 	}
 
 	var id int64

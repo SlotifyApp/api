@@ -62,7 +62,7 @@ func (ur UserRepository) CreateUser(uc UserCreate) (User, error) {
 		return User{}, fmt.Errorf("user repository fails to get rows affected: %w", err)
 	}
 	if rows != 1 {
-		return User{}, fmt.Errorf("user repository affected rows after creating user is %d, should be 1: %w", rows, err)
+		return User{}, fmt.Errorf("user repository: %w", database.WrongNumberSQLRowsError{ActualRows: rows, ExpectedRows: 1})
 	}
 
 	var id int64
@@ -101,7 +101,7 @@ func (ur UserRepository) DeleteUserByID(userID int) error {
 		return fmt.Errorf("user repository fails to get rows affected: %w", err)
 	}
 	if rows != 1 {
-		return fmt.Errorf("user repository affected rows after deleting user is %d, should be 1: %w", rows, err)
+		return fmt.Errorf("user repository: %w", database.WrongNumberSQLRowsError{ActualRows: rows, ExpectedRows: 1})
 	}
 
 	return nil

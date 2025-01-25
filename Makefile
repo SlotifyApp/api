@@ -1,3 +1,4 @@
+
 build_image:
 	# Build API image, don't need to run this unless pushing to ECR
 	docker build -f shared/docker/api.Dockerfile --tag slotify-api .
@@ -10,9 +11,11 @@ generate_api_docs:
 	# Generate API markdown documentation using openapi spec
 	docker run --rm  -v $(shell pwd):/local openapitools/openapi-generator-cli generate -i /local/shared/openapi/openapi.yaml -g markdown     -o /local/api_docs
 
+.PHONY: generate
 generate:
 	# Generate server Go code based on openapi spec
-	go generate ./... && go mod tidy
+	go generate ./... 
+	go mod tidy
 
 lint:
 	# Run Golangci-lint for Go linting

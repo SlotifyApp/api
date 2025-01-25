@@ -3,16 +3,16 @@ package api_test
 import (
 	"bytes"
 	"context"
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 
 	"github.com/SlotifyApp/slotify-backend/api"
-	"github.com/SlotifyApp/slotify-backend/database"
+	"github.com/brianvoe/gofakeit/v7"
 	"github.com/stretchr/testify/require"
 
 	"github.com/SlotifyApp/slotify-backend/testutil"
@@ -20,241 +20,220 @@ import (
 )
 
 func TestUser_GetUsersUserID(t *testing.T) {
-	ctx := context.Background()
-	dbh, err := database.NewDatabaseWithContext(ctx)
-	defer func() {
-		err = dbh.Close()
-		require.NoError(t, err, "dbh closed")
-	}()
-	require.NoError(t, err, "NewDatabaseWithContext doesn't return error")
+	var err error
+	db, server := testutil.NewServerAndDB(t, context.Background())
+	defer testutil.CloseDB(db)
 
-	var server *api.Server
-	server, err = api.NewServerWithContext(ctx, dbh)
-	require.NoError(t, err, "NewServerWithContext doesn't return error")
+	// Setup
+	insertedUser := testutil.InsertUser(t, db)
 
-	t.Run("user not found", func(t *testing.T) {
-		rr := httptest.NewRecorder()
-		userID := 1
-		req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/users/%d", userID), nil)
+	tests := map[string]struct {
+		httpStatus   int
+		userID       int
+		expectedBody any
+		testMsg      string
+	}{
+		"user does not exist": {
+			httpStatus:   http.StatusNotFound,
+			userID:       100000,
+			expectedBody: "user api: user with id(100000) doesn't exist",
+			testMsg:      "empty array is returned when team does not exist",
+		},
+		"user exists": {
+			httpStatus:   http.StatusOK,
+			userID:       insertedUser.Id,
+			expectedBody: insertedUser,
+			testMsg:      "correctly got existing user",
+		},
+	}
 
-		server.GetUsersUserID(rr, req, userID)
+	for testName, tt := range tests {
+		t.Run(testName, func(t *testing.T) {
+			rr := httptest.NewRecorder()
+			req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/users/%d", tt.userID), nil)
+			server.GetUsersUserID(rr, req, tt.userID)
 
-		t.Run("it returns 404 when user not found", func(t *testing.T) {
-			var errMsg string
-			require.Equal(t, http.StatusNotFound, rr.Result().StatusCode)
-			err = json.NewDecoder(rr.Result().Body).Decode(&errMsg)
-			require.NoError(t, err, "response body can be decoded into string")
-			require.Equal(t, "user api: user with id(1) doesn't exist", errMsg, "json body has correct message")
+			if tt.httpStatus == http.StatusOK {
+				var user api.User
+				require.Equal(t, tt.httpStatus, rr.Result().StatusCode)
+				err = json.NewDecoder(rr.Result().Body).Decode(&user)
+				require.NoError(t, err, "response body can be decoded into string")
+				require.Equal(t, tt.expectedBody, user, "got correct body")
+			} else {
+				var errMsg string
+				require.Equal(t, tt.httpStatus, rr.Result().StatusCode)
+				err = json.NewDecoder(rr.Result().Body).Decode(&errMsg)
+				require.NoError(t, err, "response body can be decoded into string")
+				require.Equal(t, tt.expectedBody, errMsg, "json body has correct error message")
+			}
+
+			testutil.OpenAPIValidateTest(t, rr, req)
 		})
-
-		testutil.OpenAPIValidateTest(t, rr, req)
-	})
-
-	t.Run("user found", func(t *testing.T) {
-		user := api.User{
-			Id:        1,
-			FirstName: "John",
-			LastName:  "Doe",
-			Email:     "john.doe@gmail.com",
-		}
-		// Setup inserting user into db
-		var res sql.Result
-		query := "INSERT into User (first_name, last_name, email) VALUES(?, ?, ?)"
-		res, err = dbh.Exec(query, user.FirstName, user.LastName, user.Email)
-		require.NoError(t, err, "dbh insert doesn't return error")
-		var rowsAffected int64
-		rowsAffected, err = res.RowsAffected()
-		require.NoError(t, err, "dbh rowsAffected doesn't return error")
-		require.Equal(t, int64(1), rowsAffected, "one user inserted into db")
-
-		rr := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/users/%d", user.Id), nil)
-
-		server.GetUsersUserID(rr, req, user.Id)
-
-		t.Run("it returns 200 when user is found", func(t *testing.T) {
-			var responseUser api.User
-			err = json.NewDecoder(rr.Result().Body).Decode(&responseUser)
-			require.NoError(t, err, "response body can be decoded into User")
-
-			require.Equal(t, http.StatusOK, rr.Result().StatusCode)
-			require.Equal(t, user, responseUser, "response body matches expected user")
-		})
-
-		testutil.OpenAPIValidateTest(t, rr, req)
-	})
+	}
 }
 
 func TestUser_PostUsers(t *testing.T) {
-	ctx := context.Background()
-	db, err := database.NewDatabaseWithContext(ctx)
-	defer func() {
-		err = db.Close()
-		require.NoError(t, err, "dbh closed")
-	}()
-	require.NoError(t, err, "NewDatabaseWithContext doesn't return error")
-
-	var server *api.Server
-	server, err = api.NewServerWithContext(ctx, db)
-	require.NoError(t, err, "NewServerWithContext doesn't return error")
+	db, server := testutil.NewServerAndDB(t, context.Background())
+	defer testutil.CloseDB(db)
 
 	userCreate := api.UserCreate{
-		Email:     "sally.doe@gmail.com",
-		FirstName: "Sally",
-		LastName:  "Doe",
+		Email:     openapi_types.Email(gofakeit.Email()),
+		FirstName: gofakeit.FirstName(),
+		LastName:  gofakeit.LastName(),
 	}
-	count := testutil.GetCount(t, db, "User")
-	user := api.User{
-		Id:        count + 1,
-		Email:     userCreate.Email,
-		FirstName: userCreate.FirstName,
-		LastName:  userCreate.LastName,
+	insertedUser := testutil.InsertUser(t, db)
+
+	tests := map[string]struct {
+		httpStatus   int
+		userCreate   api.UserCreate
+		expectedBody any
+		testMsg      string
+	}{
+		"new user insert": {
+			httpStatus: http.StatusCreated,
+			userCreate: userCreate,
+			expectedBody: api.User{
+				Id:        testutil.GetNextAutoIncrementValue(t, db, "User"),
+				Email:     userCreate.Email,
+				FirstName: userCreate.FirstName,
+				LastName:  userCreate.LastName,
+			},
+			testMsg: "new user is successfully inserted",
+		},
+		"attempt to insert user with email that already exists": {
+			httpStatus:   http.StatusBadRequest,
+			expectedBody: fmt.Sprintf("user with email %s already exists", insertedUser.Email),
+			userCreate: api.UserCreate{
+				// Use same email but other fields don't matter
+				Email:     insertedUser.Email,
+				FirstName: gofakeit.FirstName(),
+				LastName:  gofakeit.LastName(),
+			},
+			testMsg: "correctly detect email has already been used",
+		},
 	}
 
-	var body []byte
-	body, err = json.Marshal(userCreate)
-	require.NoError(t, err, "could not marshal json req body user")
-	t.Run("new user insert", func(t *testing.T) {
-		rr := httptest.NewRecorder()
+	for testName, tt := range tests {
+		t.Run(testName, func(t *testing.T) {
+			body, err := json.Marshal(tt.userCreate)
+			require.NoError(t, err, "could not marshal json req body user")
 
-		req := httptest.NewRequest(http.MethodPost, "/users", bytes.NewReader(body))
-		req.Header.Add("Content-Type", "application/json")
+			rr := httptest.NewRecorder()
 
-		server.PostUsers(rr, req)
-		// Reset the request body for openapi validate
-		req.Body = io.NopCloser(bytes.NewBuffer(body))
-		testutil.OpenAPIValidateTest(t, rr, req)
+			req := httptest.NewRequest(http.MethodPost, "/users", bytes.NewReader(body))
+			req.Header.Add("Content-Type", "application/json")
 
-		t.Run("returns 201 on successful insert", func(t *testing.T) {
-			var respUser api.User
-			require.Equal(t, http.StatusCreated, rr.Result().StatusCode)
-			err = json.NewDecoder(rr.Result().Body).Decode(&respUser)
-			require.NoError(t, err, "response body can be decoded into a User")
-			require.Equal(t, user, respUser, "user body correct")
+			server.PostUsers(rr, req)
+			// Reset the request body for openapi validate
+			req.Body = io.NopCloser(bytes.NewBuffer(body))
+
+			testutil.OpenAPIValidateTest(t, rr, req)
+
+			if tt.httpStatus == http.StatusCreated {
+				var user api.User
+				require.Equal(t, tt.httpStatus, rr.Result().StatusCode)
+				err = json.NewDecoder(rr.Result().Body).Decode(&user)
+				require.NoError(t, err, "response body can be decoded into string")
+				require.Equal(t, tt.expectedBody, user, "got correct body")
+			} else {
+				var errMsg string
+				require.Equal(t, tt.httpStatus, rr.Result().StatusCode)
+				err = json.NewDecoder(rr.Result().Body).Decode(&errMsg)
+				require.NoError(t, err, "response body can be decoded into string")
+				require.Equal(t, tt.expectedBody, errMsg, "json body has correct error message")
+			}
+
+			testutil.OpenAPIValidateTest(t, rr, req)
 		})
-	})
-
-	t.Run("attempt to insert user with email that already exists", func(t *testing.T) {
-		rr := httptest.NewRecorder()
-
-		req := httptest.NewRequest(http.MethodPost, "/users", bytes.NewReader(body))
-		req.Header.Add("Content-Type", "application/json")
-
-		server.PostUsers(rr, req)
-
-		req.Body = io.NopCloser(bytes.NewBuffer(body))
-		testutil.OpenAPIValidateTest(t, rr, req)
-
-		require.Equal(t, http.StatusBadRequest, rr.Result().StatusCode)
-		var respBody string
-		err = json.NewDecoder(rr.Result().Body).Decode(&respBody)
-		require.NoError(t, err, "response body can be decoded into a User")
-		require.Equal(t, "user with email sally.doe@gmail.com already exists", respBody, "response body correct")
-	})
+	}
 }
 
 func TestUser_GetUsers(t *testing.T) {
-	ctx := context.Background()
-	dbh, err := database.NewDatabaseWithContext(ctx)
-	defer func() {
-		err = dbh.Close()
-		require.NoError(t, err, "dbh closed")
-	}()
-	require.NoError(t, err, "NewDatabaseWithContext doesn't return error")
+	var err error
+	db, server := testutil.NewServerAndDB(t, context.Background())
+	defer testutil.CloseDB(db)
 
-	var server *api.Server
-	server, err = api.NewServerWithContext(ctx, dbh)
-	require.NoError(t, err, "NewServerWithContext doesn't return error")
+	// Setup
+	fakeLastName := gofakeit.LastName()
+	insertedUser := testutil.InsertUser(t, db)
+	insertedUser2 := testutil.InsertUser(t, db, testutil.WithFirstName(insertedUser.FirstName))
+	insertedUser3 := testutil.InsertUser(t, db, testutil.WithLastName(insertedUser.LastName))
 
-	t.Run("get existing user by email", func(t *testing.T) {
-		var email openapi_types.Email = "sally.doe@gmail.com"
-		params := api.GetUsersParams{
-			Email: &email,
-		}
-		rr := httptest.NewRecorder()
+	tests := map[string]struct {
+		httpStatus   int
+		expectedBody any
+		testMsg      string
+		route        string
+		params       api.GetUsersParams
+	}{
+		"get existing user by email that exists": {
+			httpStatus:   http.StatusOK,
+			expectedBody: api.Users{insertedUser},
+			testMsg:      "successfully got user by email",
+			route:        fmt.Sprintf("?email=%s", url.QueryEscape(string(insertedUser.Email))),
+			params: api.GetUsersParams{
+				Email: &insertedUser.Email,
+			},
+		},
+		"get existing user by first name": {
+			httpStatus:   http.StatusOK,
+			expectedBody: api.Users{insertedUser, insertedUser2},
+			testMsg:      "successfully got users by first name",
+			route:        fmt.Sprintf("?firstName=%s", url.QueryEscape(insertedUser.FirstName)),
+			params: api.GetUsersParams{
+				FirstName: &insertedUser.FirstName,
+			},
+		},
+		"get existing user by last name": {
+			httpStatus:   http.StatusOK,
+			expectedBody: api.Users{insertedUser, insertedUser3},
+			testMsg:      "successfully got users by last name",
+			route:        fmt.Sprintf("?lastName=%s", url.QueryEscape(insertedUser.LastName)),
+			params: api.GetUsersParams{
+				LastName: &insertedUser.LastName,
+			},
+		},
+		"get users by non-existent query params": {
+			httpStatus:   http.StatusOK,
+			expectedBody: api.Users{},
+			testMsg:      "successfully got empty array of users when users don't exist by query params",
+			route:        fmt.Sprintf("?lastName=%s", url.QueryEscape(fakeLastName)),
+			params: api.GetUsersParams{
+				LastName: &fakeLastName,
+			},
+		},
+	}
 
-		req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/users?email=%s", *params.Email), nil)
-		req.Header.Add("Content-Type", "application/json")
-
-		server.GetUsers(rr, req, params)
-
-		testutil.OpenAPIValidateTest(t, rr, req)
-
-		t.Run("returns 200 with users", func(t *testing.T) {
-			var respUsers api.Users
-			require.Equal(t, http.StatusOK, rr.Result().StatusCode)
-			err = json.NewDecoder(rr.Result().Body).Decode(&respUsers)
-			require.NoError(t, err, "response body can be decoded into a User")
-			require.Len(t, respUsers, 1, "one user returned")
-			sally := respUsers[0]
-			require.Equal(t, email, sally.Email, "email is correct")
-			require.Equal(t, "Sally", sally.FirstName, "first name is correct")
-			require.Equal(t, "Doe", sally.LastName, "last name is correct")
-		})
-	})
-
-	t.Run("get existing user by names", func(t *testing.T) {
-		var email openapi_types.Email = "sally.doe@gmail.com"
-		firstName := "Sally"
-		lastName := "Doe"
-		params := api.GetUsersParams{
-			FirstName: &firstName,
-		}
-
-		t.Run("get existing user by first name", func(t *testing.T) {
+	for testName, tt := range tests {
+		t.Run(testName, func(t *testing.T) {
 			rr := httptest.NewRecorder()
 
-			req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/users?firstName=%s", firstName), nil)
+			req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/users?%s", tt.route), nil)
 			req.Header.Add("Content-Type", "application/json")
 
-			server.GetUsers(rr, req, params)
+			server.GetUsers(rr, req, tt.params)
 
 			testutil.OpenAPIValidateTest(t, rr, req)
 
-			t.Run("returns 200 with users", func(t *testing.T) {
+			if tt.httpStatus == http.StatusOK {
 				var respUsers api.Users
-				require.Equal(t, http.StatusOK, rr.Result().StatusCode)
+				require.Equal(t, tt.httpStatus, rr.Result().StatusCode)
 				err = json.NewDecoder(rr.Result().Body).Decode(&respUsers)
 				require.NoError(t, err, "response body can be decoded into a User")
-				require.Len(t, respUsers, 1, "one user returned")
-				sally := respUsers[0]
-				require.Equal(t, email, sally.Email, "email is correct")
-				require.Equal(t, firstName, sally.FirstName, "first name is correct")
-				require.Equal(t, lastName, sally.LastName, "last name is correct")
-			})
+
+				require.Equal(t, tt.expectedBody, respUsers, tt.testMsg)
+			} else {
+				var errMsg string
+				require.Equal(t, tt.httpStatus, rr.Result().StatusCode)
+				err = json.NewDecoder(rr.Result().Body).Decode(&errMsg)
+				require.NoError(t, err, "response body can be decoded into a string")
+
+				require.Equal(t, tt.expectedBody, errMsg, tt.testMsg)
+			}
 		})
+	}
 
-		t.Run("get existing user by last name", func(t *testing.T) {
-			rr := httptest.NewRecorder()
-
-			req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/users?lastName=%s", lastName), nil)
-			req.Header.Add("Content-Type", "application/json")
-			params.FirstName = nil
-			params.LastName = &lastName
-
-			server.GetUsers(rr, req, params)
-
-			testutil.OpenAPIValidateTest(t, rr, req)
-
-			t.Run("returns 200 with users", func(t *testing.T) {
-				var respUsers api.Users
-				require.Equal(t, http.StatusOK, rr.Result().StatusCode)
-				err = json.NewDecoder(rr.Result().Body).Decode(&respUsers)
-				require.NoError(t, err, "response body can be decoded into a User")
-				require.Len(t, respUsers, 2, "one user returned")
-				john := respUsers[0]
-				sally := respUsers[1]
-				require.Equal(t, openapi_types.Email("john.doe@gmail.com"), john.Email, "email is correct")
-				require.Equal(t, "John", john.FirstName, "first name is correct")
-				require.Equal(t, lastName, john.LastName, "last name is correct")
-
-				require.Equal(t, email, sally.Email, "email is correct")
-				require.Equal(t, firstName, sally.FirstName, "first name is correct")
-				require.Equal(t, lastName, sally.LastName, "last name is correct")
-			})
-		})
-	})
-
+	// Don't want to assert every user in a var, so separate test
 	t.Run("route with no query params gets all users", func(t *testing.T) {
 		rr := httptest.NewRecorder()
 
@@ -268,80 +247,62 @@ func TestUser_GetUsers(t *testing.T) {
 		var respUsers api.Users
 		require.Equal(t, http.StatusOK, rr.Result().StatusCode)
 		err = json.NewDecoder(rr.Result().Body).Decode(&respUsers)
-		require.NoError(t, err, "response body can be decoded into a User")
-		require.Len(t, respUsers, 2, "all users got")
-	})
-
-	t.Run("get non-existing users", func(t *testing.T) {
-		// Doesnt exist
-		firstName := "blah"
-		rr := httptest.NewRecorder()
-
-		req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/users?firstName=%s", firstName), nil)
-		req.Header.Add("Content-Type", "application/json")
-
-		server.GetUsers(rr, req, api.GetUsersParams{FirstName: &firstName})
-
-		testutil.OpenAPIValidateTest(t, rr, req)
-
-		var respUsers api.Users
-		require.Equal(t, http.StatusOK, rr.Result().StatusCode)
-		err = json.NewDecoder(rr.Result().Body).Decode(&respUsers)
-		require.NoError(t, err, "response body can be decoded into a User")
-		require.Empty(t, respUsers, "no users with such first name are returned")
+		require.NoError(t, err, "response body can be decoded into Users struct")
+		require.Len(t, respUsers, testutil.GetCount(t, db, "User"), "got all users from the User table")
 	})
 }
 
 func TestUser_DeleteUsersUserID(t *testing.T) {
-	ctx := context.Background()
-	db, err := database.NewDatabaseWithContext(ctx)
-	defer func() {
-		err = db.Close()
-		require.NoError(t, err, "dbh closed")
-	}()
-	require.NoError(t, err, "NewDatabaseWithContext doesn't return error")
+	var err error
+	db, server := testutil.NewServerAndDB(t, context.Background())
+	defer testutil.CloseDB(db)
 
-	var server *api.Server
-	server, err = api.NewServerWithContext(ctx, db)
-	require.NoError(t, err, "NewServerWithContext doesn't return error")
+	fakeUserID := 10000
+	tests := map[string]struct {
+		httpStatus   int
+		expectedBody any
+		testMsg      string
+		userID       int
+	}{
+		"delete user that doesn't exist": {
+			httpStatus:   http.StatusBadRequest,
+			userID:       fakeUserID,
+			expectedBody: fmt.Sprintf("user api: user with id(%d) doesn't exist", fakeUserID),
+			testMsg:      "correct error response when deleting user that does not exist",
+		},
 
-	t.Run("delete user that doesn't exist", func(t *testing.T) {
-		rr := httptest.NewRecorder()
+		"delete user that exists": {
+			httpStatus:   http.StatusBadRequest,
+			userID:       fakeUserID,
+			expectedBody: fmt.Sprintf("user api: user with id(%d) doesn't exist", fakeUserID),
+			testMsg:      "correct error response when deleting user that does not exist",
+		},
+	}
 
-		// This user doesnt exist
-		userID := 1000
-		req := httptest.NewRequest(http.MethodDelete, fmt.Sprintf("/users/%d", userID), nil)
-		req.Header.Add("Content-Type", "application/json")
+	for testName, tt := range tests {
+		t.Run(testName, func(t *testing.T) {
+			rr := httptest.NewRecorder()
 
-		server.DeleteUsersUserID(rr, req, userID)
-		testutil.OpenAPIValidateTest(t, rr, req)
+			req := httptest.NewRequest(http.MethodDelete, fmt.Sprintf("/users/%d", tt.userID), nil)
+			req.Header.Add("Content-Type", "application/json")
 
-		require.Equal(t, http.StatusBadRequest, rr.Result().StatusCode)
+			oldCount := testutil.GetCount(t, db, "User")
 
-		var body string
-		err = json.NewDecoder(rr.Result().Body).Decode(&body)
-		require.NoError(t, err, "decode returns error")
-		require.Equal(t, "user api: user with id(1000) doesn't exist", body, "correct response body")
-	})
+			server.DeleteUsersUserID(rr, req, tt.userID)
+			testutil.OpenAPIValidateTest(t, rr, req)
 
-	t.Run("delete user that exists", func(t *testing.T) {
-		rr := httptest.NewRecorder()
-		userID := 1
-		req := httptest.NewRequest(http.MethodDelete, fmt.Sprintf("/users/%d", userID), nil)
-		req.Header.Add("Content-Type", "application/json")
+			require.Equal(t, tt.httpStatus, rr.Result().StatusCode)
 
-		server.DeleteUsersUserID(rr, req, userID)
-		testutil.OpenAPIValidateTest(t, rr, req)
+			if tt.httpStatus == http.StatusOK {
+				newCount := testutil.GetCount(t, db, "User")
+				require.Equal(t, newCount, oldCount-1, "user deleted from db")
+			}
 
-		require.Equal(t, http.StatusOK, rr.Result().StatusCode)
+			var actualBody string
+			err = json.NewDecoder(rr.Result().Body).Decode(&actualBody)
+			require.NoError(t, err, "decode returns error")
 
-		count := testutil.GetCount(t, db, "User")
-		require.NoError(t, err, "GetCount returns error")
-		require.Equal(t, 1, count, "user deleted from db")
-
-		var body string
-		err = json.NewDecoder(rr.Result().Body).Decode(&body)
-		require.NoError(t, err, "decode returns error")
-		require.Equal(t, "user deleted successfully", body, "user deleted successfully")
-	})
+			require.Equal(t, tt.expectedBody, actualBody, tt.testMsg)
+		})
+	}
 }

@@ -204,6 +204,8 @@ linters-settings:
       # - name: blank-imports // cant have mysql empty import and comment above is removed
       # by gofmt
       - name: context-as-argument
+        arguments:
+          - allowTypesBefore: "*testing.T"
       - name: context-keys-type
       - name: dot-imports
       - name: error-return

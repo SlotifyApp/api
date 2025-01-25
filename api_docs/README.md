@@ -23,7 +23,6 @@ All URIs are relative to *http://localhost*
 <a name="documentation-for-models"></a>
 ## Documentation for Models
 
- - [PostTeamsTeamIDUsersUserID_200_response](./Models/PostTeamsTeamIDUsersUserID_200_response.md)
  - [Team](./Models/Team.md)
  - [TeamCreate](./Models/TeamCreate.md)
  - [User](./Models/User.md)

@@ -5,10 +5,11 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"strconv"
 
-	_ "github.com/go-sql-driver/mysql"
+	"github.com/go-sql-driver/mysql"
 )
 
 type options struct {
@@ -30,7 +31,7 @@ func WithDBName(dbName string) Option {
 
 func WithDBHost(dbHost string) Option {
 	return func(options *options) error {
-		options.dbName = &dbHost
+		options.dbHost = &dbHost
 		return nil
 	}
 }
@@ -69,16 +70,27 @@ func openAndPingDBContext(ctx context.Context, dsn string) (*sql.DB, error) {
 	return db, nil
 }
 
-// then read from env variables.
+// getDSN returns the database connection string.
+func getDSN(port uint, dbHost, uname, password, dbName string) string {
+	cfg := mysql.NewConfig()
+	cfg.User = uname
+	cfg.Passwd = password
+	cfg.Addr = fmt.Sprintf("%s:%d", dbHost, port)
+	cfg.DBName = dbName
+	cfg.Net = "tcp"
+
+	return cfg.FormatDSN()
+}
+
+// NewDatabaseWithContext will return a database
+// handle, if no options are provided then read from env variables.
 func NewDatabaseWithContext(ctx context.Context, dbOpts ...Option) (*sql.DB, error) {
 	var opts options
 	for _, opt := range dbOpts {
-		err := opt(&opts)
-		if err != nil {
+		if err := opt(&opts); err != nil {
 			return nil, err
 		}
 	}
-
 	var err error
 	var dbHost string
 	if opts.dbHost == nil {
@@ -138,7 +150,8 @@ func NewDatabaseWithContext(ctx context.Context, dbOpts ...Option) (*sql.DB, err
 		password = *opts.password
 	}
 
-	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=utf8&parseTime=True&loc=Local", uname, password, dbHost, port, dbName)
+	dsn := getDSN(port, dbHost, uname, password, dbName)
+	log.Printf("db connection string: %s", dsn)
 	var db *sql.DB
 	if db, err = openAndPingDBContext(ctx, dsn); err != nil {
 		return nil, fmt.Errorf("unable to init database: %w", err)
