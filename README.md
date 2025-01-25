@@ -37,15 +37,35 @@ fix errors after pushing.
 
 (See other options in the Makefile)
 
+## Project Structure
+
+```
+.
+├── api # API code
+├── api_docs # API Docs that were automatically generated (see below)
+├── cmd # Entry point to our API
+├── database # Database utilities
+├── generate # Defines go files for oapi-codegen generation (see below)
+├── go.mod
+├── go.sum
+├── integration # Integration tests
+├── Makefile # Defines commands to use for this app (eg. make run)
+├── oapi_codegen_cfg_schema.json # schema for oapi-codegen options (see below)
+├── README.md
+├── shared # shared repo submodule (containing docker containers and db schema)
+├── testutil # test utilities
+└── tools # Folder is needed for oapi-codegen dependencies, so it doesn't clutter our main go.mod
+```
+
 ## OpenAPI
 
 Our OpenAPI spec can be found at openapi.yaml
 
 [oapi-codegen Go lib](https://github.com/oapi-codegen/oapi-codegen) is used to generate server code
-based on openapi.yaml, so things like input validation, registering handlers among other things are
-automated.
+based on `shared/openapi/openapi.yaml`, so things like input validation,
+registering handlers among other things are automated.
 
-/api/oapi_codegen_cfg.yaml defines our oapi-codegen config (eg. what Go server to use), to see everything that can be stated in this file see the oapi_codegen_cfg_schema.json
+`/generate/oapi_codegen_cfg.yaml` defines our oapi-codegen config (eg. what Go server to use), to see everything that can be stated in this file see the oapi_codegen_cfg_schema.json
 
 Using OpenAPI means API documentation (routes, parameters, etc.) is generated for us, which can be done by doing:
 
@@ -54,3 +74,9 @@ make generate_api_docs
 ```
 
 This will regenerate the API docs which can be found under api_docs/
+
+```bash
+make generate
+```
+
+This will generate API code based on our spec into a file named `api/server.gen.go`

@@ -3,6 +3,7 @@ package api_test
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -20,9 +21,13 @@ import (
 )
 
 func TestUser_GetUsersUserID(t *testing.T) {
+	t.Parallel()
+
 	var err error
 	db, server := testutil.NewServerAndDB(t, context.Background())
-	defer testutil.CloseDB(db)
+	t.Cleanup(func() {
+		testutil.CloseDB(db)
+	})
 
 	// Setup
 	insertedUser := testutil.InsertUser(t, db)
@@ -49,6 +54,8 @@ func TestUser_GetUsersUserID(t *testing.T) {
 
 	for testName, tt := range tests {
 		t.Run(testName, func(t *testing.T) {
+			t.Parallel()
+
 			rr := httptest.NewRecorder()
 			req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/users/%d", tt.userID), nil)
 			server.GetUsersUserID(rr, req, tt.userID)
@@ -73,8 +80,12 @@ func TestUser_GetUsersUserID(t *testing.T) {
 }
 
 func TestUser_PostUsers(t *testing.T) {
+	t.Parallel()
+
 	db, server := testutil.NewServerAndDB(t, context.Background())
-	defer testutil.CloseDB(db)
+	t.Cleanup(func() {
+		testutil.CloseDB(db)
+	})
 
 	userCreate := api.UserCreate{
 		Email:     openapi_types.Email(gofakeit.Email()),
@@ -92,13 +103,7 @@ func TestUser_PostUsers(t *testing.T) {
 		"new user insert": {
 			httpStatus: http.StatusCreated,
 			userCreate: userCreate,
-			expectedBody: api.User{
-				Id:        testutil.GetNextAutoIncrementValue(t, db, "User"),
-				Email:     userCreate.Email,
-				FirstName: userCreate.FirstName,
-				LastName:  userCreate.LastName,
-			},
-			testMsg: "new user is successfully inserted",
+			testMsg:    "new user is successfully inserted",
 		},
 		"attempt to insert user with email that already exists": {
 			httpStatus:   http.StatusBadRequest,
@@ -115,6 +120,8 @@ func TestUser_PostUsers(t *testing.T) {
 
 	for testName, tt := range tests {
 		t.Run(testName, func(t *testing.T) {
+			t.Parallel()
+
 			body, err := json.Marshal(tt.userCreate)
 			require.NoError(t, err, "could not marshal json req body user")
 
@@ -134,13 +141,16 @@ func TestUser_PostUsers(t *testing.T) {
 				require.Equal(t, tt.httpStatus, rr.Result().StatusCode)
 				err = json.NewDecoder(rr.Result().Body).Decode(&user)
 				require.NoError(t, err, "response body can be decoded into string")
-				require.Equal(t, tt.expectedBody, user, "got correct body")
+
+				require.Equal(t, tt.userCreate.Email, user.Email, "email is correct")
+				require.Equal(t, tt.userCreate.FirstName, user.FirstName, "firstname is correct")
+				require.Equal(t, tt.userCreate.LastName, user.LastName, "last name is correct")
 			} else {
 				var errMsg string
 				require.Equal(t, tt.httpStatus, rr.Result().StatusCode)
 				err = json.NewDecoder(rr.Result().Body).Decode(&errMsg)
 				require.NoError(t, err, "response body can be decoded into string")
-				require.Equal(t, tt.expectedBody, errMsg, "json body has correct error message")
+				require.Equal(t, tt.expectedBody, errMsg, tt.testMsg)
 			}
 
 			testutil.OpenAPIValidateTest(t, rr, req)
@@ -149,9 +159,13 @@ func TestUser_PostUsers(t *testing.T) {
 }
 
 func TestUser_GetUsers(t *testing.T) {
+	t.Parallel()
+
 	var err error
 	db, server := testutil.NewServerAndDB(t, context.Background())
-	defer testutil.CloseDB(db)
+	t.Cleanup(func() {
+		testutil.CloseDB(db)
+	})
 
 	// Setup
 	fakeLastName := gofakeit.LastName()
@@ -206,6 +220,8 @@ func TestUser_GetUsers(t *testing.T) {
 
 	for testName, tt := range tests {
 		t.Run(testName, func(t *testing.T) {
+			t.Parallel()
+
 			rr := httptest.NewRecorder()
 
 			req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/users?%s", tt.route), nil)
@@ -235,12 +251,19 @@ func TestUser_GetUsers(t *testing.T) {
 
 	// Don't want to assert every user in a var, so separate test
 	t.Run("route with no query params gets all users", func(t *testing.T) {
+		var tx *sql.Tx
+		tx, err = db.Begin()
+		require.NoError(t, err, "could not begin transaction")
+
 		rr := httptest.NewRecorder()
 
 		req := httptest.NewRequest(http.MethodGet, "/users", nil)
 		req.Header.Add("Content-Type", "application/json")
 
+		count := testutil.GetCount(t, db, "User")
 		server.GetUsers(rr, req, api.GetUsersParams{})
+		err = tx.Commit()
+		require.NoError(t, err, "failed to commit transaction")
 
 		testutil.OpenAPIValidateTest(t, rr, req)
 
@@ -248,14 +271,18 @@ func TestUser_GetUsers(t *testing.T) {
 		require.Equal(t, http.StatusOK, rr.Result().StatusCode)
 		err = json.NewDecoder(rr.Result().Body).Decode(&respUsers)
 		require.NoError(t, err, "response body can be decoded into Users struct")
-		require.Len(t, respUsers, testutil.GetCount(t, db, "User"), "got all users from the User table")
+		require.Len(t, respUsers, count, "got all users from the User table")
 	})
 }
 
 func TestUser_DeleteUsersUserID(t *testing.T) {
+	t.Parallel()
+
 	var err error
 	db, server := testutil.NewServerAndDB(t, context.Background())
-	defer testutil.CloseDB(db)
+	t.Cleanup(func() {
+		testutil.CloseDB(db)
+	})
 
 	fakeUserID := 10000
 	tests := map[string]struct {
@@ -281,8 +308,9 @@ func TestUser_DeleteUsersUserID(t *testing.T) {
 
 	for testName, tt := range tests {
 		t.Run(testName, func(t *testing.T) {
-			rr := httptest.NewRecorder()
+			t.Parallel()
 
+			rr := httptest.NewRecorder()
 			req := httptest.NewRequest(http.MethodDelete, fmt.Sprintf("/users/%d", tt.userID), nil)
 			req.Header.Add("Content-Type", "application/json")
 

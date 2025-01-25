@@ -13,13 +13,18 @@ import (
 
 	"github.com/SlotifyApp/slotify-backend/api"
 	"github.com/SlotifyApp/slotify-backend/testutil"
+	"github.com/brianvoe/gofakeit/v7"
 	"github.com/stretchr/testify/require"
 )
 
 func TestTeam_GetTeams(t *testing.T) {
+	t.Parallel()
+
 	var err error
 	db, server := testutil.NewServerAndDB(t, context.Background())
-	defer testutil.CloseDB(db)
+	t.Cleanup(func() {
+		testutil.CloseDB(db)
+	})
 
 	insertedTeam := testutil.InsertTeam(t, db)
 
@@ -46,6 +51,8 @@ func TestTeam_GetTeams(t *testing.T) {
 
 	for testName, tt := range tests {
 		t.Run(testName, func(t *testing.T) {
+			t.Parallel()
+
 			params := api.GetTeamsParams{
 				Name: &tt.teamName,
 			}
@@ -68,10 +75,16 @@ func TestTeam_GetTeams(t *testing.T) {
 }
 
 func TestTeam_PostTeams(t *testing.T) {
-	db, server := testutil.NewServerAndDB(t, context.Background())
-	defer testutil.CloseDB(db)
+	t.Parallel()
 
+	db, server := testutil.NewServerAndDB(t, context.Background())
+	t.Cleanup(func() {
+		testutil.CloseDB(db)
+	})
+
+	// Setup
 	insertedTeam := testutil.InsertTeam(t, db)
+	newTeamName := gofakeit.ProductName()
 
 	tests := map[string]struct {
 		httpStatus       int
@@ -81,14 +94,10 @@ func TestTeam_PostTeams(t *testing.T) {
 		testMsg          string
 	}{
 		"team inserted correctly": {
-			httpStatus: 201,
-			teamName:   "NewTeam",
+			httpStatus: http.StatusCreated,
+			teamName:   newTeamName,
 			teamBody: api.TeamCreate{
-				Name: "NewTeam",
-			},
-			expectedRespBody: api.Team{
-				Id:   testutil.GetNextAutoIncrementValue(t, db, "Team") - 1,
-				Name: "NewTeam",
+				Name: newTeamName,
 			},
 			testMsg: "team made successfully",
 		},
@@ -104,6 +113,8 @@ func TestTeam_PostTeams(t *testing.T) {
 
 	for testName, tt := range tests {
 		t.Run(testName, func(t *testing.T) {
+			t.Parallel()
+
 			body, err := json.Marshal(tt.teamBody)
 			require.NoError(t, err, "could not marshal json req body team")
 			rr := httptest.NewRecorder()
@@ -117,6 +128,7 @@ func TestTeam_PostTeams(t *testing.T) {
 				require.Equal(t, tt.httpStatus, rr.Result().StatusCode)
 				err = json.NewDecoder(rr.Result().Body).Decode(&team)
 				require.NoError(t, err, "response cannot be decoded into Team struct")
+
 				require.Equal(t, tt.teamName, team.Name, tt.testMsg)
 			} else {
 				var errMsg string
@@ -133,9 +145,13 @@ func TestTeam_PostTeams(t *testing.T) {
 }
 
 func TestTeam_DeleteTeamsTeamID(t *testing.T) {
+	t.Parallel()
+
 	var err error
 	db, server := testutil.NewServerAndDB(t, context.Background())
-	defer testutil.CloseDB(db)
+	t.Cleanup(func() {
+		testutil.CloseDB(db)
+	})
 
 	teamInserted := testutil.InsertTeam(t, db)
 
@@ -148,7 +164,7 @@ func TestTeam_DeleteTeamsTeamID(t *testing.T) {
 		"deleting team that doesn't exist": {
 			expectedRespBody: "team api: incorrect team ID",
 			httpStatus:       http.StatusBadRequest,
-			teamID:           1000,
+			teamID:           10000,
 			testMsg:          "team that doesn't exist, returns client error",
 		}, "deleting team that exists": {
 			expectedRespBody: "team api: team deleted successfully",
@@ -160,6 +176,8 @@ func TestTeam_DeleteTeamsTeamID(t *testing.T) {
 
 	for testName, tt := range tests {
 		t.Run(testName, func(t *testing.T) {
+			t.Parallel()
+
 			rr := httptest.NewRecorder()
 			req := httptest.NewRequest(http.MethodDelete, fmt.Sprintf("/teams/%d", tt.teamID), nil)
 
@@ -176,9 +194,13 @@ func TestTeam_DeleteTeamsTeamID(t *testing.T) {
 }
 
 func TestTeam_GetTeamsTeamID(t *testing.T) {
+	t.Parallel()
+
 	var err error
 	db, server := testutil.NewServerAndDB(t, context.Background())
-	defer testutil.CloseDB(db)
+	t.Cleanup(func() {
+		testutil.CloseDB(db)
+	})
 
 	teamInserted := testutil.InsertTeam(t, db)
 
@@ -204,6 +226,8 @@ func TestTeam_GetTeamsTeamID(t *testing.T) {
 
 	for testName, tt := range tests {
 		t.Run(testName, func(t *testing.T) {
+			t.Parallel()
+
 			rr := httptest.NewRecorder()
 			req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/teams/%d", tt.teamID), nil)
 
@@ -228,9 +252,13 @@ func TestTeam_GetTeamsTeamID(t *testing.T) {
 }
 
 func TestTeam_PostTeamsTeamIDUsersUserID(t *testing.T) {
+	t.Parallel()
+
 	var err error
 	db, server := testutil.NewServerAndDB(t, context.Background())
-	defer testutil.CloseDB(db)
+	t.Cleanup(func() {
+		testutil.CloseDB(db)
+	})
 
 	teamInserted := testutil.InsertTeam(t, db)
 
@@ -279,6 +307,8 @@ func TestTeam_PostTeamsTeamIDUsersUserID(t *testing.T) {
 
 	for testName, tt := range tests {
 		t.Run(testName, func(t *testing.T) {
+			t.Parallel()
+
 			rr := httptest.NewRecorder()
 			req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/teams/%d/users/%d", tt.teamID, tt.userID), nil)
 
@@ -296,9 +326,13 @@ func TestTeam_PostTeamsTeamIDUsersUserID(t *testing.T) {
 }
 
 func TestTeam_GetTeamsTeamIDUsers(t *testing.T) {
+	t.Parallel()
+
 	var err error
 	db, server := testutil.NewServerAndDB(t, context.Background())
-	defer testutil.CloseDB(db)
+	t.Cleanup(func() {
+		testutil.CloseDB(db)
+	})
 
 	teamInserted := testutil.InsertTeam(t, db)
 
@@ -330,6 +364,8 @@ func TestTeam_GetTeamsTeamIDUsers(t *testing.T) {
 
 	for testName, tt := range tests {
 		t.Run(testName, func(t *testing.T) {
+			t.Parallel()
+
 			rr := httptest.NewRecorder()
 			req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/teams/%d/users", tt.teamID), nil)
 
