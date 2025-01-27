@@ -6,12 +6,13 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/SlotifyApp/slotify-backend/api"
+	"github.com/SlotifyApp/slotify-backend/database"
 	"github.com/getkin/kin-openapi/openapi3"
 	chi_middleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/httprate"
 	"github.com/gorilla/mux"
 	oapi_middleware "github.com/oapi-codegen/nethttp-middleware"
-	"github.com/saths008/slotify-backend/api"
 )
 
 const (
@@ -39,9 +40,15 @@ func main() {
 		log.Fatalf("error getting swagger/openapi spec: %s", err.Error())
 	}
 	ctx := context.Background()
-	server, err := api.NewServerWithContext(ctx)
+
+	db, err := database.NewDatabaseWithContext(ctx)
 	if err != nil {
-		log.Fatalf("error creating new server: %s", err.Error())
+		log.Fatalf("error creating db: %s", err.Error())
+	}
+
+	server, err := api.NewServerWithContext(ctx, db)
+	if err != nil {
+		log.Fatalf("error creating server: %s", err.Error())
 	}
 
 	r := mux.NewRouter()

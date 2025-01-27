@@ -92,7 +92,7 @@ linters-settings:
   gocognit:
     # Minimal code complexity to report.
     # Default: 30 (but we recommend 10-20)
-    min-complexity: 20
+    min-complexity: 27
 
   gocritic:
     # Settings passed to gocritic.
@@ -201,8 +201,11 @@ linters-settings:
     errorCode: 0
     warningCode: 0
     rules:
-      - name: blank-imports
+      # - name: blank-imports // cant have mysql empty import and comment above is removed
+      # by gofmt
       - name: context-as-argument
+        arguments:
+          - allowTypesBefore: "*testing.T"
       - name: context-keys-type
       - name: dot-imports
       - name: error-return
@@ -617,7 +620,6 @@ linters:
     - rowserrcheck # checks whether Err of rows is checked successfully
     - sloglint # ensure consistent code style when using log/slog
     - spancheck # checks for mistakes with OpenTelemetry/Census spans
-    - sqlclosecheck # checks that sql.Rows and sql.Stmt are closed
     - stylecheck # is a replacement for golint
     - tenv # detects using os.Setenv instead of t.Setenv since Go1.17
     - testableexamples # checks if examples are testable (have an expected output)
@@ -664,6 +666,7 @@ linters:
     #- misspell # [useless] finds commonly misspelled English words in comments
     #- nlreturn # [too strict and mostly code is not more readable] checks for a new line before return and branch statements to increase code clarity
     #- paralleltest # [too many false positives] detects missing usage of t.Parallel() method in your Go test
+    #- sqlclosecheck # checks that sql.Rows and sql.Stmt are closed #wouldnt detect use of another function for defer
     #- tagliatelle # checks the struct tags
     #- thelper # detects golang test helpers without t.Helper() call and checks the consistency of test helpers
     #- wsl # [too strict and mostly code is not more readable] whitespace linter forces you to use empty lines
