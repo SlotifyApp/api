@@ -159,8 +159,6 @@ func TestUser_PostUsers(t *testing.T) {
 }
 
 func TestUser_GetUsers(t *testing.T) {
-	t.Parallel()
-
 	var err error
 	db, server := testutil.NewServerAndDB(t, context.Background())
 	t.Cleanup(func() {
@@ -168,7 +166,7 @@ func TestUser_GetUsers(t *testing.T) {
 	})
 
 	// Setup
-	fakeLastName := gofakeit.LastName()
+	fakeLastName := gofakeit.LastName() + "blah"
 	insertedUser := testutil.InsertUser(t, db)
 	insertedUser2 := testutil.InsertUser(t, db, testutil.WithFirstName(insertedUser.FirstName))
 	insertedUser3 := testutil.InsertUser(t, db, testutil.WithLastName(insertedUser.LastName))
