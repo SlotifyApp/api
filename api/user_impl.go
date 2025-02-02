@@ -8,6 +8,7 @@ import (
 	"net/http"
 
 	"github.com/SlotifyApp/slotify-backend/database"
+	"github.com/SlotifyApp/slotify-backend/jwt"
 	"go.uber.org/zap"
 )
 
@@ -33,9 +34,8 @@ func (s Server) PostUsers(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 	if err = json.NewDecoder(r.Body).Decode(&userBody); err != nil {
-		errMsg := "failed to unmarshal request body correctly"
-		s.Logger.Error(errMsg, zap.Object("body", userBody), zap.Error(err))
-		sendError(w, http.StatusBadRequest, errMsg)
+		s.Logger.Error(ErrUnmarshalBody, zap.Object("body", userBody), zap.Error(err))
+		sendError(w, http.StatusBadRequest, ErrUnmarshalBody.Error())
 		return
 	}
 
@@ -88,4 +88,49 @@ func (s Server) GetUsersUserID(w http.ResponseWriter, _ *http.Request, userID in
 	}
 
 	SetHeaderAndWriteResponse(w, http.StatusOK, user)
+}
+
+// (GET /user).
+func (s Server) GetUser(w http.ResponseWriter, r *http.Request) {
+	tk, _ := jwt.GetJWTFromRequest(r)
+	claims, _ := jwt.ParseJWT(tk, jwt.AccessTokenJWTSecretEnv)
+	userID := claims.UserID
+
+	var user User
+	var err error
+	if user, err = s.UserRepository.GetUserByID(userID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			errMsg := fmt.Sprintf("user api: user with id(%d) doesn't exist", userID)
+			s.Logger.Error(errMsg, zap.Int("userID", userID), zap.Error(err))
+			sendError(w, http.StatusNotFound, errMsg)
+		} else {
+			errMsg := fmt.Sprintf("user api: failed to get user with id(%d)", userID)
+			s.Logger.Error(errMsg, zap.Int("userID", userID), zap.Error(err))
+			sendError(w, http.StatusBadRequest, errMsg)
+		}
+		return
+	}
+
+	SetHeaderAndWriteResponse(w, http.StatusOK, user)
+}
+
+// (POST /user/logout).
+func (s Server) PostUserLogout(w http.ResponseWriter, r *http.Request) {
+	userID, err := jwt.GetUserIDFromReq(r)
+	if err != nil {
+		s.Logger.Error("jwt not valid in logout", zap.Error(err))
+		RemoveCookies(w)
+		// still logout successfully, dont return error on logout
+		SetHeaderAndWriteResponse(w, http.StatusOK, "Logging out")
+		return
+	}
+
+	// Remove refresh token from db
+	if err = s.RefreshTokenRepository.DeleteRefreshTokenByUserID(userID); err != nil {
+		// no need to return early here
+		s.Logger.Errorf("failed to logout user", zap.Int("userID", userID), zap.Error(err))
+	}
+
+	RemoveCookies(w)
+	SetHeaderAndWriteResponse(w, http.StatusOK, "Logging out")
 }

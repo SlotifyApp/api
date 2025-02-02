@@ -45,6 +45,12 @@ type UserCreate struct {
 	LastName  string              `json:"lastName"`
 }
 
+// GetAPIAuthCallbackParams defines parameters for GetAPIAuthCallback.
+type GetAPIAuthCallbackParams struct {
+	Code  string `form:"code" json:"code"`
+	State string `form:"state" json:"state"`
+}
+
 // GetTeamsParams defines parameters for GetTeams.
 type GetTeamsParams struct {
 	// Name Team name
@@ -71,9 +77,15 @@ type PostUsersJSONRequestBody = UserCreate
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// Auth route for authorisation code flow
+	// (GET /api/auth/callback)
+	GetAPIAuthCallback(w http.ResponseWriter, r *http.Request, params GetAPIAuthCallbackParams)
 	// Healthcheck route
 	// (GET /healthcheck)
 	GetHealthcheck(w http.ResponseWriter, r *http.Request)
+	// Create new Slotify access token and refresh token
+	// (POST /refresh)
+	PostRefresh(w http.ResponseWriter, r *http.Request)
 	// Get a team by query params
 	// (GET /teams)
 	GetTeams(w http.ResponseWriter, r *http.Request, params GetTeamsParams)
@@ -92,6 +104,12 @@ type ServerInterface interface {
 	// Add a user to a team
 	// (POST /teams/{teamID}/users/{userID})
 	PostTeamsTeamIDUsersUserID(w http.ResponseWriter, r *http.Request, teamID int, userID int)
+	// Get a user by id passed by JWT
+	// (GET /user)
+	GetUser(w http.ResponseWriter, r *http.Request)
+	// Logout user
+	// (POST /user/logout)
+	PostUserLogout(w http.ResponseWriter, r *http.Request)
 	// Get a user by query params
 	// (GET /users)
 	GetUsers(w http.ResponseWriter, r *http.Request, params GetUsersParams)
@@ -115,11 +133,74 @@ type ServerInterfaceWrapper struct {
 
 type MiddlewareFunc func(http.Handler) http.Handler
 
+// GetAPIAuthCallback operation middleware
+func (siw *ServerInterfaceWrapper) GetAPIAuthCallback(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetAPIAuthCallbackParams
+
+	// ------------- Required query parameter "code" -------------
+
+	if paramValue := r.URL.Query().Get("code"); paramValue != "" {
+
+	} else {
+		siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "code"})
+		return
+	}
+
+	err = runtime.BindQueryParameter("form", true, true, "code", r.URL.Query(), &params.Code)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "code", Err: err})
+		return
+	}
+
+	// ------------- Required query parameter "state" -------------
+
+	if paramValue := r.URL.Query().Get("state"); paramValue != "" {
+
+	} else {
+		siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "state"})
+		return
+	}
+
+	err = runtime.BindQueryParameter("form", true, true, "state", r.URL.Query(), &params.State)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "state", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAPIAuthCallback(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetHealthcheck operation middleware
 func (siw *ServerInterfaceWrapper) GetHealthcheck(w http.ResponseWriter, r *http.Request) {
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetHealthcheck(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PostRefresh operation middleware
+func (siw *ServerInterfaceWrapper) PostRefresh(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PostRefresh(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -270,6 +351,34 @@ func (siw *ServerInterfaceWrapper) PostTeamsTeamIDUsersUserID(w http.ResponseWri
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.PostTeamsTeamIDUsersUserID(w, r, teamID, userID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetUser operation middleware
+func (siw *ServerInterfaceWrapper) GetUser(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetUser(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PostUserLogout operation middleware
+func (siw *ServerInterfaceWrapper) PostUserLogout(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PostUserLogout(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -499,7 +608,11 @@ func HandlerWithOptions(si ServerInterface, options GorillaServerOptions) http.H
 		ErrorHandlerFunc:   options.ErrorHandlerFunc,
 	}
 
+	r.HandleFunc(options.BaseURL+"/api/auth/callback", wrapper.GetAPIAuthCallback).Methods("GET")
+
 	r.HandleFunc(options.BaseURL+"/healthcheck", wrapper.GetHealthcheck).Methods("GET")
+
+	r.HandleFunc(options.BaseURL+"/refresh", wrapper.PostRefresh).Methods("POST")
 
 	r.HandleFunc(options.BaseURL+"/teams", wrapper.GetTeams).Methods("GET")
 
@@ -512,6 +625,10 @@ func HandlerWithOptions(si ServerInterface, options GorillaServerOptions) http.H
 	r.HandleFunc(options.BaseURL+"/teams/{teamID}/users", wrapper.GetTeamsTeamIDUsers).Methods("GET")
 
 	r.HandleFunc(options.BaseURL+"/teams/{teamID}/users/{userID}", wrapper.PostTeamsTeamIDUsersUserID).Methods("POST")
+
+	r.HandleFunc(options.BaseURL+"/user", wrapper.GetUser).Methods("GET")
+
+	r.HandleFunc(options.BaseURL+"/user/logout", wrapper.PostUserLogout).Methods("POST")
 
 	r.HandleFunc(options.BaseURL+"/users", wrapper.GetUsers).Methods("GET")
 
@@ -527,24 +644,30 @@ func HandlerWithOptions(si ServerInterface, options GorillaServerOptions) http.H
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"H4sIAAAAAAAC/9RYXW/bNhT9KwS3hxUQImfNXvTWLFtmYCgKNHkq+sBIVzZbkVRJqoFh6L8P90qyJVuy",
-	"5I+02UvlSuT9Oude8mTNY6Nyo0F7x6M1d/ESlKCfDyAUPnNrcrBeAr2VCf6rpJaqUDy6Drhf5cAjLrWH",
-	"BVheBlwLBbiq/uK8lXrByzLgFr4V0kLCo09oqV76eWPEPH2B2KMN9P6nBeFhP4Zp9gdNPzqw+0ZBCZnh",
-	"j9RYJTyP6jfBrpuAp9I6/74/iGBShTIxaKCvSk0kW8ctE0MpDlXvYolOT+LI+HG71Kkhw9Jn+O1jZrxM",
-	"V+xWxF9BJ+zdhzkP+HewThrNI359NbuaYVQmBy1yySP+ll4FPBd+SZmHSxCZX8ZLiL/i/xfg8YHFEV4a",
-	"PU94xO/B/9Nahom43GhXFe/32QwfsdEeNO0WeZ7JmPaHXxzG0nRRX13KgCfgYitzX8Xd8sVcEcfgXFpk",
-	"VEFXKCXsameRNYUH+h56EModSuSBFmAFrFDgwToefVrvRICLmK5AkfjiWwF21fRmxOtPwzl9PrNG0kOV",
-	"xq8WUh7xX8LtTArrgRTSNCo3VBHWilVfPSllpoSPl1IvmF8Co3xYqwZlwG+qGLt7b0XCkLbgPPsNrhZX",
-	"AZP6u8hkwnxTpDc70NyDZ6L6/LRquyI3uXE9yHwwbgNN7e/WJKujijZWq7r7y24reltAuQfX9UU9D6HC",
-	"YgopadE8W7WwuFxPnYJjVS8mmIZnWtVqsXCNj/ldWVEmg2qsdkG9o/cE6wOtHuu794UCK2M2v2MmJaJS",
-	"cN6w2kXdjji+tt3oG9tdUNv9eejoObtZR4tf1aGu9ADUx8ElkzfV3pv9vdXwMp6lptDJDqZVKK32lAka",
-	"Ojgtz8UOjb9K4E5p23vjh3CcgEXA/+iD+6NR4Gk4P4P27NkavWCYp9WCzB+YrzLpa8uwcATTegq0j7R2",
-	"BN8urq8T0EnHJt11JxybVJUOzFsUb2ZvX2w+B02LM+marm8x53I++1jXR7UsYwrUE1bDpDXzhjkXrvFR",
-	"nwwjh32Lfo+0aToJ0Uk/CYvG0okkDP6PzB8FG+vbJbNIEjyTzDazCadRi/w99o2tbxMDp8+7JGGCoEO/",
-	"bSaNjqtJM+ovFFUIVpsdO3f3Rnhtazcm+vYZ8TeKNrozjThrq7thsPbs/yummd8Ixp+uRY4bqi+jReZ3",
-	"/UqE+HaUEmnI9hJKpPV3iB+sRCqMBkbDiBI5F4mOliiqQJq275wYh7XEEUfF/n20mTuHtMS5h8cP0xLF",
-	"7jw/BSwyQmAN3F+JGqNaommww1riItgNaomfDdwpjYda4iI4bpvuFBy7U5L0RFn+FwAA//+hVjwMBhcA",
-	"AA==",
+	"H4sIAAAAAAAC/9RYTW/bOBP+KwTf97AFhMhtuhfd0qbtpgiKoknQQ9EDLY4sthKpkqNmvYH/+4KkZH1Y",
+	"suQ4abOXOJbo+XrmmQ/e0VjlhZIg0dDojmowhZIG3JcbyUpMlRb/AH+jtdL2IQcTa1GgUJJG9CyOwRiC",
+	"6jtIIgzJhTFCrojSRMifLBOcbjYBNXEKOXNCr4Hl9rPQqgCNwqsS3P7NhRR5mdPoeUBxXQCNqJAIK9B0",
+	"E1DJcrCnqjcGtZArJ17Dj1Jo4DT6YiVVR79uhajlN4jRyrDaX2tgCLs2zJM/KvrGgN4VCjkTmf0nUTpn",
+	"SKPqSdBXE9BEaIMfho0IZkUoY6MChqJUW9IobokYc3Eseg/m6HwnDrTf5iHEpRa4vrL56O1eAtOgz0pM",
+	"m29vaxfef76mVfZaSf5t41KKWNCNFSxkopzBAjP75ipTKJI1ecXi7yA5Oft4QQP6E7TxvHl+sjhZWG9V",
+	"AZIVgkb01D0KaMEwdZaFrBChZWAYsyxbsvi7fboCtB829MyS8ILTiL4DPPt4YZ14XR+1gjTLAUEbGn25",
+	"o8Lq/VGCXtcEiWisuA1aE1TUJdR0HQRgWI5BmxOHCPoadGvN6eLFbnW5Kl15ScqM2DjQgKbAuHPojl6q",
+	"mPlz/Z9dp0BuPl0SVEQDFxpitP+zBEET05UJEkUlp20u/M3yIqsxjsIwUzHLUmUwOl0sFiFnJl0qpvlu",
+	"fm9cQpgyz5le2xJZYkq0KhFIojSpSqpxOokFgCSZunXpGabAMkzjFPZj/VfrWC+OLxYL+xEriSDdr1lR",
+	"ZJWL4Tfj4zWOyyboBbOlqxU72vWxfci56t3RkGgwjliFMgO+fFQGP1WHdhx5/rCONMmUrUllGXDCWh3M",
+	"EvKl1/t/DQmN6P/Cpj+GW/vC3c7YjYcvkkTCLakrQVsPYZLXJtSabbwQWG72AX/tDuxQu5f+wHIifTkc",
+	"Imv1aj43D80pgeDdGApiNQqEbg7YbNnDtGbrIdicyyRnGKd2sMAUiPOHtGLgYFvsFoJXzIb5RwkGyR9w",
+	"sjoJ6qmEYB2kZz3o3gES5l8v121VTs14GtfQVPpeKb4+KGhTsar67qbbBG2Z3RzJnGmUhlEhsTOJt8pC",
+	"tm5h8XDUvQ+OFQWZIyF6N2qKhXf24+J841MmAz/QdEE9d88drNfu9BTvPpQ5aBGTi3OiEpeozjhUpFJR",
+	"0dE2+IaNWMse7537hr6jyToZfB+HKtIjUB8Gl+DP/G9fDvRuh6dCkqhS8h6m3pQWPe16EeyvlsdiZ4U/",
+	"SeDuQ9t3CsdwnIFFQP8cgvtK5YCuON+CRHKrlVwR66eWzInfU1+r/bBHy7A01ZA3A9obd3YC3y6uTxPQ",
+	"WW3TbZkz2qaLSgfmBsWXi9NHq89BTXEiTHMFsM2cBxznBrJuKNWyjOSQL200VFJl3njOhXf2o+oME82+",
+	"lX437kfzk9AqGU7CspZ0zyQM/ouZPwm2jW83mRnntiepxrMZ3aiV/APyla6miZHuc8Y5YQ46t022Mqms",
+	"rn7GqtWNh/vRyr0vCsPlvuyH7t5t++L82TEL0kiTcaEfC7lvFs4F1yxIwYwBbr+8/3zdBD/M1EqVuJ+0",
+	"VtOlP/fY+drZNTO1WgEnqkSiJFn6G6Geo94uXxe2XpmpnJpse29yJjLL/3bB6a2D9S1a497UDd5ukXkr",
+	"tEE3hk8oa1/V7b1l6sq/ZPPEb2//fvt6e1iffpz11hF2D5/mL7d1sj3Gctu6VP7Fy+1Y2XQlaWK5PRaJ",
+	"znrao31nCNm/nh4wfeyuOHUr27eeHjuP/LL19EH6nBOy7XOHdqvteto0rH3r6YNgN7qe/m7gntC8cuzU",
+	"4e70/w0AAP//fmMNKyodAAA=",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file

@@ -35,7 +35,6 @@ func NewTeamRepository(logger *zap.SugaredLogger, db *sql.DB) TeamRepository {
 var _ TeamRepositoryInterface = (*TeamRepository)(nil)
 
 func (tr TeamRepository) AddUserToTeam(teamID int, userID int) error {
-	// TODO: What error is returned when teamID or userID don't exist? Make this a 400, and the rest 500
 	stmt, err := tr.db.Prepare("INSERT INTO UserToTeam (user_id, team_id) VALUES (?, ?)")
 	if err != nil {
 		return fmt.Errorf("team repository failed to add team member: %s: %w", PrepareStmtFail, err)
@@ -51,7 +50,7 @@ func (tr TeamRepository) AddUserToTeam(teamID int, userID int) error {
 	}
 
 	if rows != 1 {
-		return fmt.Errorf("team repository: %w", database.WrongNumberSQLRowsError{ActualRows: rows, ExpectedRows: 1})
+		return fmt.Errorf("team repository: %w", database.WrongNumberSQLRowsError{ActualRows: rows, ExpectedRows: []int64{1}})
 	}
 
 	return nil
@@ -135,7 +134,7 @@ func (tr TeamRepository) DeleteTeamByID(teamID int) error {
 	}
 
 	if rows != 1 {
-		return fmt.Errorf("team repository: %w", database.WrongNumberSQLRowsError{ActualRows: rows, ExpectedRows: 1})
+		return fmt.Errorf("team repository: %w", database.WrongNumberSQLRowsError{ActualRows: rows, ExpectedRows: []int64{1}})
 	}
 	return nil
 }
@@ -196,7 +195,8 @@ func (tr TeamRepository) AddTeam(teamCreate TeamCreate) (Team, error) {
 		return Team{}, fmt.Errorf("team repository: %w", err)
 	}
 	if rows != 1 {
-		return Team{}, fmt.Errorf("team repository: %w", database.WrongNumberSQLRowsError{ActualRows: rows, ExpectedRows: 1})
+		return Team{}, fmt.Errorf("team repository: %w",
+			database.WrongNumberSQLRowsError{ActualRows: rows, ExpectedRows: []int64{1}})
 	}
 
 	var id int64

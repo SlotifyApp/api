@@ -6,13 +6,17 @@ All URIs are relative to *http://localhost*
 |------------- | ------------- | -------------|
 | [**deleteTeamsTeamID**](DefaultApi.md#deleteTeamsTeamID) | **DELETE** /teams/{teamID} | Delete a team by id |
 | [**deleteUsersUserID**](DefaultApi.md#deleteUsersUserID) | **DELETE** /users/{userID} | Delete a user by id |
+| [**getAPIAuthCallback**](DefaultApi.md#getAPIAuthCallback) | **GET** /api/auth/callback | Auth route for authorisation code flow |
 | [**getTeamsTeamID**](DefaultApi.md#getTeamsTeamID) | **GET** /teams/{teamID} | Get a team by id |
 | [**getTeamsTeamIDUsers**](DefaultApi.md#getTeamsTeamIDUsers) | **GET** /teams/{teamID}/users | Get all members of a team |
 | [**getUsersUserID**](DefaultApi.md#getUsersUserID) | **GET** /users/{userID} | Get a user by id |
 | [**healthcheckGet**](DefaultApi.md#healthcheckGet) | **GET** /healthcheck | Healthcheck route |
 | [**postTeamsTeamIDUsersUserID**](DefaultApi.md#postTeamsTeamIDUsersUserID) | **POST** /teams/{teamID}/users/{userID} | Add a user to a team |
+| [**refreshPost**](DefaultApi.md#refreshPost) | **POST** /refresh | Create new Slotify access token and refresh token |
 | [**teamsGet**](DefaultApi.md#teamsGet) | **GET** /teams | Get a team by query params |
 | [**teamsPost**](DefaultApi.md#teamsPost) | **POST** /teams | Create a new team |
+| [**userGet**](DefaultApi.md#userGet) | **GET** /user | Get a user by id passed by JWT |
+| [**userLogoutPost**](DefaultApi.md#userLogoutPost) | **POST** /user/logout | Logout user |
 | [**usersGet**](DefaultApi.md#usersGet) | **GET** /users | Get a user by query params |
 | [**usersPost**](DefaultApi.md#usersPost) | **POST** /users | Create a new user |
 
@@ -66,6 +70,32 @@ No authorization required
 
 - **Content-Type**: Not defined
 - **Accept**: application/json
+
+<a name="getAPIAuthCallback"></a>
+# **getAPIAuthCallback**
+> getAPIAuthCallback(code, state)
+
+Auth route for authorisation code flow
+
+### Parameters
+
+|Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **code** | **String**|  | [default to null] |
+| **state** | **String**|  | [default to null] |
+
+### Return type
+
+null (empty response body)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: Not defined
 
 <a name="getTeamsTeamID"></a>
 # **getTeamsTeamID**
@@ -190,6 +220,28 @@ No authorization required
 - **Content-Type**: Not defined
 - **Accept**: application/json
 
+<a name="refreshPost"></a>
+# **refreshPost**
+> String refreshPost()
+
+Create new Slotify access token and refresh token
+
+### Parameters
+This endpoint does not need any parameter.
+
+### Return type
+
+**String**
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: application/json
+
 <a name="teamsGet"></a>
 # **teamsGet**
 > List teamsGet(name)
@@ -238,6 +290,50 @@ No authorization required
 ### HTTP request headers
 
 - **Content-Type**: application/json
+- **Accept**: application/json
+
+<a name="userGet"></a>
+# **userGet**
+> User userGet()
+
+Get a user by id passed by JWT
+
+### Parameters
+This endpoint does not need any parameter.
+
+### Return type
+
+[**User**](../Models/User.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: application/json
+
+<a name="userLogoutPost"></a>
+# **userLogoutPost**
+> String userLogoutPost()
+
+Logout user
+
+### Parameters
+This endpoint does not need any parameter.
+
+### Return type
+
+**String**
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
 - **Accept**: application/json
 
 <a name="usersGet"></a>

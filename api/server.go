@@ -26,10 +26,12 @@ func WithLogger(logger *zap.SugaredLogger) ServerOption {
 }
 
 type Server struct {
-	Logger         *zap.SugaredLogger
-	DB             *sql.DB
-	TeamRepository TeamRepository
-	UserRepository UserRepository
+	Logger                           *zap.SugaredLogger
+	DB                               *sql.DB
+	RefreshTokenRepository           RefreshTokenRepository
+	TeamRepository                   TeamRepository
+	UserRepository                   UserRepository
+	UserToMSFTRefreshTokenRepository UserToMSFTRefreshTokenRepository
 }
 
 func NewServerWithContext(_ context.Context, db *sql.DB, serverOpts ...ServerOption) (*Server, error) {
@@ -57,19 +59,17 @@ func NewServerWithContext(_ context.Context, db *sql.DB, serverOpts ...ServerOpt
 		return nil, errors.New("db must be provided")
 	}
 
-	teamRepository := TeamRepository{
-		db:     db,
-		logger: serverLogger,
-	}
-	userRepository := UserRepository{
-		db:     db,
-		logger: serverLogger,
-	}
+	refreshTokenRepository := NewRefreshTokenRepository(serverLogger, db)
+	teamRepository := NewTeamRepository(serverLogger, db)
+	userRepository := NewUserRepository(serverLogger, db)
+	userToMSFTRefreshTokenRepository := NewUserToMSFTRefreshTokenRepository(serverLogger, db)
 
 	return &Server{
-		Logger:         serverLogger,
-		DB:             db,
-		TeamRepository: teamRepository,
-		UserRepository: userRepository,
+		Logger:                           serverLogger,
+		DB:                               db,
+		RefreshTokenRepository:           refreshTokenRepository,
+		TeamRepository:                   teamRepository,
+		UserRepository:                   userRepository,
+		UserToMSFTRefreshTokenRepository: userToMSFTRefreshTokenRepository,
 	}, nil
 }

@@ -78,6 +78,7 @@ func getDSN(port uint, dbHost, uname, password, dbName string) string {
 	cfg.Addr = fmt.Sprintf("%s:%d", dbHost, port)
 	cfg.DBName = dbName
 	cfg.Net = "tcp"
+	cfg.ParseTime = true
 
 	return cfg.FormatDSN()
 }

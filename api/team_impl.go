@@ -28,9 +28,8 @@ func (s Server) PostTeams(w http.ResponseWriter, r *http.Request) {
 	var teamBody PostTeamsJSONRequestBody
 	var err error
 	if err = json.NewDecoder(r.Body).Decode(&teamBody); err != nil {
-		errMsg := "failed to unmarshal request body correctly"
-		s.Logger.Error(errMsg, zap.Object("body", teamBody), zap.Error(err))
-		sendError(w, http.StatusBadRequest, errMsg)
+		s.Logger.Error(ErrUnmarshalBody, zap.Object("body", teamBody), zap.Error(err))
+		sendError(w, http.StatusBadRequest, ErrUnmarshalBody.Error())
 		return
 	}
 	var team Team
