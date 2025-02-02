@@ -7,7 +7,8 @@ All URIs are relative to *http://localhost*
 
 | Class | Method | HTTP request | Description |
 |------------ | ------------- | ------------- | -------------|
-| *DefaultApi* | [**deleteTeamsTeamID**](Apis/DefaultApi.md#deleteteamsteamid) | **DELETE** /teams/{teamID} | Delete a team by id |
+| *DefaultApi* | [**calendarMeGet**](Apis/DefaultApi.md#calendarmeget) | **GET** /calendar/me | get a user's calendar events |
+*DefaultApi* | [**deleteTeamsTeamID**](Apis/DefaultApi.md#deleteteamsteamid) | **DELETE** /teams/{teamID} | Delete a team by id |
 *DefaultApi* | [**deleteUsersUserID**](Apis/DefaultApi.md#deleteusersuserid) | **DELETE** /users/{userID} | Delete a user by id |
 *DefaultApi* | [**getAPIAuthCallback**](Apis/DefaultApi.md#getapiauthcallback) | **GET** /api/auth/callback | Auth route for authorisation code flow |
 *DefaultApi* | [**getTeamsTeamID**](Apis/DefaultApi.md#getteamsteamid) | **GET** /teams/{teamID} | Get a team by id |
@@ -27,6 +28,7 @@ All URIs are relative to *http://localhost*
 <a name="documentation-for-models"></a>
 ## Documentation for Models
 
+ - [CalendarEvent](./Models/CalendarEvent.md)
  - [Team](./Models/Team.md)
  - [TeamCreate](./Models/TeamCreate.md)
  - [User](./Models/User.md)

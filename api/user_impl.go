@@ -72,9 +72,9 @@ func (s Server) DeleteUsersUserID(w http.ResponseWriter, _ *http.Request, userID
 
 // (GET /users/{userID}) Get a user by id.
 func (s Server) GetUsersUserID(w http.ResponseWriter, _ *http.Request, userID int) {
-	var user User
+	var uq UserQuery
 	var err error
-	if user, err = s.UserRepository.GetUserByID(userID); err != nil {
+	if uq, err = s.UserRepository.GetUserByID(userID); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			errMsg := fmt.Sprintf("user api: user with id(%d) doesn't exist", userID)
 			s.Logger.Error(errMsg, zap.Int("userID", userID), zap.Error(err))
@@ -87,18 +87,20 @@ func (s Server) GetUsersUserID(w http.ResponseWriter, _ *http.Request, userID in
 		return
 	}
 
-	SetHeaderAndWriteResponse(w, http.StatusOK, user)
+	SetHeaderAndWriteResponse(w, http.StatusOK, uq.User)
 }
 
 // (GET /user).
 func (s Server) GetUser(w http.ResponseWriter, r *http.Request) {
-	tk, _ := jwt.GetJWTFromRequest(r)
-	claims, _ := jwt.ParseJWT(tk, jwt.AccessTokenJWTSecretEnv)
-	userID := claims.UserID
+	userID, err := jwt.GetUserIDFromReq(r)
+	if err != nil {
+		s.Logger.Error("failed to get userid from request access token")
+		sendError(w, http.StatusUnauthorized, "Try again later.")
+		return
+	}
 
-	var user User
-	var err error
-	if user, err = s.UserRepository.GetUserByID(userID); err != nil {
+	var uq UserQuery
+	if uq, err = s.UserRepository.GetUserByID(userID); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			errMsg := fmt.Sprintf("user api: user with id(%d) doesn't exist", userID)
 			s.Logger.Error(errMsg, zap.Int("userID", userID), zap.Error(err))
@@ -111,7 +113,7 @@ func (s Server) GetUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	SetHeaderAndWriteResponse(w, http.StatusOK, user)
+	SetHeaderAndWriteResponse(w, http.StatusOK, uq.User)
 }
 
 // (POST /user/logout).

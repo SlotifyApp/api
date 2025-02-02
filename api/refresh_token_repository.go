@@ -2,84 +2,12 @@ package api
 
 import (
 	"database/sql"
-	"errors"
 	"fmt"
 
 	"github.com/SlotifyApp/slotify-backend/database"
 	"github.com/SlotifyApp/slotify-backend/jwt"
 	"go.uber.org/zap"
 )
-
-// Refers to the UserToMSFTRefreshToken table.
-type UserToMSFTRefreshTokenRepositoryInterface interface {
-	// Stores/Updates the Microsoft OAuth refresh token tied to a specific user
-	StoreMicrosoftRefreshToken(int, string) error
-	// Returns Microsoft refresh token of a user. If the user doesn't have one, then error is returned
-	GetMicrosoftRefreshToken(int) (string, error)
-}
-
-type UserToMSFTRefreshTokenRepository struct {
-	logger *zap.SugaredLogger
-	db     *sql.DB
-}
-
-func NewUserToMSFTRefreshTokenRepository(logger *zap.SugaredLogger, db *sql.DB) UserToMSFTRefreshTokenRepository {
-	return UserToMSFTRefreshTokenRepository{
-		logger: logger,
-		db:     db,
-	}
-}
-
-// check UserToMSFTRefreshTokenRepository conforms to the interface.
-var _ UserToMSFTRefreshTokenRepositoryInterface = (*UserToMSFTRefreshTokenRepository)(nil)
-
-func (utm UserToMSFTRefreshTokenRepository) GetMicrosoftRefreshToken(userID int) (string, error) {
-	var stmt *sql.Stmt
-	var err error
-	if stmt, err = utm.db.Prepare("SELECT * FROM UserToMSFTRefreshToken WHERE user_id=?"); err != nil {
-		return "", fmt.Errorf("user to msft refresh tok repository: %s: %w", PrepareStmtFail, err)
-	}
-	defer database.CloseStmt(stmt, utm.logger)
-
-	var refreshToken string
-	if err = stmt.QueryRow(userID).Scan(&refreshToken); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return "", nil
-		}
-		return "", fmt.Errorf("user to msft refresh tok repository failed to scan: %w", err)
-	}
-
-	return refreshToken, nil
-}
-
-func (utm UserToMSFTRefreshTokenRepository) StoreMicrosoftRefreshToken(userID int, msftTok string) error {
-	var stmt *sql.Stmt
-	var err error
-	// If that row already exists for a user, then
-	// replace it. Otherwise insert
-	if stmt, err = utm.db.Prepare("REPLACE INTO UserToMSFTRefreshToken (user_id, token) VALUES (?, ?)"); err != nil {
-		return fmt.Errorf("userToMicrosoftRefreshToken repository: %s: %w", PrepareStmtFail, err)
-	}
-	defer database.CloseStmt(stmt, utm.logger)
-
-	var res sql.Result
-	if res, err = stmt.Exec(userID, msftTok); err != nil {
-		return fmt.Errorf("userToMicrosoftRefreshToken repository: %s: %w", QueryDBFail, err)
-	}
-	var rows int64
-	if rows, err = res.RowsAffected(); err != nil {
-		return fmt.Errorf("userToMicrosoftRefreshToken repository failed to get rows affected: %w", err)
-	}
-	// REPLACE will affect either 1 or 2 rows dependent on whether
-	// the db is updating an existing row
-	if rows < 1 || rows > 2 {
-		return fmt.Errorf("userToMicrosoftRefreshToken repository: %w",
-			database.WrongNumberSQLRowsError{ActualRows: rows, ExpectedRows: []int64{1, 2}},
-		)
-	}
-
-	return nil
-}
 
 // Refers to the RefreshToken table.
 type RefreshTokenRepositoryInterface interface {

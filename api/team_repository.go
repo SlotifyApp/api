@@ -90,11 +90,11 @@ func (tr TeamRepository) GetAllTeamMembers(teamID int) (Users, error) {
 
 	users := Users{}
 	for rows.Next() {
-		var user User
-		if err = rows.Scan(&user.Id, &user.Email, &user.FirstName, &user.LastName); err != nil {
+		var uq UserQuery
+		if err = rows.Scan(&uq.Id, &uq.Email, &uq.FirstName, &uq.LastName, &uq.HomeAccountID); err != nil {
 			return Users{}, fmt.Errorf("team repository failed to scan rows: %w", err)
 		}
-		users = append(users, user)
+		users = append(users, uq.User)
 	}
 
 	if err = rows.Err(); err != nil {

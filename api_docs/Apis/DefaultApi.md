@@ -4,6 +4,7 @@ All URIs are relative to *http://localhost*
 
 | Method | HTTP request | Description |
 |------------- | ------------- | -------------|
+| [**calendarMeGet**](DefaultApi.md#calendarMeGet) | **GET** /calendar/me | get a user&#39;s calendar events |
 | [**deleteTeamsTeamID**](DefaultApi.md#deleteTeamsTeamID) | **DELETE** /teams/{teamID} | Delete a team by id |
 | [**deleteUsersUserID**](DefaultApi.md#deleteUsersUserID) | **DELETE** /users/{userID} | Delete a user by id |
 | [**getAPIAuthCallback**](DefaultApi.md#getAPIAuthCallback) | **GET** /api/auth/callback | Auth route for authorisation code flow |
@@ -20,6 +21,28 @@ All URIs are relative to *http://localhost*
 | [**usersGet**](DefaultApi.md#usersGet) | **GET** /users | Get a user by query params |
 | [**usersPost**](DefaultApi.md#usersPost) | **POST** /users | Create a new user |
 
+
+<a name="calendarMeGet"></a>
+# **calendarMeGet**
+> List calendarMeGet()
+
+get a user&#39;s calendar events
+
+### Parameters
+This endpoint does not need any parameter.
+
+### Return type
+
+[**List**](../Models/CalendarEvent.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: application/json
 
 <a name="deleteTeamsTeamID"></a>
 # **deleteTeamsTeamID**

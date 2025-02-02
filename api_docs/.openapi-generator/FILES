@@ -1,4 +1,5 @@
 Apis/DefaultApi.md
+Models/CalendarEvent.md
 Models/Team.md
 Models/TeamCreate.md
 Models/User.md

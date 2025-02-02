@@ -6,18 +6,13 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"os"
 	"strings"
-	"time"
 
 	"github.com/SlotifyApp/slotify-backend/jwt"
-	"github.com/coreos/go-oidc/v3/oidc"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 
 	openapi_types "github.com/oapi-codegen/runtime/types"
-
-	"golang.org/x/oauth2"
 )
 
 const (
@@ -159,41 +154,12 @@ type MSFTEntraValues struct {
 	TenantID     string
 }
 
-// MSFTEntraValues and error.
-func getMSFTEntraValues() (MSFTEntraValues, error) {
-	var tenantID string
-	var clientID string
-	var clientSecret string
-	var present bool
-	// Check if the microsoft entra environment vars are set
-	if tenantID, present = os.LookupEnv(TenantIDEnvName); !present {
-		return MSFTEntraValues{}, fmt.Errorf("failed to get %s env variable", TenantIDEnvName)
-	}
-
-	if clientID, present = os.LookupEnv(ClientIDEnvName); !present {
-		return MSFTEntraValues{}, fmt.Errorf("failed to get %s env variable", ClientIDEnvName)
-	}
-
-	if clientSecret, present = os.LookupEnv(ClientSecretEnvName); !present {
-		return MSFTEntraValues{}, fmt.Errorf("failed to get %s env variable", ClientSecretEnvName)
-	}
-
-	return MSFTEntraValues{
-		ClientID:     clientID,
-		ClientSecret: clientSecret,
-		TenantID:     tenantID,
-	}, nil
-}
-
 type AccessAndRefreshTokens struct {
 	AccessToken  string
 	RefreshToken string
 }
 
-func createAndStoreTokens(userID int, email string, msftRefreshTk string,
-	rtr RefreshTokenRepository,
-	utmr UserToMSFTRefreshTokenRepository,
-) (AccessAndRefreshTokens, error) {
+func createAndStoreTokens(userID int, email string, rtr RefreshTokenRepository) (AccessAndRefreshTokens, error) {
 	var accessToken string
 	var err error
 	if accessToken, err = jwt.CreateNewJWT(userID, email, jwt.AccessTokenJWTSecretEnv); err != nil {
@@ -206,35 +172,30 @@ func createAndStoreTokens(userID int, email string, msftRefreshTk string,
 		return AccessAndRefreshTokens{}, fmt.Errorf("failed to create refresh token: %w", err)
 	}
 
-	if err = utmr.StoreMicrosoftRefreshToken(userID, msftRefreshTk); err != nil {
-		return AccessAndRefreshTokens{}, fmt.Errorf("failed to store refresh token: %w", err)
-	}
-
 	return AccessAndRefreshTokens{
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
 	}, nil
 }
 
-// the email or it will create a new user and return this user.
-func getUserByClaimEmail(claimEmail string, claimName string, ur UserRepository) (User, error) {
+// getUserByClaimEmail will get user by the claim email or it will create a new user and return this user.
+func getUserByClaimEmail(ur UserRepository, msftTokenRes MSFTTokenResult) (User, error) {
+	email := msftTokenRes.Email
 	var users Users
 	var err error
 	users, err = ur.GetUsersByQueryParams(GetUsersParams{
-		Email: (*openapi_types.Email)(&claimEmail),
+		Email: (*openapi_types.Email)(&email),
 	})
 	if err != nil {
 		return User{}, fmt.Errorf("failed to get user from claim email: %w", err)
 	}
 
-	firstName, lastName := splitName(claimName)
-
 	var u User
 	if len(users) == 0 {
 		u, err = ur.CreateUser(UserCreate{
-			Email:     openapi_types.Email(claimEmail),
-			FirstName: firstName,
-			LastName:  lastName,
+			Email:     openapi_types.Email(email),
+			FirstName: msftTokenRes.FirstName,
+			LastName:  msftTokenRes.LastName,
 		})
 		if err != nil {
 			return User{}, fmt.Errorf("failed to create user for claim email: %w", err)
@@ -243,91 +204,30 @@ func getUserByClaimEmail(claimEmail string, claimName string, ur UserRepository)
 		u = users[0]
 	}
 
+	if err = ur.UpdateUserHomeAccountID(u.Id, msftTokenRes.HomeAccountID); err != nil {
+		return User{}, fmt.Errorf("failed to update user home account id: %w", err)
+	}
+
 	return u, nil
 }
 
 func (s Server) GetAPIAuthCallback(w http.ResponseWriter, r *http.Request, params GetAPIAuthCallbackParams) {
-	msftEntraVals, err := getMSFTEntraValues()
+	msftTokenRes, err := MSFTAuthoriseByCode(context.Background(), s.MSALClient, params.Code)
 	if err != nil {
-		s.Logger.Error("failed to get msft entra values", zap.Error(err))
-		sendError(w, http.StatusInternalServerError, "sorry, try again later")
+		s.Logger.Error("failed to get microsoft tokens", zap.Error(err))
+		sendError(w, http.StatusInternalServerError, "Sorry, try again later. Failed to get Microsoft tokens.")
 		return
 	}
 
-	// Acquire token by authorization code
-	discoveryBaseURL := "https://login.microsoftonline.com/organizations/v2.0"
-	issuerURL := fmt.Sprintf("https://login.microsoftonline.com/%s/v2.0", msftEntraVals.TenantID)
-
-	ctx := oidc.InsecureIssuerURLContext(context.Background(), issuerURL)
-	provider, err := oidc.NewProvider(ctx, discoveryBaseURL)
-	if err != nil {
-		s.Logger.Error("failed to create open id provider", zap.Error(err))
-		sendError(w, http.StatusInternalServerError, "failed to create open id provider")
-		return
-	}
-
-	scopes := []string{
-		oidc.ScopeOpenID, "profile", "email", "User.ReadWrite",
-		"Calendars.ReadBasic", "Calendars.Read", "Calendars.ReadWrite",
-		"Calendars.ReadWrite.Shared", "offline_access",
-	}
-
-	conf := &oauth2.Config{
-		ClientID:     msftEntraVals.ClientID,
-		ClientSecret: msftEntraVals.ClientSecret,
-		Scopes:       scopes,
-		RedirectURL:  "http://localhost:8080/api/auth/callback",
-		Endpoint: oauth2.Endpoint{
-			TokenURL: provider.Endpoint().TokenURL,
-		},
-	}
-
-	// Use the custom HTTP client when requesting a token.
-	httpClient := &http.Client{Timeout: HTTPClientTimeOutSecs * time.Second}
-	ctx = context.WithValue(ctx, oauth2.HTTPClient, httpClient)
-
-	tok, err := conf.Exchange(ctx, params.Code)
-	if err != nil {
-		s.Logger.Error("failed to get access token", zap.Error(err))
-		sendError(w, http.StatusInternalServerError, "failed to get access token")
-		return
-	}
-	rawIDToken, ok := tok.Extra("id_token").(string)
-	if !ok {
-		s.Logger.Error("failed to get id token", zap.Error(err))
-		sendError(w, http.StatusInternalServerError, "failed to get id token")
-		return
-	}
-
-	verifier := provider.Verifier(&oidc.Config{ClientID: msftEntraVals.ClientID})
-	// Parse and verify ID Token payload.
-	idToken, err := verifier.Verify(ctx, rawIDToken)
-	if err != nil {
-		s.Logger.Error("failed to verify id token", zap.Error(err))
-		sendError(w, http.StatusInternalServerError, "failed to verify id token")
-		return
-	}
-
-	// Extract custom claims
-	var claims struct {
-		Email string `json:"email"`
-		Name  string `json:"name"`
-	}
-	if err = idToken.Claims(&claims); err != nil {
-		s.Logger.Error("failed to scan claims", zap.Error(err))
-		sendError(w, http.StatusInternalServerError, "failed to scan claims")
-		return
-	}
 	var u User
-	if u, err = getUserByClaimEmail(claims.Email, claims.Name, s.UserRepository); err != nil {
+	if u, err = getUserByClaimEmail(s.UserRepository, msftTokenRes); err != nil {
 		s.Logger.Error("failed to get user for claim email", zap.Error(err))
 		sendError(w, http.StatusInternalServerError, "Sorry, try again later")
 		return
 	}
 
 	var tks AccessAndRefreshTokens
-	if tks, err = createAndStoreTokens(u.Id, string(u.Email), tok.RefreshToken,
-		s.RefreshTokenRepository, s.UserToMSFTRefreshTokenRepository); err != nil {
+	if tks, err = createAndStoreTokens(u.Id, string(u.Email), s.RefreshTokenRepository); err != nil {
 		s.Logger.Error("failed to create and store tokens", zap.Error(err))
 		sendError(w, http.StatusInternalServerError, "sorry, try again")
 		return
@@ -369,8 +269,8 @@ func (s Server) PostRefresh(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Generate new access token and new refresh token
-	var u User
-	if u, err = s.UserRepository.GetUserByID(userID); err != nil {
+	var uq UserQuery
+	if uq, err = s.UserRepository.GetUserByID(userID); err != nil {
 		s.Logger.Error("Failed to refresh token", zap.Error(err))
 		sendError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -378,14 +278,14 @@ func (s Server) PostRefresh(w http.ResponseWriter, r *http.Request) {
 
 	// Create new access token
 	var accessToken string
-	if accessToken, err = jwt.CreateNewJWT(userID, string(u.Email), jwt.AccessTokenJWTSecretEnv); err != nil {
+	if accessToken, err = jwt.CreateNewJWT(userID, string(uq.Email), jwt.AccessTokenJWTSecretEnv); err != nil {
 		s.Logger.Error("Failed to refresh token", zap.Error(err))
 		sendError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
 	// Create new refresh token
-	if refreshToken, err = s.RefreshTokenRepository.CreateRefreshToken(userID, string(u.Email)); err != nil {
+	if refreshToken, err = s.RefreshTokenRepository.CreateRefreshToken(userID, string(uq.Email)); err != nil {
 		s.Logger.Error("Failed to refresh token", zap.Error(err))
 		sendError(w, http.StatusInternalServerError, err.Error())
 		return
