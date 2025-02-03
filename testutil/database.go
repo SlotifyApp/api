@@ -27,29 +27,6 @@ func GetCount(t *testing.T, db *sql.DB, table string) int {
 	return count
 }
 
-// GetUserRows returns all rows in the User table.
-func GetUserRows(t *testing.T, db *sql.DB) api.Users {
-	rows, err := db.Query("SELECT * FROM User")
-	require.NoError(t, err, "unable to form query")
-	defer func() {
-		err = rows.Close()
-		require.NoError(t, err, "unable to close rows")
-	}()
-
-	var users api.Users
-	for rows.Next() {
-		var uq api.UserQuery
-		err = rows.Scan(&uq.Id, &uq.Email, &uq.FirstName, &uq.LastName, &uq.HomeAccountID)
-		require.NoError(t, err, "unable to scan rows")
-		users = append(users, uq.User)
-	}
-
-	err = rows.Err()
-	require.NoError(t, err, "sql rows error")
-
-	return users
-}
-
 func GetTeamRows(t *testing.T, db *sql.DB) api.Teams {
 	rows, err := db.Query("SELECT * FROM Team")
 	require.NoError(t, err, "unable to form query")
@@ -89,7 +66,7 @@ func GetNextAutoIncrementValue(t *testing.T, db *sql.DB, tableName string) int {
 	return nextAutoIncrement
 }
 
-func AddUserToTeam(t *testing.T, db *sql.DB, userID int, teamID int) {
+func AddUserToTeam(t *testing.T, db *sql.DB, userID uint32, teamID uint32) {
 	res, err := db.Exec("INSERT INTO UserToTeam (user_id, team_id) VALUES (?, ?)", userID, teamID)
 	require.NoError(t, err, "failed to execute sql query to add user to team")
 
@@ -113,14 +90,15 @@ func InsertTeam(t *testing.T, db *sql.DB) api.Team {
 	require.NoError(t, err, "failed to get last insert id")
 
 	return api.Team{
-		Id:   int(id),
+		//nolint: gosec // id is unsigned 32 bit int
+		Id:   uint32(id),
 		Name: name,
 	}
 }
 
 // NewServerAndDB creates a server and a db, test fails
 // if any errors are returned.
-func NewServerAndDB(t *testing.T, ctx context.Context) (*sql.DB, *api.Server) {
+func NewServerAndDB(t *testing.T, ctx context.Context) (*database.Database, *api.Server) {
 	db, err := database.NewDatabaseWithContext(ctx)
 	require.NoError(t, err, "error creating database handle")
 	require.NotNil(t, db, "db handle cannot be nil")
@@ -207,7 +185,8 @@ func InsertUser(t *testing.T, db *sql.DB, userOpts ...UserOption) api.User {
 	require.NoError(t, err, "failed to get last insert id")
 
 	return api.User{
-		Id:        int(id),
+		//nolint: gosec // id is unsigned 32 bit int
+		Id:        uint32(id),
 		Email:     openapi_types.Email(email),
 		FirstName: firstName,
 		LastName:  lastName,

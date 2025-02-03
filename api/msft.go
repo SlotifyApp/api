@@ -10,6 +10,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 	"github.com/AzureAD/microsoft-authentication-library-for-go/apps/confidential"
+	"github.com/SlotifyApp/slotify-backend/database"
 	"github.com/coreos/go-oidc/v3/oidc"
 	msgraphsdk "github.com/microsoftgraph/msgraph-sdk-go"
 )
@@ -84,20 +85,36 @@ func createMSALClient() (confidential.Client, error) {
 
 // GetMSFTAccessToken gets a MSFT access token for a user.
 func GetMSFTAccessToken(ctx context.Context, c *confidential.Client,
-	ur UserRepositoryInterface, userID int,
+	db *database.Database, userID uint32,
 ) (azcore.AccessToken, error) {
-	user, err := ur.GetUserByID(userID)
+	ctx, cancel := context.WithTimeout(ctx, database.DatabaseTimeout)
+	defer cancel()
+
+	user, err := db.GetUserByID(ctx, userID)
 	if err != nil {
-		return azcore.AccessToken{}, fmt.Errorf("failed to get user by id: %w", err)
+		switch {
+		case errors.Is(err, context.Canceled):
+			log.Print("getMSFTaccesstoken: context cancelled")
+			return azcore.AccessToken{},
+				fmt.Errorf("failed to get user by id: context cancelled: %w", err)
+		case errors.Is(err, context.DeadlineExceeded):
+			log.Print("getMSFTaccesstoken: query timed out")
+			return azcore.AccessToken{},
+				fmt.Errorf("failed to get user by id: query timed out: %w", err)
+		default:
+			log.Print("getMSFTaccesstoken: query timed out")
+			return azcore.AccessToken{},
+				fmt.Errorf("failed to get user by id: %w", err)
+		}
 	}
 
 	// HomeAccountID is NULL, should not happen. This is set when a user logs in.
-	if !user.HomeAccountID.Valid {
+	if !user.MsftHomeAccountID.Valid {
 		return azcore.AccessToken{}, errors.New("msft_home_account_id was null")
 	}
 
 	// msal attempts to get account cache, if this fails user has to reauthenticate
-	account, err := c.Account(ctx, user.HomeAccountID.String)
+	account, err := c.Account(ctx, user.MsftHomeAccountID.String)
 	if err != nil {
 		return azcore.AccessToken{}, fmt.Errorf("msal failed to get account by home account id: %w: %w", ErrMSALCache, err)
 	}
@@ -136,8 +153,6 @@ func MSFTAuthoriseByCode(ctx context.Context, c *confidential.Client, authCode s
 	if res.Account.IsZero() {
 		return MSFTTokenResult{}, errors.New("msft id token was zero value")
 	}
-
-	log.Printf("account: %+v", res.Account)
 
 	firstName := res.IDToken.GivenName
 	lastName := res.IDToken.FamilyName

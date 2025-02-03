@@ -9,7 +9,7 @@ import (
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
-func CreateJWT(t *testing.T, userID int, email openapi_types.Email) string {
+func CreateJWT(t *testing.T, userID uint32, email openapi_types.Email) string {
 	jwt, err := jwt.CreateNewJWT(userID, string(email), jwt.AccessTokenJWTSecretEnv)
 
 	require.NoError(t, err, "failed to create jwt token")

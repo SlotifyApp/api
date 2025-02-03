@@ -17,7 +17,7 @@ func (s Server) GetAPICalendarMe(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	at, err := GetMSFTAccessToken(context.Background(), s.MSALClient, s.UserRepository, userID)
+	at, err := GetMSFTAccessToken(context.Background(), s.MSALClient, s.DB, userID)
 	if err != nil {
 		s.Logger.Error("failed to get microsoft access token", zap.Error(err))
 		sendError(w, http.StatusUnauthorized, "Try again later.")

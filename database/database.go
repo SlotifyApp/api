@@ -8,8 +8,14 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"time"
 
 	"github.com/go-sql-driver/mysql"
+)
+
+const (
+	// DatabaseTimeout defines the time limit spent in the database.
+	DatabaseTimeout = 10 * time.Second
 )
 
 type options struct {
@@ -83,9 +89,15 @@ func getDSN(port uint, dbHost, uname, password, dbName string) string {
 	return cfg.FormatDSN()
 }
 
+// Database is a struct that wraps sql.DB and sqlc's queries.
+type Database struct {
+	DB *sql.DB
+	Queries
+}
+
 // NewDatabaseWithContext will return a database
 // handle, if no options are provided then read from env variables.
-func NewDatabaseWithContext(ctx context.Context, dbOpts ...Option) (*sql.DB, error) {
+func NewDatabaseWithContext(ctx context.Context, dbOpts ...Option) (*Database, error) {
 	var opts options
 	for _, opt := range dbOpts {
 		if err := opt(&opts); err != nil {
@@ -150,7 +162,6 @@ func NewDatabaseWithContext(ctx context.Context, dbOpts ...Option) (*sql.DB, err
 	} else {
 		password = *opts.password
 	}
-
 	dsn := getDSN(port, dbHost, uname, password, dbName)
 	log.Printf("db connection string: %s", dsn)
 	var db *sql.DB
@@ -158,5 +169,14 @@ func NewDatabaseWithContext(ctx context.Context, dbOpts ...Option) (*sql.DB, err
 		return nil, fmt.Errorf("unable to init database: %w", err)
 	}
 
-	return db, nil
+	queries := New(db)
+	if queries == nil {
+		return nil, fmt.Errorf("unable to init sqlc queries: %w", err)
+	}
+	database := Database{
+		DB:      db,
+		Queries: *queries,
+	}
+
+	return &database, nil
 }

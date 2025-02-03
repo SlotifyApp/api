@@ -24,7 +24,8 @@ func TestUser_GetUsersUserID(t *testing.T) {
 	t.Parallel()
 
 	var err error
-	db, server := testutil.NewServerAndDB(t, context.Background())
+	database, server := testutil.NewServerAndDB(t, context.Background())
+	db := database.DB
 	t.Cleanup(func() {
 		testutil.CloseDB(db)
 	})
@@ -34,7 +35,7 @@ func TestUser_GetUsersUserID(t *testing.T) {
 
 	tests := map[string]struct {
 		httpStatus   int
-		userID       int
+		userID       uint32
 		expectedBody any
 		testMsg      string
 	}{
@@ -82,7 +83,8 @@ func TestUser_GetUsersUserID(t *testing.T) {
 func TestUser_PostUsers(t *testing.T) {
 	t.Parallel()
 
-	db, server := testutil.NewServerAndDB(t, context.Background())
+	database, server := testutil.NewServerAndDB(t, context.Background())
+	db := database.DB
 	t.Cleanup(func() {
 		testutil.CloseDB(db)
 	})
@@ -160,7 +162,8 @@ func TestUser_PostUsers(t *testing.T) {
 
 func TestUser_GetUsers(t *testing.T) {
 	var err error
-	db, server := testutil.NewServerAndDB(t, context.Background())
+	database, server := testutil.NewServerAndDB(t, context.Background())
+	db := database.DB
 	t.Cleanup(func() {
 		testutil.CloseDB(db)
 	})
@@ -275,17 +278,18 @@ func TestUser_DeleteUsersUserID(t *testing.T) {
 	t.Parallel()
 
 	var err error
-	db, server := testutil.NewServerAndDB(t, context.Background())
+	database, server := testutil.NewServerAndDB(t, context.Background())
+	db := database.DB
 	t.Cleanup(func() {
 		testutil.CloseDB(db)
 	})
 
-	fakeUserID := 10000
+	fakeUserID := uint32(10000)
 	tests := map[string]struct {
 		httpStatus   int
 		expectedBody any
 		testMsg      string
-		userID       int
+		userID       uint32
 	}{
 		"delete user that doesn't exist": {
 			httpStatus:   http.StatusBadRequest,

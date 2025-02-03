@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"log"
@@ -10,6 +9,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/AzureAD/microsoft-authentication-library-for-go/apps/confidential"
+	"github.com/SlotifyApp/slotify-backend/database"
 )
 
 type options struct {
@@ -50,15 +50,12 @@ func WithNotInitMSALClient() ServerOption {
 }
 
 type Server struct {
-	Logger                 *zap.SugaredLogger
-	DB                     *sql.DB
-	RefreshTokenRepository RefreshTokenRepository
-	TeamRepository         TeamRepository
-	UserRepository         UserRepository
-	MSALClient             *confidential.Client
+	Logger     *zap.SugaredLogger
+	DB         *database.Database
+	MSALClient *confidential.Client
 }
 
-func NewServerWithContext(_ context.Context, db *sql.DB, serverOpts ...ServerOption) (*Server, error) {
+func NewServerWithContext(_ context.Context, db *database.Database, serverOpts ...ServerOption) (*Server, error) {
 	var opts options
 	for _, opt := range serverOpts {
 		err := opt(&opts)
@@ -103,16 +100,9 @@ func NewServerWithContext(_ context.Context, db *sql.DB, serverOpts ...ServerOpt
 		return nil, errors.New("db must be provided")
 	}
 
-	refreshTokenRepository := NewRefreshTokenRepository(serverLogger, db)
-	teamRepository := NewTeamRepository(serverLogger, db)
-	userRepository := NewUserRepository(serverLogger, db)
-
 	return &Server{
-		Logger:                 serverLogger,
-		DB:                     db,
-		MSALClient:             msalClient,
-		RefreshTokenRepository: refreshTokenRepository,
-		TeamRepository:         teamRepository,
-		UserRepository:         userRepository,
+		Logger:     serverLogger,
+		DB:         db,
+		MSALClient: msalClient,
 	}, nil
 }

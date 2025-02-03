@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -21,19 +22,36 @@ func (s Server) GetAPITeamsMe(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	teams, err := s.UserRepository.GetUsersTeams(userID)
+	ctx, cancel := context.WithTimeout(context.Background(), database.DatabaseTimeout)
+	defer cancel()
+	teams, err := s.DB.GetUsersTeams(ctx, userID)
 	if err != nil {
-		s.Logger.Errorf("failed to get user id(%d)'s teams", userID, zap.Error(err))
-		sendError(w, http.StatusInternalServerError, "Failed to get user's teams")
-		return
+		switch {
+		case errors.Is(err, context.Canceled):
+			s.Logger.Error("getting users team failed: context was cancelled",
+				zap.Uint32("userID", userID))
+			sendError(w, http.StatusUnauthorized, "Try again later.")
+			return
+		case errors.Is(err, context.DeadlineExceeded):
+			s.Logger.Error("getting users team query timed out",
+				zap.Uint32("userID", userID))
+			sendError(w, http.StatusUnauthorized, "Try again later.")
+			return
+		default:
+			s.Logger.Error("failed to get users teams", zap.Uint32("userID", userID))
+			sendError(w, http.StatusInternalServerError, fmt.Sprintf("Sorry, failed to get user id(%d)'s teams", userID))
+			return
+		}
 	}
-
 	SetHeaderAndWriteResponse(w, http.StatusOK, teams)
 }
 
 // (GET /teams) Get a team by query params.
 func (s Server) GetAPITeams(w http.ResponseWriter, _ *http.Request, params GetAPITeamsParams) {
-	teams, err := s.TeamRepository.GetTeamsByQueryParams(params)
+	ctx, cancel := context.WithTimeout(context.Background(), database.DatabaseTimeout)
+	defer cancel()
+
+	teams, err := s.DB.ListTeams(ctx, params.Name)
 	if err != nil {
 		s.Logger.Error(zap.Object("params", params), zap.Error(err))
 		sendError(w, http.StatusBadRequest, "team api: failed to get teams")
@@ -52,30 +70,72 @@ func (s Server) PostAPITeams(w http.ResponseWriter, r *http.Request) {
 		sendError(w, http.StatusBadRequest, ErrUnmarshalBody.Error())
 		return
 	}
-	var team Team
-	if team, err = s.TeamRepository.AddTeam(teamBody); err != nil {
-		if database.IsDuplicateEntrySQLError(err) {
+
+	ctx, cancel := context.WithTimeout(context.Background(), database.DatabaseTimeout)
+	defer cancel()
+	var teamID int64
+	teamID, err = s.DB.AddTeam(ctx, teamBody.Name)
+	if err != nil {
+		switch {
+		case errors.Is(err, context.Canceled):
+			s.Logger.Error("team api: add team query context cancelled",
+				zap.Object("req_body", teamBody), zap.Error(err))
+			sendError(w, http.StatusInternalServerError, "something went wrong")
+			return
+		case errors.Is(err, context.DeadlineExceeded):
+			s.Logger.Error("team api: add team query timed out",
+				zap.Object("req_body", teamBody), zap.Error(err))
+			sendError(w, http.StatusInternalServerError, "add team query timed out")
+			return
+		case database.IsDuplicateEntrySQLError(err):
 			s.Logger.Error("team api: team already exists", zap.Object("req_body", teamBody), zap.Error(err))
 			sendError(w, http.StatusBadRequest, fmt.Sprintf("team with name %s already exists", teamBody.Name))
 			return
+		default:
+			s.Logger.Error("failed to create team", zap.Object("body", teamBody), zap.Error(err))
+			sendError(w, http.StatusBadRequest, "team api: team creation unsuccessful")
+			return
 		}
-		s.Logger.Error("failed to create team", zap.Object("body", teamBody), zap.Error(err))
-		sendError(w, http.StatusBadRequest, "team api: team creation unsuccessful")
-		return
+	}
+
+	team := Team{
+		//nolint: gosec // id is unsigned 32 bit int
+		Id:   uint32(teamID),
+		Name: teamBody.Name,
 	}
 	SetHeaderAndWriteResponse(w, http.StatusCreated, team)
 }
 
 // (DELETE /teams/{teamID}) Delete a team by id.
-func (s Server) DeleteAPITeamsTeamID(w http.ResponseWriter, _ *http.Request, teamID int) {
-	if err := s.TeamRepository.DeleteTeamByID(teamID); err != nil {
-		if errors.Is(err, database.WrongNumberSQLRowsError{}) {
-			s.Logger.Error("team api: incorrect team ID", zap.Error(err))
-			sendError(w, http.StatusBadRequest, "team api: incorrect team ID")
+func (s Server) DeleteAPITeamsTeamID(w http.ResponseWriter, _ *http.Request, teamID uint32) {
+	ctx, cancel := context.WithTimeout(context.Background(), database.DatabaseTimeout)
+	defer cancel()
+
+	rowsDeleted, err := s.DB.DeleteTeamByID(ctx, teamID)
+	if err != nil {
+		switch {
+		case errors.Is(err, context.Canceled):
+			s.Logger.Error("team api: delete team by id query timed out", zap.Uint32("teamID", teamID))
+			sendError(w, http.StatusInternalServerError, "add team query timed out")
+			return
+		case errors.Is(err, context.DeadlineExceeded):
+			s.Logger.Error("team api: delete team by id query timed out", zap.Uint32("teamID", teamID))
+			sendError(w, http.StatusInternalServerError, "add team query timed out")
+			return
+		default:
+			s.Logger.Error("team api: failed to DeleteTeamsTeamID", zap.Error(err))
+			sendError(w, http.StatusInternalServerError, "team api: team deletion unsuccessful")
 			return
 		}
-		s.Logger.Error("team api: failed to DeleteTeamsTeamID", zap.Error(err))
-		sendError(w, http.StatusInternalServerError, "team api: team deletion unsuccessful")
+	}
+
+	if rowsDeleted != 1 {
+		err = database.WrongNumberSQLRowsError{
+			ActualRows:   rowsDeleted,
+			ExpectedRows: []int64{1},
+		}
+		s.Logger.Errorf("team api failed to delete team", zap.Error(err))
+		sendError(w, http.StatusBadRequest, "team api: incorrect team id")
 		return
 	}
 
@@ -83,53 +143,125 @@ func (s Server) DeleteAPITeamsTeamID(w http.ResponseWriter, _ *http.Request, tea
 }
 
 // (GET /teams/{teamID}) Get a team by id.
-func (s Server) GetAPITeamsTeamID(w http.ResponseWriter, _ *http.Request, teamID int) {
-	team, err := s.TeamRepository.GetTeamByID(teamID)
+func (s Server) GetAPITeamsTeamID(w http.ResponseWriter, _ *http.Request, teamID uint32) {
+	ctx, cancel := context.WithTimeout(context.Background(), database.DatabaseTimeout)
+	defer cancel()
+
+	team, err := s.DB.GetTeamByID(ctx, teamID)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			s.Logger.Error("team api: failed to GetTeamsTeamID, no matching rows", zap.Error(err))
+		switch {
+		case errors.Is(err, context.Canceled):
+			s.Logger.Error("team api: context cancelled", zap.Uint32("teamID", teamID), zap.Error(err))
+			sendError(w, http.StatusInternalServerError, "sorry try again")
+			return
+		case errors.Is(err, context.DeadlineExceeded):
+			s.Logger.Error("team api: delete team by id query timed out", zap.Uint32("teamID", teamID))
+			sendError(w, http.StatusInternalServerError, "add team query timed out")
+			return
+		case errors.Is(err, sql.ErrNoRows):
+			s.Logger.Error("team api: failed to get team by id, no matching rows", zap.Error(err))
 			sendError(w, http.StatusNotFound, fmt.Sprintf("team api: team with id %d does not exist", teamID))
 			return
+		default:
+			s.Logger.Error("team api: failed to GetTeamsTeamID", zap.Error(err))
+			sendError(w, http.StatusInternalServerError, "team api: failed to get team")
+			return
 		}
-
-		s.Logger.Error("team api: failed to GetTeamsTeamID", zap.Error(err))
-		sendError(w, http.StatusInternalServerError, "team api: failed to get team")
-		return
 	}
 	SetHeaderAndWriteResponse(w, http.StatusOK, team)
 }
 
 // (GET /teams/{teamID}/users) Get all members of a team.
-func (s Server) GetAPITeamsTeamIDUsers(w http.ResponseWriter, _ *http.Request, teamID int) {
-	var users Users
-	var err error
-	if users, err = s.TeamRepository.GetAllTeamMembers(teamID); err != nil {
-		if errors.Is(err, database.ErrTeamIDInvalid) {
-			s.Logger.Errorf("team api: team id was invalid: %w", err)
-			sendError(w, http.StatusForbidden,
-				fmt.Sprintf("team api: team with id(%d) does not exist", teamID))
+func (s Server) GetAPITeamsTeamIDUsers(w http.ResponseWriter, _ *http.Request, teamID uint32) {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*database.DatabaseTimeout)
+	defer cancel()
+
+	count, err := s.DB.CountTeamByID(ctx, teamID)
+	if err != nil {
+		switch {
+		case errors.Is(err, context.Canceled):
+			s.Logger.Error("team api: context cancelled", zap.Uint32("teamID", teamID))
+			sendError(w, http.StatusInternalServerError, "sorry try again")
+			return
+		case errors.Is(err, context.DeadlineExceeded):
+			s.Logger.Error("team api: get all team members query timed out", zap.Uint32("teamID", teamID))
+			sendError(w, http.StatusInternalServerError, "get all team members query timed out")
+			return
+		default:
+			s.Logger.Error("team api: failed to count team members by id", zap.Uint32("teamID", teamID), zap.Error(err))
+			sendError(w, http.StatusInternalServerError, "get all team members query timed out")
 			return
 		}
-		s.Logger.Errorf("team api: failed to GetTeamsTeamIDUsers: %w", err)
-		sendError(w, http.StatusInternalServerError,
-			fmt.Sprintf("team api: failed to get team members for team with id %d", teamID))
+	}
+
+	if count == 0 {
+		s.Logger.Error("team api: team members of non-existent team requested", zap.Uint32("teamID", teamID), zap.Error(err))
+		sendError(w, http.StatusForbidden, fmt.Sprintf("team api: team with id(%d) does not exist", teamID))
 		return
+	}
+
+	users, err := s.DB.GetAllTeamMembers(ctx, teamID)
+	if err != nil {
+		switch {
+		case errors.Is(err, context.Canceled):
+			s.Logger.Error("team api: context cancelled", zap.Uint32("teamID", teamID))
+			sendError(w, http.StatusInternalServerError, "context cancelled")
+			return
+		case errors.Is(err, context.DeadlineExceeded):
+			s.Logger.Error("team api: get all team members query timed out", zap.Uint32("teamID", teamID))
+			sendError(w, http.StatusInternalServerError, "get all team members query timed out")
+			return
+		default:
+			s.Logger.Errorf("team api: failed to get all team members: %w", err)
+			sendError(w, http.StatusInternalServerError,
+				fmt.Sprintf("team api: failed to get team members for team with id %d", teamID))
+			return
+		}
 	}
 
 	SetHeaderAndWriteResponse(w, http.StatusOK, users)
 }
 
 // (POST /teams/{teamID}/users/{userID}) Add a user to a team.
-func (s Server) PostAPITeamsTeamIDUsersUserID(w http.ResponseWriter, _ *http.Request, teamID int, userID int) {
-	if err := s.TeamRepository.AddUserToTeam(teamID, userID); err != nil {
-		if database.IsRowDoesNotExistSQLError(err) {
+func (s Server) PostAPITeamsTeamIDUsersUserID(w http.ResponseWriter, _ *http.Request, teamID uint32, userID uint32) {
+	ctx, cancel := context.WithTimeout(context.Background(), database.DatabaseTimeout)
+	defer cancel()
+
+	rowsAffected, err := s.DB.AddUserToTeam(ctx, database.AddUserToTeamParams{
+		UserID: userID,
+		TeamID: teamID,
+	})
+	if err != nil {
+		switch {
+		case errors.Is(err, context.Canceled):
+			s.Logger.Error("team api: context cancelled",
+				zap.Uint32("userID", userID), zap.Uint32("teamID", teamID), zap.Error(err))
+			sendError(w, http.StatusInternalServerError, "team api: context cancelled")
+			return
+		case errors.Is(err, context.DeadlineExceeded):
+			s.Logger.Error("team api: add user to team query timed out",
+				zap.Uint32("userID", userID), zap.Uint32("teamID", teamID), zap.Error(err))
+			sendError(w, http.StatusInternalServerError, "team api: add team query timed out")
+			return
+		case database.IsRowDoesNotExistSQLError(err):
 			s.Logger.Errorf("team api: user id or team id invalid fk: %w", err)
 			sendError(w, http.StatusForbidden,
 				fmt.Sprintf("team api: team id(%d) or user id(%d) was invalid", teamID, userID))
 			return
+		default:
+			s.Logger.Errorf("team api: failed to add user to team: %w", err)
+			sendError(w, http.StatusInternalServerError, "team api: failed to add user to team")
+			return
 		}
-		s.Logger.Errorf("team api: failed to add user to team: %w", err)
-		sendError(w, http.StatusInternalServerError, "team api: failed to add user to team")
+	}
+
+	if rowsAffected != 1 {
+		err = database.WrongNumberSQLRowsError{
+			ActualRows:   rowsAffected,
+			ExpectedRows: []int64{1},
+		}
+		s.Logger.Error(zap.Uint32("userID", userID), zap.Uint32("teamID", teamID), zap.Error(err))
+		sendError(w, http.StatusBadRequest, "user api: failed to add member to team")
 		return
 	}
 
