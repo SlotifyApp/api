@@ -80,3 +80,13 @@ make generate
 ```
 
 This will generate API code based on our spec into a file named `api/server.gen.go`
+
+## OpenID Microsoft Flow and Slotify API protection
+
+![OpenID Flow](./docs/openid_flow_diagram.png)
+
+In order to authenticate a user, the [OpenID Connect flow](https://openid.net/developers/how-connect-works/) is used, this
+is done through a [authorisation code flow](https://auth0.com/docs/get-started/authentication-and-authorization-flow/authorization-code-flow).
+
+Slotify's API has its own protection in the form of a JWT access and refresh token. This is stored in the frontend
+as http-only cookies which are sent with every fetch request.

@@ -13,7 +13,7 @@ import (
 )
 
 // (GET /users) Get a user by query params.
-func (s Server) GetUsers(w http.ResponseWriter, _ *http.Request, params GetUsersParams) {
+func (s Server) GetAPIUsers(w http.ResponseWriter, _ *http.Request, params GetAPIUsersParams) {
 	users, err := s.UserRepository.GetUsersByQueryParams(params)
 	if err != nil {
 		s.Logger.Error("user api: failed to get users", zap.Error(err))
@@ -25,8 +25,8 @@ func (s Server) GetUsers(w http.ResponseWriter, _ *http.Request, params GetUsers
 }
 
 // (POST /users) Create a new user.
-func (s Server) PostUsers(w http.ResponseWriter, r *http.Request) {
-	var userBody PostUsersJSONRequestBody
+func (s Server) PostAPIUsers(w http.ResponseWriter, r *http.Request) {
+	var userBody PostAPIUsersJSONRequestBody
 	var err error
 	defer func() {
 		if err = r.Body.Close(); err != nil {
@@ -55,7 +55,7 @@ func (s Server) PostUsers(w http.ResponseWriter, r *http.Request) {
 }
 
 // (DELETE /users/{userID}) Delete a user by id.
-func (s Server) DeleteUsersUserID(w http.ResponseWriter, _ *http.Request, userID int) {
+func (s Server) DeleteAPIUsersUserID(w http.ResponseWriter, _ *http.Request, userID int) {
 	if err := s.UserRepository.DeleteUserByID(userID); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			errMsg := fmt.Sprintf("user api: user with id(%d) doesn't exist", userID)
@@ -71,7 +71,7 @@ func (s Server) DeleteUsersUserID(w http.ResponseWriter, _ *http.Request, userID
 }
 
 // (GET /users/{userID}) Get a user by id.
-func (s Server) GetUsersUserID(w http.ResponseWriter, _ *http.Request, userID int) {
+func (s Server) GetAPIUsersUserID(w http.ResponseWriter, _ *http.Request, userID int) {
 	var uq UserQuery
 	var err error
 	if uq, err = s.UserRepository.GetUserByID(userID); err != nil {
@@ -90,8 +90,8 @@ func (s Server) GetUsersUserID(w http.ResponseWriter, _ *http.Request, userID in
 	SetHeaderAndWriteResponse(w, http.StatusOK, uq.User)
 }
 
-// (GET /user).
-func (s Server) GetUser(w http.ResponseWriter, r *http.Request) {
+// (GET /users/me).
+func (s Server) GetAPIUsersMe(w http.ResponseWriter, r *http.Request) {
 	userID, err := jwt.GetUserIDFromReq(r)
 	if err != nil {
 		s.Logger.Error("failed to get userid from request access token")
@@ -116,8 +116,8 @@ func (s Server) GetUser(w http.ResponseWriter, r *http.Request) {
 	SetHeaderAndWriteResponse(w, http.StatusOK, uq.User)
 }
 
-// (POST /user/logout).
-func (s Server) PostUserLogout(w http.ResponseWriter, r *http.Request) {
+// (POST /users/logout).
+func (s Server) PostAPIUsersMeLogout(w http.ResponseWriter, r *http.Request) {
 	userID, err := jwt.GetUserIDFromReq(r)
 	if err != nil {
 		s.Logger.Error("jwt not valid in logout", zap.Error(err))

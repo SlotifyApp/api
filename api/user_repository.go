@@ -24,7 +24,9 @@ type UserRepositoryInterface interface {
 	GetUserByID(int) (UserQuery, error)
 	// Get users by query parameters, if none match
 	// return an empty array.
-	GetUsersByQueryParams(GetUsersParams) (Users, error)
+	GetUsersByQueryParams(GetAPIUsersParams) (Users, error)
+	// Get all the teams of a user
+	GetUsersTeams(int) (Teams, error)
 	// Update a user's home account ID
 	UpdateUserHomeAccountID(int, string) error
 }
@@ -50,6 +52,37 @@ func (ur UserRepository) CheckUserExistsByID(userID int) (bool, error) {
 		return false, fmt.Errorf("user repository: error checking user existence: %w", err)
 	}
 	return exists, nil
+}
+
+func (ur UserRepository) GetUsersTeams(userID int) (Teams, error) {
+	query := "SELECT t.* FROM UserToTeam utt JOIN Team t ON utt.team_id=t.id WHERE utt.user_id=?"
+	stmt, err := ur.db.Prepare(query)
+	if err != nil {
+		return Teams{}, fmt.Errorf("user repository: %s: %w", PrepareStmtFail, err)
+	}
+
+	defer database.CloseStmt(stmt, ur.logger)
+
+	var rows *sql.Rows
+	if rows, err = stmt.Query(userID); err != nil {
+		return Teams{}, fmt.Errorf("user repository: %s: %w", QueryDBFail, err)
+	}
+
+	defer database.CloseRows(rows, ur.logger)
+
+	teams := Teams{}
+	for rows.Next() {
+		var t Team
+		if err = rows.Scan(&t.Id, &t.Name); err != nil {
+			return Teams{}, fmt.Errorf("user repository: failed to scan row: %w", err)
+		}
+		teams = append(teams, t)
+	}
+
+	if err = rows.Err(); err != nil {
+		return Teams{}, fmt.Errorf("user repository: sql rows error: %w", err)
+	}
+	return teams, nil
 }
 
 func (ur UserRepository) CreateUser(uc UserCreate) (User, error) {
@@ -132,7 +165,7 @@ func (ur UserRepository) GetUserByID(userID int) (UserQuery, error) {
 	return uq, nil
 }
 
-func (ur UserRepository) GetUsersByQueryParams(params GetUsersParams) (Users, error) {
+func (ur UserRepository) GetUsersByQueryParams(params GetAPIUsersParams) (Users, error) {
 	var conditions []string
 	var args []any
 

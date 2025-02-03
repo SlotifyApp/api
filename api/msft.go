@@ -63,7 +63,7 @@ type MSFTTokenResult struct {
 	HomeAccountID string
 }
 
-// createMSALClient creates a new confiential MSFT Client.
+// createMSALClient creates a new confiential MSAL Client.
 func createMSALClient() (confidential.Client, error) {
 	msftEntraVals, err := getMSFTEntraValues()
 	if err != nil {
@@ -82,6 +82,7 @@ func createMSALClient() (confidential.Client, error) {
 	return c, nil
 }
 
+// GetMSFTAccessToken gets a MSFT access token for a user.
 func GetMSFTAccessToken(ctx context.Context, c *confidential.Client,
 	ur UserRepositoryInterface, userID int,
 ) (azcore.AccessToken, error) {
@@ -116,8 +117,6 @@ func GetMSFTAccessToken(ctx context.Context, c *confidential.Client,
 		Token:     res.AccessToken,
 	}
 
-	log.Printf("azcore accesstoken: %+v", tk)
-
 	return tk, nil
 }
 
@@ -142,7 +141,6 @@ func MSFTAuthoriseByCode(ctx context.Context, c *confidential.Client, authCode s
 
 	firstName := res.IDToken.GivenName
 	lastName := res.IDToken.FamilyName
-	log.Printf("id token: %+v", res.IDToken)
 	// If the id token doesn't contain given and family names, then attempt to
 	// manually split by getting Name
 	if firstName == "" && lastName == "" {
@@ -167,6 +165,7 @@ func (satp SlotifyAccessTokenProvider) GetToken(_ context.Context,
 	return satp.accessToken, nil
 }
 
+// CreateMSFTGraphClient creates a MSGraph SDK Client.
 func CreateMSFTGraphClient(accessToken azcore.AccessToken) (*msgraphsdk.GraphServiceClient, error) {
 	satp := SlotifyAccessTokenProvider{
 		accessToken: accessToken,

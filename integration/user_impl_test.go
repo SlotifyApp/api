@@ -57,8 +57,8 @@ func TestUser_GetUsersUserID(t *testing.T) {
 			t.Parallel()
 
 			rr := httptest.NewRecorder()
-			req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/users/%d", tt.userID), nil)
-			server.GetUsersUserID(rr, req, tt.userID)
+			req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/users/%d", tt.userID), nil)
+			server.GetAPIUsersUserID(rr, req, tt.userID)
 
 			if tt.httpStatus == http.StatusOK {
 				var user api.User
@@ -127,10 +127,10 @@ func TestUser_PostUsers(t *testing.T) {
 
 			rr := httptest.NewRecorder()
 
-			req := httptest.NewRequest(http.MethodPost, "/users", bytes.NewReader(body))
+			req := httptest.NewRequest(http.MethodPost, "/api/users", bytes.NewReader(body))
 			req.Header.Add("Content-Type", "application/json")
 
-			server.PostUsers(rr, req)
+			server.PostAPIUsers(rr, req)
 			// Reset the request body for openapi validate
 			req.Body = io.NopCloser(bytes.NewBuffer(body))
 
@@ -176,14 +176,14 @@ func TestUser_GetUsers(t *testing.T) {
 		expectedBody any
 		testMsg      string
 		route        string
-		params       api.GetUsersParams
+		params       api.GetAPIUsersParams
 	}{
 		"get existing user by email that exists": {
 			httpStatus:   http.StatusOK,
 			expectedBody: api.Users{insertedUser},
 			testMsg:      "successfully got user by email",
 			route:        fmt.Sprintf("?email=%s", url.QueryEscape(string(insertedUser.Email))),
-			params: api.GetUsersParams{
+			params: api.GetAPIUsersParams{
 				Email: &insertedUser.Email,
 			},
 		},
@@ -192,7 +192,7 @@ func TestUser_GetUsers(t *testing.T) {
 			expectedBody: api.Users{insertedUser, insertedUser2},
 			testMsg:      "successfully got users by first name",
 			route:        fmt.Sprintf("?firstName=%s", url.QueryEscape(insertedUser.FirstName)),
-			params: api.GetUsersParams{
+			params: api.GetAPIUsersParams{
 				FirstName: &insertedUser.FirstName,
 			},
 		},
@@ -201,7 +201,7 @@ func TestUser_GetUsers(t *testing.T) {
 			expectedBody: api.Users{insertedUser, insertedUser3},
 			testMsg:      "successfully got users by last name",
 			route:        fmt.Sprintf("?lastName=%s", url.QueryEscape(insertedUser.LastName)),
-			params: api.GetUsersParams{
+			params: api.GetAPIUsersParams{
 				LastName: &insertedUser.LastName,
 			},
 		},
@@ -210,7 +210,7 @@ func TestUser_GetUsers(t *testing.T) {
 			expectedBody: api.Users{},
 			testMsg:      "successfully got empty array of users when users don't exist by query params",
 			route:        fmt.Sprintf("?lastName=%s", url.QueryEscape(fakeLastName)),
-			params: api.GetUsersParams{
+			params: api.GetAPIUsersParams{
 				LastName: &fakeLastName,
 			},
 		},
@@ -220,10 +220,10 @@ func TestUser_GetUsers(t *testing.T) {
 		t.Run(testName, func(t *testing.T) {
 			rr := httptest.NewRecorder()
 
-			req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/users?%s", tt.route), nil)
+			req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/users?%s", tt.route), nil)
 			req.Header.Add("Content-Type", "application/json")
 
-			server.GetUsers(rr, req, tt.params)
+			server.GetAPIUsers(rr, req, tt.params)
 
 			testutil.OpenAPIValidateTest(t, rr, req)
 
@@ -253,11 +253,11 @@ func TestUser_GetUsers(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		req := httptest.NewRequest(http.MethodGet, "/users", nil)
+		req := httptest.NewRequest(http.MethodGet, "/api/users", nil)
 		req.Header.Add("Content-Type", "application/json")
 
 		count := testutil.GetCount(t, db, "User")
-		server.GetUsers(rr, req, api.GetUsersParams{})
+		server.GetAPIUsers(rr, req, api.GetAPIUsersParams{})
 		err = tx.Commit()
 		require.NoError(t, err, "failed to commit transaction")
 
@@ -307,12 +307,12 @@ func TestUser_DeleteUsersUserID(t *testing.T) {
 			t.Parallel()
 
 			rr := httptest.NewRecorder()
-			req := httptest.NewRequest(http.MethodDelete, fmt.Sprintf("/users/%d", tt.userID), nil)
+			req := httptest.NewRequest(http.MethodDelete, fmt.Sprintf("/api/users/%d", tt.userID), nil)
 			req.Header.Add("Content-Type", "application/json")
 
 			oldCount := testutil.GetCount(t, db, "User")
 
-			server.DeleteUsersUserID(rr, req, tt.userID)
+			server.DeleteAPIUsersUserID(rr, req, tt.userID)
 			testutil.OpenAPIValidateTest(t, rr, req)
 
 			require.Equal(t, tt.httpStatus, rr.Result().StatusCode)

@@ -14,7 +14,8 @@ import (
 )
 
 const (
-	requestLimit = 100
+	requestLimit       = 100
+	refreshTokenHeader = "Refreshtoken"
 )
 
 func CORSMiddleware(next http.Handler) http.Handler {
@@ -37,7 +38,7 @@ func CORSMiddleware(next http.Handler) http.Handler {
 func AuthMiddleware(next http.Handler) http.Handler {
 	excludedPaths := map[string]bool{
 		"/api/auth/callback": true,
-		"/healthcheck":       true,
+		"/api/healthcheck":   true,
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if excludedPaths[r.URL.Path] {
@@ -45,7 +46,7 @@ func AuthMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		log.Printf("AuthMiddleware executed")
+		log.Print("AuthMiddleware executed")
 
 		accessTokenCookie, err := r.Cookie("access_token")
 		if err != nil {
@@ -75,7 +76,7 @@ func AuthMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		r.Header.Set("Refreshtoken", refreshTokenCookie.Value)
+		r.Header.Set(refreshTokenHeader, refreshTokenCookie.Value)
 
 		next.ServeHTTP(w, r)
 	})
@@ -84,9 +85,9 @@ func AuthMiddleware(next http.Handler) http.Handler {
 func JWTMiddleware(next http.Handler) http.Handler {
 	excludedPaths := map[string]bool{
 		"/api/auth/callback": true,
-		"/healthcheck":       true,
-		"/user/logout":       true,
-		"/refresh":           true,
+		"/api/healthcheck":   true,
+		"/api/users/logout":  true,
+		"/api/refresh":       true,
 	}
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -95,7 +96,7 @@ func JWTMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		log.Printf("JWTMiddleware executed")
+		log.Print("JWTMiddleware executed")
 		accessToken, err := jwt.GetJWTFromRequest(r)
 		if err != nil {
 			log.Printf("jwt middleware error: %s", err.Error())

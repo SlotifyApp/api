@@ -53,15 +53,15 @@ func TestTeam_GetTeams(t *testing.T) {
 		t.Run(testName, func(t *testing.T) {
 			t.Parallel()
 
-			params := api.GetTeamsParams{
+			params := api.GetAPITeamsParams{
 				Name: &tt.teamName,
 			}
 			rr := httptest.NewRecorder()
 
 			req := httptest.NewRequest(http.MethodGet,
-				fmt.Sprintf("/teams?name=%s", url.QueryEscape(*params.Name)), nil)
+				fmt.Sprintf("/api/teams?name=%s", url.QueryEscape(*params.Name)), nil)
 
-			server.GetTeams(rr, req, params)
+			server.GetAPITeams(rr, req, params)
 
 			var teams api.Teams
 			require.Equal(t, tt.httpStatus, rr.Result().StatusCode)
@@ -81,7 +81,6 @@ func TestTeam_PostTeams(t *testing.T) {
 	t.Cleanup(func() {
 		testutil.CloseDB(db)
 	})
-
 	// Setup
 	insertedTeam := testutil.InsertTeam(t, db)
 	newTeamName := gofakeit.ProductName()
@@ -118,10 +117,10 @@ func TestTeam_PostTeams(t *testing.T) {
 			body, err := json.Marshal(tt.teamBody)
 			require.NoError(t, err, "could not marshal json req body team")
 			rr := httptest.NewRecorder()
-			req := httptest.NewRequest(http.MethodPost, "/teams", bytes.NewReader(body))
+			req := httptest.NewRequest(http.MethodPost, "/api/teams", bytes.NewReader(body))
 			req.Header.Add("Content-Type", "application/json")
 
-			server.PostTeams(rr, req)
+			server.PostAPITeams(rr, req)
 
 			if tt.httpStatus == http.StatusCreated {
 				var team api.Team
@@ -179,9 +178,9 @@ func TestTeam_DeleteTeamsTeamID(t *testing.T) {
 			t.Parallel()
 
 			rr := httptest.NewRecorder()
-			req := httptest.NewRequest(http.MethodDelete, fmt.Sprintf("/teams/%d", tt.teamID), nil)
+			req := httptest.NewRequest(http.MethodDelete, fmt.Sprintf("/api/teams/%d", tt.teamID), nil)
 
-			server.DeleteTeamsTeamID(rr, req, tt.teamID)
+			server.DeleteAPITeamsTeamID(rr, req, tt.teamID)
 
 			testutil.OpenAPIValidateTest(t, rr, req)
 			var errMsg string
@@ -229,9 +228,9 @@ func TestTeam_GetTeamsTeamID(t *testing.T) {
 			t.Parallel()
 
 			rr := httptest.NewRecorder()
-			req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/teams/%d", tt.teamID), nil)
+			req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/teams/%d", tt.teamID), nil)
 
-			server.GetTeamsTeamID(rr, req, tt.teamID)
+			server.GetAPITeamsTeamID(rr, req, tt.teamID)
 
 			testutil.OpenAPIValidateTest(t, rr, req)
 			if tt.httpStatus == http.StatusOK {
@@ -310,9 +309,9 @@ func TestTeam_PostTeamsTeamIDUsersUserID(t *testing.T) {
 			t.Parallel()
 
 			rr := httptest.NewRecorder()
-			req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/teams/%d/users/%d", tt.teamID, tt.userID), nil)
+			req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/api/teams/%d/users/%d", tt.teamID, tt.userID), nil)
 
-			server.PostTeamsTeamIDUsersUserID(rr, req, tt.teamID, tt.userID)
+			server.PostAPITeamsTeamIDUsersUserID(rr, req, tt.teamID, tt.userID)
 
 			testutil.OpenAPIValidateTest(t, rr, req)
 
@@ -367,14 +366,82 @@ func TestTeam_GetTeamsTeamIDUsers(t *testing.T) {
 			t.Parallel()
 
 			rr := httptest.NewRecorder()
-			req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/teams/%d/users", tt.teamID), nil)
+			req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/teams/%d/users", tt.teamID), nil)
 
-			server.GetTeamsTeamIDUsers(rr, req, tt.teamID)
+			server.GetAPITeamsTeamIDUsers(rr, req, tt.teamID)
 
 			testutil.OpenAPIValidateTest(t, rr, req)
 
 			if tt.httpStatus == http.StatusOK {
 				var respBody api.Users
+				require.Equal(t, tt.httpStatus, rr.Result().StatusCode)
+				err = json.NewDecoder(rr.Result().Body).Decode(&respBody)
+				require.NoError(t, err, "response cannot be decoded into Users struct")
+				require.Equal(t, tt.expectedRespBody, respBody, tt.testMsg)
+			} else {
+				var respBody string
+				require.Equal(t, tt.httpStatus, rr.Result().StatusCode)
+				err = json.NewDecoder(rr.Result().Body).Decode(&respBody)
+				require.NoError(t, err, "response cannot be decoded into string")
+				require.Equal(t, tt.expectedRespBody, respBody, tt.testMsg)
+			}
+		})
+	}
+}
+
+func TestTeam_GetAPITeamsMe(t *testing.T) {
+	t.Parallel()
+
+	var err error
+	db, server := testutil.NewServerAndDB(t, context.Background())
+	t.Cleanup(func() {
+		testutil.CloseDB(db)
+	})
+
+	user1 := testutil.InsertUser(t, db, testutil.WithEmail("blah@example.com"))
+	jwt1 := testutil.CreateJWT(t, user1.Id, user1.Email)
+
+	insertedTeam1 := testutil.InsertTeam(t, db)
+	insertedTeam2 := testutil.InsertTeam(t, db)
+	user2 := testutil.InsertUser(t, db)
+	testutil.AddUserToTeam(t, db, user2.Id, insertedTeam1.Id)
+	testutil.AddUserToTeam(t, db, user2.Id, insertedTeam2.Id)
+	jwt2 := testutil.CreateJWT(t, user2.Id, user2.Email)
+
+	tests := map[string]struct {
+		expectedRespBody any
+		httpStatus       int
+		jwt              string
+		testMsg          string
+	}{
+		"get teams of user who has no teams": {
+			expectedRespBody: api.Teams{},
+			httpStatus:       http.StatusOK,
+			jwt:              jwt1,
+			testMsg:          "user who has no teams returns empty list",
+		},
+		"get teams of user who has many tams": {
+			expectedRespBody: api.Teams{insertedTeam1, insertedTeam2},
+			httpStatus:       http.StatusOK,
+			jwt:              jwt2,
+			testMsg:          "correctly get all of a user's teams",
+		},
+	}
+
+	for testName, tt := range tests {
+		t.Run(testName, func(t *testing.T) {
+			t.Parallel()
+
+			rr := httptest.NewRecorder()
+			req := httptest.NewRequest(http.MethodGet, "/api/teams/me", nil)
+			req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", tt.jwt))
+
+			server.GetAPITeamsMe(rr, req)
+
+			testutil.OpenAPIValidateTest(t, rr, req)
+
+			if tt.httpStatus == http.StatusOK {
+				var respBody api.Teams
 				require.Equal(t, tt.httpStatus, rr.Result().StatusCode)
 				err = json.NewDecoder(rr.Result().Body).Decode(&respBody)
 				require.NoError(t, err, "response cannot be decoded into Users struct")

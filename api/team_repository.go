@@ -16,7 +16,7 @@ type TeamRepositoryInterface interface {
 	DeleteTeamByID(int) error
 	GetAllTeamMembers(int) (Users, error)
 	GetTeamByID(int) (Team, error)
-	GetTeamsByQueryParams(GetTeamsParams) (Teams, error)
+	GetTeamsByQueryParams(GetAPITeamsParams) (Teams, error)
 }
 
 type TeamRepository struct {
@@ -74,6 +74,7 @@ func (tr TeamRepository) GetAllTeamMembers(teamID int) (Users, error) {
 		return Users{}, fmt.Errorf("team repository: %w: ", database.ErrTeamIDInvalid)
 	}
 
+	// TODO: Check if this is correct
 	query := "SELECT u.* FROM Team t JOIN UserToTeam utt ON t.id=utt.team_id JOIN User u ON u.id=utt.user_id WHERE t.id=?"
 	stmt, err := tr.db.Prepare(query)
 	if err != nil {
@@ -141,7 +142,7 @@ func (tr TeamRepository) DeleteTeamByID(teamID int) error {
 
 // GetTeamsByQueryParams returns a list of teams matching the given
 // query parameters.
-func (tr TeamRepository) GetTeamsByQueryParams(params GetTeamsParams) (Teams, error) {
+func (tr TeamRepository) GetTeamsByQueryParams(params GetAPITeamsParams) (Teams, error) {
 	var args []any
 
 	query := "SELECT * FROM Team"

@@ -110,7 +110,7 @@ func (t Team) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 	return nil
 }
 
-func (tp GetTeamsParams) MarshalLogObject(enc zapcore.ObjectEncoder) error {
+func (tp GetAPITeamsParams) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 	name := ""
 	if tp.Name != nil {
 		name = *tp.Name
@@ -120,7 +120,7 @@ func (tp GetTeamsParams) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 }
 
 // (GET /healthcheck).
-func (s Server) GetHealthcheck(w http.ResponseWriter, _ *http.Request) {
+func (s Server) GetAPIHealthcheck(w http.ResponseWriter, _ *http.Request) {
 	resp := "Healthcheck Successful!"
 	w.WriteHeader(http.StatusOK)
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
@@ -183,7 +183,7 @@ func getUserByClaimEmail(ur UserRepository, msftTokenRes MSFTTokenResult) (User,
 	email := msftTokenRes.Email
 	var users Users
 	var err error
-	users, err = ur.GetUsersByQueryParams(GetUsersParams{
+	users, err = ur.GetUsersByQueryParams(GetAPIUsersParams{
 		Email: (*openapi_types.Email)(&email),
 	})
 	if err != nil {
@@ -238,9 +238,9 @@ func (s Server) GetAPIAuthCallback(w http.ResponseWriter, r *http.Request, param
 	http.Redirect(w, r, "http://localhost:3000/dashboard", http.StatusFound)
 }
 
-func (s Server) PostRefresh(w http.ResponseWriter, r *http.Request) {
+func (s Server) PostAPIRefresh(w http.ResponseWriter, r *http.Request) {
 	var refreshToken string
-	if refreshToken = r.Header.Get("Refreshtoken"); refreshToken == "" {
+	if refreshToken = r.Header.Get(refreshTokenHeader); refreshToken == "" {
 		s.Logger.Error("refresh token was empty")
 		sendError(w, http.StatusUnauthorized, "refresh token was empty")
 		return

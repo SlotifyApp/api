@@ -40,8 +40,7 @@ func WithMSALClient(msalClient *confidential.Client) ServerOption {
 	}
 }
 
-// Use if not to initialise MSAL client when one was not
-// specified.
+// WithNotInitMSALClient prevents setting MSAL client if it has not been passed in.
 func WithNotInitMSALClient() ServerOption {
 	return func(options *options) error {
 		shouldInit := false
@@ -80,8 +79,7 @@ func NewServerWithContext(_ context.Context, db *sql.DB, serverOpts ...ServerOpt
 		serverLogger = opts.logger
 	}
 
-	// default to initialising the MSAL client unless
-	// specified
+	// default to initialising MSAL client unless specified
 	var shouldInitMSALClient bool
 	if opts.initMSALClient == nil {
 		shouldInitMSALClient = true

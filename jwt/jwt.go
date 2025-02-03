@@ -23,12 +23,13 @@ var (
 	ErrInvalidAuthHeader = errors.New("header Authorization is malformed")
 )
 
-// CustomClaims is a struct for JWT claims ie. structure of JWT payload.
+// CustomClaims is a struct for Slotify JWT claims.
 type CustomClaims struct {
 	UserID int `json:"user_id"`
 	goJWT.RegisteredClaims
 }
 
+// RefreshToken is a struct for Slotify refresh tokens.
 type RefreshToken struct {
 	ID      int
 	UserID  int
@@ -121,7 +122,7 @@ func GetJWTFromRequest(req *http.Request) (string, error) {
 	return strings.TrimPrefix(authHdr, prefix), nil
 }
 
-// the user id.
+// GetUserIDFromReq gets the user id from the request Authorization header.
 func GetUserIDFromReq(r *http.Request) (int, error) {
 	var err error
 	var accessToken string

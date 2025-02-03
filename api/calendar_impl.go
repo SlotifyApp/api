@@ -9,7 +9,7 @@ import (
 )
 
 // (GET /calendar/me).
-func (s Server) GetCalendarMe(w http.ResponseWriter, r *http.Request) {
+func (s Server) GetAPICalendarMe(w http.ResponseWriter, r *http.Request) {
 	userID, err := jwt.GetUserIDFromReq(r)
 	if err != nil {
 		s.Logger.Error("failed to get userid from request access token")
