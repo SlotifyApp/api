@@ -8,11 +8,12 @@ import (
 	"net/http"
 
 	"github.com/SlotifyApp/slotify-backend/database"
+	"github.com/SlotifyApp/slotify-backend/jwt"
 	"go.uber.org/zap"
 )
 
 // (GET /users) Get a user by query params.
-func (s Server) GetUsers(w http.ResponseWriter, _ *http.Request, params GetUsersParams) {
+func (s Server) GetAPIUsers(w http.ResponseWriter, _ *http.Request, params GetAPIUsersParams) {
 	users, err := s.UserRepository.GetUsersByQueryParams(params)
 	if err != nil {
 		s.Logger.Error("user api: failed to get users", zap.Error(err))
@@ -24,8 +25,8 @@ func (s Server) GetUsers(w http.ResponseWriter, _ *http.Request, params GetUsers
 }
 
 // (POST /users) Create a new user.
-func (s Server) PostUsers(w http.ResponseWriter, r *http.Request) {
-	var userBody PostUsersJSONRequestBody
+func (s Server) PostAPIUsers(w http.ResponseWriter, r *http.Request) {
+	var userBody PostAPIUsersJSONRequestBody
 	var err error
 	defer func() {
 		if err = r.Body.Close(); err != nil {
@@ -33,9 +34,8 @@ func (s Server) PostUsers(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 	if err = json.NewDecoder(r.Body).Decode(&userBody); err != nil {
-		errMsg := "failed to unmarshal request body correctly"
-		s.Logger.Error(errMsg, zap.Object("body", userBody), zap.Error(err))
-		sendError(w, http.StatusBadRequest, errMsg)
+		s.Logger.Error(ErrUnmarshalBody, zap.Object("body", userBody), zap.Error(err))
+		sendError(w, http.StatusBadRequest, ErrUnmarshalBody.Error())
 		return
 	}
 
@@ -55,7 +55,7 @@ func (s Server) PostUsers(w http.ResponseWriter, r *http.Request) {
 }
 
 // (DELETE /users/{userID}) Delete a user by id.
-func (s Server) DeleteUsersUserID(w http.ResponseWriter, _ *http.Request, userID int) {
+func (s Server) DeleteAPIUsersUserID(w http.ResponseWriter, _ *http.Request, userID int) {
 	if err := s.UserRepository.DeleteUserByID(userID); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			errMsg := fmt.Sprintf("user api: user with id(%d) doesn't exist", userID)
@@ -71,10 +71,10 @@ func (s Server) DeleteUsersUserID(w http.ResponseWriter, _ *http.Request, userID
 }
 
 // (GET /users/{userID}) Get a user by id.
-func (s Server) GetUsersUserID(w http.ResponseWriter, _ *http.Request, userID int) {
-	var user User
+func (s Server) GetAPIUsersUserID(w http.ResponseWriter, _ *http.Request, userID int) {
+	var uq UserQuery
 	var err error
-	if user, err = s.UserRepository.GetUserByID(userID); err != nil {
+	if uq, err = s.UserRepository.GetUserByID(userID); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			errMsg := fmt.Sprintf("user api: user with id(%d) doesn't exist", userID)
 			s.Logger.Error(errMsg, zap.Int("userID", userID), zap.Error(err))
@@ -87,5 +87,52 @@ func (s Server) GetUsersUserID(w http.ResponseWriter, _ *http.Request, userID in
 		return
 	}
 
-	SetHeaderAndWriteResponse(w, http.StatusOK, user)
+	SetHeaderAndWriteResponse(w, http.StatusOK, uq.User)
+}
+
+// (GET /users/me).
+func (s Server) GetAPIUsersMe(w http.ResponseWriter, r *http.Request) {
+	userID, err := jwt.GetUserIDFromReq(r)
+	if err != nil {
+		s.Logger.Error("failed to get userid from request access token")
+		sendError(w, http.StatusUnauthorized, "Try again later.")
+		return
+	}
+
+	var uq UserQuery
+	if uq, err = s.UserRepository.GetUserByID(userID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			errMsg := fmt.Sprintf("user api: user with id(%d) doesn't exist", userID)
+			s.Logger.Error(errMsg, zap.Int("userID", userID), zap.Error(err))
+			sendError(w, http.StatusNotFound, errMsg)
+		} else {
+			errMsg := fmt.Sprintf("user api: failed to get user with id(%d)", userID)
+			s.Logger.Error(errMsg, zap.Int("userID", userID), zap.Error(err))
+			sendError(w, http.StatusBadRequest, errMsg)
+		}
+		return
+	}
+
+	SetHeaderAndWriteResponse(w, http.StatusOK, uq.User)
+}
+
+// (POST /users/logout).
+func (s Server) PostAPIUsersMeLogout(w http.ResponseWriter, r *http.Request) {
+	userID, err := jwt.GetUserIDFromReq(r)
+	if err != nil {
+		s.Logger.Error("jwt not valid in logout", zap.Error(err))
+		RemoveCookies(w)
+		// still logout successfully, dont return error on logout
+		SetHeaderAndWriteResponse(w, http.StatusOK, "Logging out")
+		return
+	}
+
+	// Remove refresh token from db
+	if err = s.RefreshTokenRepository.DeleteRefreshTokenByUserID(userID); err != nil {
+		// no need to return early here
+		s.Logger.Errorf("failed to logout user", zap.Int("userID", userID), zap.Error(err))
+	}
+
+	RemoveCookies(w)
+	SetHeaderAndWriteResponse(w, http.StatusOK, "Logging out")
 }

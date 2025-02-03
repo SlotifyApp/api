@@ -16,7 +16,7 @@ type TeamRepositoryInterface interface {
 	DeleteTeamByID(int) error
 	GetAllTeamMembers(int) (Users, error)
 	GetTeamByID(int) (Team, error)
-	GetTeamsByQueryParams(GetTeamsParams) (Teams, error)
+	GetTeamsByQueryParams(GetAPITeamsParams) (Teams, error)
 }
 
 type TeamRepository struct {
@@ -35,7 +35,6 @@ func NewTeamRepository(logger *zap.SugaredLogger, db *sql.DB) TeamRepository {
 var _ TeamRepositoryInterface = (*TeamRepository)(nil)
 
 func (tr TeamRepository) AddUserToTeam(teamID int, userID int) error {
-	// TODO: What error is returned when teamID or userID don't exist? Make this a 400, and the rest 500
 	stmt, err := tr.db.Prepare("INSERT INTO UserToTeam (user_id, team_id) VALUES (?, ?)")
 	if err != nil {
 		return fmt.Errorf("team repository failed to add team member: %s: %w", PrepareStmtFail, err)
@@ -51,7 +50,7 @@ func (tr TeamRepository) AddUserToTeam(teamID int, userID int) error {
 	}
 
 	if rows != 1 {
-		return fmt.Errorf("team repository: %w", database.WrongNumberSQLRowsError{ActualRows: rows, ExpectedRows: 1})
+		return fmt.Errorf("team repository: %w", database.WrongNumberSQLRowsError{ActualRows: rows, ExpectedRows: []int64{1}})
 	}
 
 	return nil
@@ -75,6 +74,7 @@ func (tr TeamRepository) GetAllTeamMembers(teamID int) (Users, error) {
 		return Users{}, fmt.Errorf("team repository: %w: ", database.ErrTeamIDInvalid)
 	}
 
+	// TODO: Check if this is correct
 	query := "SELECT u.* FROM Team t JOIN UserToTeam utt ON t.id=utt.team_id JOIN User u ON u.id=utt.user_id WHERE t.id=?"
 	stmt, err := tr.db.Prepare(query)
 	if err != nil {
@@ -91,11 +91,11 @@ func (tr TeamRepository) GetAllTeamMembers(teamID int) (Users, error) {
 
 	users := Users{}
 	for rows.Next() {
-		var user User
-		if err = rows.Scan(&user.Id, &user.Email, &user.FirstName, &user.LastName); err != nil {
+		var uq UserQuery
+		if err = rows.Scan(&uq.Id, &uq.Email, &uq.FirstName, &uq.LastName, &uq.HomeAccountID); err != nil {
 			return Users{}, fmt.Errorf("team repository failed to scan rows: %w", err)
 		}
-		users = append(users, user)
+		users = append(users, uq.User)
 	}
 
 	if err = rows.Err(); err != nil {
@@ -135,14 +135,14 @@ func (tr TeamRepository) DeleteTeamByID(teamID int) error {
 	}
 
 	if rows != 1 {
-		return fmt.Errorf("team repository: %w", database.WrongNumberSQLRowsError{ActualRows: rows, ExpectedRows: 1})
+		return fmt.Errorf("team repository: %w", database.WrongNumberSQLRowsError{ActualRows: rows, ExpectedRows: []int64{1}})
 	}
 	return nil
 }
 
 // GetTeamsByQueryParams returns a list of teams matching the given
 // query parameters.
-func (tr TeamRepository) GetTeamsByQueryParams(params GetTeamsParams) (Teams, error) {
+func (tr TeamRepository) GetTeamsByQueryParams(params GetAPITeamsParams) (Teams, error) {
 	var args []any
 
 	query := "SELECT * FROM Team"
@@ -196,7 +196,8 @@ func (tr TeamRepository) AddTeam(teamCreate TeamCreate) (Team, error) {
 		return Team{}, fmt.Errorf("team repository: %w", err)
 	}
 	if rows != 1 {
-		return Team{}, fmt.Errorf("team repository: %w", database.WrongNumberSQLRowsError{ActualRows: rows, ExpectedRows: 1})
+		return Team{}, fmt.Errorf("team repository: %w",
+			database.WrongNumberSQLRowsError{ActualRows: rows, ExpectedRows: []int64{1}})
 	}
 
 	var id int64

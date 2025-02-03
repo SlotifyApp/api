@@ -38,10 +38,10 @@ func GetUserRows(t *testing.T, db *sql.DB) api.Users {
 
 	var users api.Users
 	for rows.Next() {
-		var user api.User
-		err = rows.Scan(&user.Id, &user.Email, &user.FirstName, &user.LastName)
+		var uq api.UserQuery
+		err = rows.Scan(&uq.Id, &uq.Email, &uq.FirstName, &uq.LastName, &uq.HomeAccountID)
 		require.NoError(t, err, "unable to scan rows")
-		users = append(users, user)
+		users = append(users, uq.User)
 	}
 
 	err = rows.Err()
@@ -125,7 +125,7 @@ func NewServerAndDB(t *testing.T, ctx context.Context) (*sql.DB, *api.Server) {
 	require.NoError(t, err, "error creating database handle")
 	require.NotNil(t, db, "db handle cannot be nil")
 
-	server, err := api.NewServerWithContext(ctx, db)
+	server, err := api.NewServerWithContext(ctx, db, api.WithNotInitMSALClient())
 
 	require.NoError(t, err, "error creating server ")
 	require.NotNil(t, db, "server cannot be nil")

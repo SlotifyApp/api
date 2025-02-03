@@ -1,4 +1,4 @@
-# Documentation for Slotify Backend API
+# Documentation for Slotify API
 
 <a name="documentation-for-api-endpoints"></a>
 ## Documentation for API Endpoints
@@ -7,22 +7,29 @@ All URIs are relative to *http://localhost*
 
 | Class | Method | HTTP request | Description |
 |------------ | ------------- | ------------- | -------------|
-| *DefaultApi* | [**deleteTeamsTeamID**](Apis/DefaultApi.md#deleteteamsteamid) | **DELETE** /teams/{teamID} | Delete a team by id |
-*DefaultApi* | [**deleteUsersUserID**](Apis/DefaultApi.md#deleteusersuserid) | **DELETE** /users/{userID} | Delete a user by id |
-*DefaultApi* | [**getTeamsTeamID**](Apis/DefaultApi.md#getteamsteamid) | **GET** /teams/{teamID} | Get a team by id |
-*DefaultApi* | [**getTeamsTeamIDUsers**](Apis/DefaultApi.md#getteamsteamidusers) | **GET** /teams/{teamID}/users | Get all members of a team |
-*DefaultApi* | [**getUsersUserID**](Apis/DefaultApi.md#getusersuserid) | **GET** /users/{userID} | Get a user by id |
-*DefaultApi* | [**healthcheckGet**](Apis/DefaultApi.md#healthcheckget) | **GET** /healthcheck | Healthcheck route |
-*DefaultApi* | [**postTeamsTeamIDUsersUserID**](Apis/DefaultApi.md#postteamsteamidusersuserid) | **POST** /teams/{teamID}/users/{userID} | Add a user to a team |
-*DefaultApi* | [**teamsGet**](Apis/DefaultApi.md#teamsget) | **GET** /teams | Get a team by query params |
-*DefaultApi* | [**teamsPost**](Apis/DefaultApi.md#teamspost) | **POST** /teams | Create a new team |
-*DefaultApi* | [**usersGet**](Apis/DefaultApi.md#usersget) | **GET** /users | Get a user by query params |
-*DefaultApi* | [**usersPost**](Apis/DefaultApi.md#userspost) | **POST** /users | Create a new user |
+| *DefaultApi* | [**deleteAPITeamsTeamID**](Apis/DefaultApi.md#deleteapiteamsteamid) | **DELETE** /api/teams/{teamID} | Delete a team by id |
+*DefaultApi* | [**deleteAPIUsersUserID**](Apis/DefaultApi.md#deleteapiusersuserid) | **DELETE** /api/users/{userID} | Delete a user by id |
+*DefaultApi* | [**getAPIAuthCallback**](Apis/DefaultApi.md#getapiauthcallback) | **GET** /api/auth/callback | Auth route for authorisation code flow |
+*DefaultApi* | [**getAPICalendarMe**](Apis/DefaultApi.md#getapicalendarme) | **GET** /api/calendar/me | get a user's calendar events |
+*DefaultApi* | [**getAPIHealthcheck**](Apis/DefaultApi.md#getapihealthcheck) | **GET** /api/healthcheck | Healthcheck route |
+*DefaultApi* | [**getAPITeams**](Apis/DefaultApi.md#getapiteams) | **GET** /api/teams | Get a team by query params |
+*DefaultApi* | [**getAPITeamsMe**](Apis/DefaultApi.md#getapiteamsme) | **GET** /api/teams/me | Get all teams for user by id passed by JWT |
+*DefaultApi* | [**getAPITeamsTeamID**](Apis/DefaultApi.md#getapiteamsteamid) | **GET** /api/teams/{teamID} | Get a team by id |
+*DefaultApi* | [**getAPITeamsTeamIDUsers**](Apis/DefaultApi.md#getapiteamsteamidusers) | **GET** /api/teams/{teamID}/users | Get all members of a team |
+*DefaultApi* | [**getAPIUsers**](Apis/DefaultApi.md#getapiusers) | **GET** /api/users | Get a user by query params |
+*DefaultApi* | [**getAPIUsersMe**](Apis/DefaultApi.md#getapiusersme) | **GET** /api/users/me | Get the user by id passed by JWT |
+*DefaultApi* | [**getAPIUsersUserID**](Apis/DefaultApi.md#getapiusersuserid) | **GET** /api/users/{userID} | Get a user by id |
+*DefaultApi* | [**postAPIRefresh**](Apis/DefaultApi.md#postapirefresh) | **POST** /api/refresh | Refresh Slotify access token and refresh token |
+*DefaultApi* | [**postAPITeams**](Apis/DefaultApi.md#postapiteams) | **POST** /api/teams | Create a new team |
+*DefaultApi* | [**postAPITeamsTeamIDUsersUserID**](Apis/DefaultApi.md#postapiteamsteamidusersuserid) | **POST** /api/teams/{teamID}/users/{userID} | Add a user to a team |
+*DefaultApi* | [**postAPIUsers**](Apis/DefaultApi.md#postapiusers) | **POST** /api/users | Create a new user |
+*DefaultApi* | [**postAPIUsersMeLogout**](Apis/DefaultApi.md#postapiusersmelogout) | **POST** /api/users/me/logout | Logout user |
 
 
 <a name="documentation-for-models"></a>
 ## Documentation for Models
 
+ - [CalendarEvent](./Models/CalendarEvent.md)
  - [Team](./Models/Team.md)
  - [TeamCreate](./Models/TeamCreate.md)
  - [User](./Models/User.md)
@@ -32,4 +39,8 @@ All URIs are relative to *http://localhost*
 <a name="documentation-for-authorization"></a>
 ## Documentation for Authorization
 
-All endpoints do not require authorization.
+<a name="bearerAuth"></a>
+### bearerAuth
+
+- **Type**: HTTP Bearer Token authentication (JWT)
+

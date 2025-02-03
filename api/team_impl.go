@@ -8,11 +8,31 @@ import (
 	"net/http"
 
 	"github.com/SlotifyApp/slotify-backend/database"
+	"github.com/SlotifyApp/slotify-backend/jwt"
 	"go.uber.org/zap"
 )
 
+// (GET /api/teams/me).
+func (s Server) GetAPITeamsMe(w http.ResponseWriter, r *http.Request) {
+	userID, err := jwt.GetUserIDFromReq(r)
+	if err != nil {
+		s.Logger.Error("failed to get userid from request access token")
+		sendError(w, http.StatusUnauthorized, "Try again later.")
+		return
+	}
+
+	teams, err := s.UserRepository.GetUsersTeams(userID)
+	if err != nil {
+		s.Logger.Errorf("failed to get user id(%d)'s teams", userID, zap.Error(err))
+		sendError(w, http.StatusInternalServerError, "Failed to get user's teams")
+		return
+	}
+
+	SetHeaderAndWriteResponse(w, http.StatusOK, teams)
+}
+
 // (GET /teams) Get a team by query params.
-func (s Server) GetTeams(w http.ResponseWriter, _ *http.Request, params GetTeamsParams) {
+func (s Server) GetAPITeams(w http.ResponseWriter, _ *http.Request, params GetAPITeamsParams) {
 	teams, err := s.TeamRepository.GetTeamsByQueryParams(params)
 	if err != nil {
 		s.Logger.Error(zap.Object("params", params), zap.Error(err))
@@ -24,13 +44,12 @@ func (s Server) GetTeams(w http.ResponseWriter, _ *http.Request, params GetTeams
 }
 
 // (POST /teams) Create a new team.
-func (s Server) PostTeams(w http.ResponseWriter, r *http.Request) {
-	var teamBody PostTeamsJSONRequestBody
+func (s Server) PostAPITeams(w http.ResponseWriter, r *http.Request) {
+	var teamBody PostAPITeamsJSONRequestBody
 	var err error
 	if err = json.NewDecoder(r.Body).Decode(&teamBody); err != nil {
-		errMsg := "failed to unmarshal request body correctly"
-		s.Logger.Error(errMsg, zap.Object("body", teamBody), zap.Error(err))
-		sendError(w, http.StatusBadRequest, errMsg)
+		s.Logger.Error(ErrUnmarshalBody, zap.Object("body", teamBody), zap.Error(err))
+		sendError(w, http.StatusBadRequest, ErrUnmarshalBody.Error())
 		return
 	}
 	var team Team
@@ -48,7 +67,7 @@ func (s Server) PostTeams(w http.ResponseWriter, r *http.Request) {
 }
 
 // (DELETE /teams/{teamID}) Delete a team by id.
-func (s Server) DeleteTeamsTeamID(w http.ResponseWriter, _ *http.Request, teamID int) {
+func (s Server) DeleteAPITeamsTeamID(w http.ResponseWriter, _ *http.Request, teamID int) {
 	if err := s.TeamRepository.DeleteTeamByID(teamID); err != nil {
 		if errors.Is(err, database.WrongNumberSQLRowsError{}) {
 			s.Logger.Error("team api: incorrect team ID", zap.Error(err))
@@ -64,7 +83,7 @@ func (s Server) DeleteTeamsTeamID(w http.ResponseWriter, _ *http.Request, teamID
 }
 
 // (GET /teams/{teamID}) Get a team by id.
-func (s Server) GetTeamsTeamID(w http.ResponseWriter, _ *http.Request, teamID int) {
+func (s Server) GetAPITeamsTeamID(w http.ResponseWriter, _ *http.Request, teamID int) {
 	team, err := s.TeamRepository.GetTeamByID(teamID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -81,7 +100,7 @@ func (s Server) GetTeamsTeamID(w http.ResponseWriter, _ *http.Request, teamID in
 }
 
 // (GET /teams/{teamID}/users) Get all members of a team.
-func (s Server) GetTeamsTeamIDUsers(w http.ResponseWriter, _ *http.Request, teamID int) {
+func (s Server) GetAPITeamsTeamIDUsers(w http.ResponseWriter, _ *http.Request, teamID int) {
 	var users Users
 	var err error
 	if users, err = s.TeamRepository.GetAllTeamMembers(teamID); err != nil {
@@ -101,7 +120,7 @@ func (s Server) GetTeamsTeamIDUsers(w http.ResponseWriter, _ *http.Request, team
 }
 
 // (POST /teams/{teamID}/users/{userID}) Add a user to a team.
-func (s Server) PostTeamsTeamIDUsersUserID(w http.ResponseWriter, _ *http.Request, teamID int, userID int) {
+func (s Server) PostAPITeamsTeamIDUsersUserID(w http.ResponseWriter, _ *http.Request, teamID int, userID int) {
 	if err := s.TeamRepository.AddUserToTeam(teamID, userID); err != nil {
 		if database.IsRowDoesNotExistSQLError(err) {
 			s.Logger.Errorf("team api: user id or team id invalid fk: %w", err)

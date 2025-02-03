@@ -12,11 +12,11 @@ var ErrTeamIDInvalid = errors.New("team id does not exist")
 
 type WrongNumberSQLRowsError struct {
 	ActualRows   int64
-	ExpectedRows int64
+	ExpectedRows []int64
 }
 
 func (e WrongNumberSQLRowsError) Error() string {
-	return fmt.Sprintf("expected %d affected rows, but got %d affected rows", e.ExpectedRows, e.ActualRows)
+	return fmt.Sprintf("expected %v affected rows, but got %d affected rows", e.ExpectedRows, e.ActualRows)
 }
 
 func (e WrongNumberSQLRowsError) Is(target error) bool {

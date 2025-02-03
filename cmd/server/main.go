@@ -8,31 +8,12 @@ import (
 
 	"github.com/SlotifyApp/slotify-backend/api"
 	"github.com/SlotifyApp/slotify-backend/database"
-	"github.com/getkin/kin-openapi/openapi3"
-	chi_middleware "github.com/go-chi/chi/v5/middleware"
-	"github.com/go-chi/httprate"
 	"github.com/gorilla/mux"
-	oapi_middleware "github.com/oapi-codegen/nethttp-middleware"
 )
 
 const (
 	readHeaderTimeout = 5
-	requestLimit      = 100
 )
-
-func applyMiddlewares(r *mux.Router, swagger *openapi3.T) {
-	middlewares := []mux.MiddlewareFunc{
-		chi_middleware.Logger,
-		chi_middleware.AllowContentType("application/json"),
-		httprate.LimitByIP(requestLimit, 1*time.Minute),
-		oapi_middleware.OapiRequestValidator(swagger),
-		chi_middleware.Recoverer,
-	}
-
-	for _, middleware := range middlewares {
-		r.Use(middleware)
-	}
-}
 
 func main() {
 	swagger, err := api.GetSwagger()
@@ -53,7 +34,7 @@ func main() {
 
 	r := mux.NewRouter()
 
-	applyMiddlewares(r, swagger)
+	api.ApplyMiddlewares(r, swagger)
 
 	h := api.HandlerFromMux(server, r)
 
