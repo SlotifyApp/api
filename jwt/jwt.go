@@ -31,8 +31,8 @@ type CustomClaims struct {
 	goJWT.RegisteredClaims
 }
 
-// CreateNewJWT returns a signed JWT.
-func CreateNewJWT(userID uint32, email string, keyEnv string) (string, error) {
+// GenerateJWT returns a signed JWT.
+func GenerateJWT(userID uint32, email string, keyEnv string) (string, error) {
 	m := map[string]time.Duration{
 		AccessTokenJWTSecretEnv:  time.Hour,
 		RefreshTokenJWTSecretEnv: OneWeek,
@@ -131,10 +131,11 @@ func GetUserIDFromReq(r *http.Request) (uint32, error) {
 	return claims.UserID, nil
 }
 
-// CreateNewRefreshToken will generate a new refresh token and store it in the database.
-func CreateNewRefreshToken(ctx context.Context, db *database.Database, userID uint32, email string) (string, error) {
-	// TODO: Put storing and creating in a sql transaction, so if one of those fails then neither are committed
-	refreshToken, err := CreateNewJWT(userID, email, RefreshTokenJWTSecretEnv)
+// GenerateAndStoreRefreshToken will generate a new refresh token and store it in the database.
+func GenerateAndStoreRefreshToken(ctx context.Context, qtx *database.Queries,
+	userID uint32, email string,
+) (string, error) {
+	refreshToken, err := GenerateJWT(userID, email, RefreshTokenJWTSecretEnv)
 	if err != nil {
 		return "", fmt.Errorf("failed to create refresh token: %w", err)
 	}
@@ -144,7 +145,7 @@ func CreateNewRefreshToken(ctx context.Context, db *database.Database, userID ui
 		Token:  refreshToken,
 	}
 
-	rowsAffected, err := db.CreateRefreshToken(ctx, dbParams)
+	rowsAffected, err := qtx.CreateRefreshToken(ctx, dbParams)
 	if err != nil {
 		switch {
 		case errors.Is(err, context.Canceled):
@@ -156,10 +157,11 @@ func CreateNewRefreshToken(ctx context.Context, db *database.Database, userID ui
 		}
 	}
 
-	if rowsAffected != 1 {
+	// Rows affected are 1 or 2 as REPLACE can affect 2 rows.
+	if rowsAffected < 1 || rowsAffected > 2 {
 		return "", database.WrongNumberSQLRowsError{
 			ActualRows:   rowsAffected,
-			ExpectedRows: []int64{1},
+			ExpectedRows: []int64{1, 2},
 		}
 	}
 

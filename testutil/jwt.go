@@ -10,7 +10,7 @@ import (
 )
 
 func CreateJWT(t *testing.T, userID uint32, email openapi_types.Email) string {
-	jwt, err := jwt.CreateNewJWT(userID, string(email), jwt.AccessTokenJWTSecretEnv)
+	jwt, err := jwt.GenerateJWT(userID, string(email), jwt.AccessTokenJWTSecretEnv)
 
 	require.NoError(t, err, "failed to create jwt token")
 

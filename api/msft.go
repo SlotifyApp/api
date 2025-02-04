@@ -83,8 +83,8 @@ func createMSALClient() (confidential.Client, error) {
 	return c, nil
 }
 
-// GetMSFTAccessToken gets a MSFT access token for a user.
-func GetMSFTAccessToken(ctx context.Context, c *confidential.Client,
+// getMSFTAccessToken gets a MSFT access token for a user.
+func getMSFTAccessToken(ctx context.Context, c *confidential.Client,
 	db *database.Database, userID uint32,
 ) (azcore.AccessToken, error) {
 	ctx, cancel := context.WithTimeout(ctx, database.DatabaseTimeout)
@@ -137,9 +137,9 @@ func GetMSFTAccessToken(ctx context.Context, c *confidential.Client,
 	return tk, nil
 }
 
-// MSFTAuthoriseByCode will exchange a authorisation code with an access token.
+// msftAuthoriseByCode will exchange a authorisation code with an access token.
 // The home account id is stored, using this an access token can be gained.
-func MSFTAuthoriseByCode(ctx context.Context, c *confidential.Client, authCode string) (MSFTTokenResult, error) {
+func msftAuthoriseByCode(ctx context.Context, c *confidential.Client, authCode string) (MSFTTokenResult, error) {
 	// MSAL fn to exchange auth code for token
 	res, err := c.AcquireTokenByAuthCode(ctx, authCode, "http://localhost:8080/api/auth/callback", getMSFTScopes())
 	if err != nil {
@@ -180,8 +180,8 @@ func (satp SlotifyAccessTokenProvider) GetToken(_ context.Context,
 	return satp.accessToken, nil
 }
 
-// CreateMSFTGraphClient creates a MSGraph SDK Client.
-func CreateMSFTGraphClient(accessToken azcore.AccessToken) (*msgraphsdk.GraphServiceClient, error) {
+// createMSFTGraphClient creates a MSGraph SDK Client.
+func createMSFTGraphClient(accessToken azcore.AccessToken) (*msgraphsdk.GraphServiceClient, error) {
 	satp := SlotifyAccessTokenProvider{
 		accessToken: accessToken,
 	}

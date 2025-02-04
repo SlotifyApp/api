@@ -167,6 +167,8 @@ linters-settings:
       - prometheus.ExponentialBuckets.*
       - prometheus.LinearBuckets
       - context.WithTimeout
+      - retry.Delay
+      - retry.Attempts
 
   nakedret:
     # Make an issue if func has more lines of code than this setting, and it has naked returns.
