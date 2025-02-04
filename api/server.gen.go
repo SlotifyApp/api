@@ -28,7 +28,7 @@ type CalendarEvent struct {
 
 // Team defines model for Team.
 type Team struct {
-	Id   int    `json:"id"`
+	Id   uint32 `json:"id"`
 	Name string `json:"name"`
 }
 
@@ -41,7 +41,7 @@ type TeamCreate struct {
 type User struct {
 	Email     openapi_types.Email `json:"email"`
 	FirstName string              `json:"firstName"`
-	Id        int                 `json:"id"`
+	Id        uint32              `json:"id"`
 	LastName  string              `json:"lastName"`
 }
 
@@ -107,16 +107,16 @@ type ServerInterface interface {
 	GetAPITeamsMe(w http.ResponseWriter, r *http.Request)
 	// Delete a team by id
 	// (DELETE /api/teams/{teamID})
-	DeleteAPITeamsTeamID(w http.ResponseWriter, r *http.Request, teamID int)
+	DeleteAPITeamsTeamID(w http.ResponseWriter, r *http.Request, teamID uint32)
 	// Get a team by id
 	// (GET /api/teams/{teamID})
-	GetAPITeamsTeamID(w http.ResponseWriter, r *http.Request, teamID int)
+	GetAPITeamsTeamID(w http.ResponseWriter, r *http.Request, teamID uint32)
 	// Get all members of a team
 	// (GET /api/teams/{teamID}/users)
-	GetAPITeamsTeamIDUsers(w http.ResponseWriter, r *http.Request, teamID int)
+	GetAPITeamsTeamIDUsers(w http.ResponseWriter, r *http.Request, teamID uint32)
 	// Add a user to a team
 	// (POST /api/teams/{teamID}/users/{userID})
-	PostAPITeamsTeamIDUsersUserID(w http.ResponseWriter, r *http.Request, teamID int, userID int)
+	PostAPITeamsTeamIDUsersUserID(w http.ResponseWriter, r *http.Request, teamID uint32, userID uint32)
 	// Get a user by query params
 	// (GET /api/users)
 	GetAPIUsers(w http.ResponseWriter, r *http.Request, params GetAPIUsersParams)
@@ -131,10 +131,10 @@ type ServerInterface interface {
 	PostAPIUsersMeLogout(w http.ResponseWriter, r *http.Request)
 	// Delete a user by id
 	// (DELETE /api/users/{userID})
-	DeleteAPIUsersUserID(w http.ResponseWriter, r *http.Request, userID int)
+	DeleteAPIUsersUserID(w http.ResponseWriter, r *http.Request, userID uint32)
 	// Get a user by id
 	// (GET /api/users/{userID})
-	GetAPIUsersUserID(w http.ResponseWriter, r *http.Request, userID int)
+	GetAPIUsersUserID(w http.ResponseWriter, r *http.Request, userID uint32)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -298,7 +298,7 @@ func (siw *ServerInterfaceWrapper) DeleteAPITeamsTeamID(w http.ResponseWriter, r
 	var err error
 
 	// ------------- Path parameter "teamID" -------------
-	var teamID int
+	var teamID uint32
 
 	err = runtime.BindStyledParameterWithOptions("simple", "teamID", mux.Vars(r)["teamID"], &teamID, runtime.BindStyledParameterOptions{Explode: false, Required: true})
 	if err != nil {
@@ -323,7 +323,7 @@ func (siw *ServerInterfaceWrapper) GetAPITeamsTeamID(w http.ResponseWriter, r *h
 	var err error
 
 	// ------------- Path parameter "teamID" -------------
-	var teamID int
+	var teamID uint32
 
 	err = runtime.BindStyledParameterWithOptions("simple", "teamID", mux.Vars(r)["teamID"], &teamID, runtime.BindStyledParameterOptions{Explode: false, Required: true})
 	if err != nil {
@@ -348,7 +348,7 @@ func (siw *ServerInterfaceWrapper) GetAPITeamsTeamIDUsers(w http.ResponseWriter,
 	var err error
 
 	// ------------- Path parameter "teamID" -------------
-	var teamID int
+	var teamID uint32
 
 	err = runtime.BindStyledParameterWithOptions("simple", "teamID", mux.Vars(r)["teamID"], &teamID, runtime.BindStyledParameterOptions{Explode: false, Required: true})
 	if err != nil {
@@ -373,7 +373,7 @@ func (siw *ServerInterfaceWrapper) PostAPITeamsTeamIDUsersUserID(w http.Response
 	var err error
 
 	// ------------- Path parameter "teamID" -------------
-	var teamID int
+	var teamID uint32
 
 	err = runtime.BindStyledParameterWithOptions("simple", "teamID", mux.Vars(r)["teamID"], &teamID, runtime.BindStyledParameterOptions{Explode: false, Required: true})
 	if err != nil {
@@ -382,7 +382,7 @@ func (siw *ServerInterfaceWrapper) PostAPITeamsTeamIDUsersUserID(w http.Response
 	}
 
 	// ------------- Path parameter "userID" -------------
-	var userID int
+	var userID uint32
 
 	err = runtime.BindStyledParameterWithOptions("simple", "userID", mux.Vars(r)["userID"], &userID, runtime.BindStyledParameterOptions{Explode: false, Required: true})
 	if err != nil {
@@ -492,7 +492,7 @@ func (siw *ServerInterfaceWrapper) DeleteAPIUsersUserID(w http.ResponseWriter, r
 	var err error
 
 	// ------------- Path parameter "userID" -------------
-	var userID int
+	var userID uint32
 
 	err = runtime.BindStyledParameterWithOptions("simple", "userID", mux.Vars(r)["userID"], &userID, runtime.BindStyledParameterOptions{Explode: false, Required: true})
 	if err != nil {
@@ -517,7 +517,7 @@ func (siw *ServerInterfaceWrapper) GetAPIUsersUserID(w http.ResponseWriter, r *h
 	var err error
 
 	// ------------- Path parameter "userID" -------------
-	var userID int
+	var userID uint32
 
 	err = runtime.BindStyledParameterWithOptions("simple", "userID", mux.Vars(r)["userID"], &userID, runtime.BindStyledParameterOptions{Explode: false, Required: true})
 	if err != nil {
@@ -689,32 +689,32 @@ func HandlerWithOptions(si ServerInterface, options GorillaServerOptions) http.H
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"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",
+	"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",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file

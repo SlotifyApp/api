@@ -2,17 +2,19 @@ package api
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
+	"github.com/SlotifyApp/slotify-backend/database"
 	"github.com/SlotifyApp/slotify-backend/jwt"
+	"github.com/avast/retry-go"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-
-	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
 const (
@@ -79,7 +81,7 @@ func (u User) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 	if err := userCreate.MarshalLogObject(enc); err != nil {
 		return fmt.Errorf("failed to marshal User obj: %v", err.Error())
 	}
-	enc.AddInt("id", u.Id)
+	enc.AddUint32("id", u.Id)
 	return nil
 }
 
@@ -106,7 +108,7 @@ func (t Team) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 	if err := teamCreate.MarshalLogObject(enc); err != nil {
 		return fmt.Errorf("failed to marshal Team obj: %v", err.Error())
 	}
-	enc.AddInt("id", t.Id)
+	enc.AddUint32("id", t.Id)
 	return nil
 }
 
@@ -159,16 +161,20 @@ type AccessAndRefreshTokens struct {
 	RefreshToken string
 }
 
-func createAndStoreTokens(userID int, email string, rtr RefreshTokenRepository) (AccessAndRefreshTokens, error) {
+// createAndStoreTokens will generate an access and refresh token and store the refresh token.
+func createAndStoreTokens(qtx database.Queries, userID uint32, email string) (AccessAndRefreshTokens, error) {
 	var accessToken string
 	var err error
-	if accessToken, err = jwt.CreateNewJWT(userID, email, jwt.AccessTokenJWTSecretEnv); err != nil {
+	if accessToken, err = jwt.GenerateJWT(userID, email, jwt.AccessTokenJWTSecretEnv); err != nil {
 		return AccessAndRefreshTokens{}, fmt.Errorf("failed to create jwt: %w", err)
 	}
 
-	// TODO: Put storing and creating in a sql transaction, so if one of those fails then neither are committed
+	ctx, cancel := context.WithTimeout(context.Background(), database.DatabaseTimeout)
+	defer cancel()
+
 	var refreshToken string
-	if refreshToken, err = rtr.CreateRefreshToken(userID, email); err != nil {
+	refreshToken, err = jwt.GenerateAndStoreRefreshToken(ctx, &qtx, userID, email)
+	if err != nil {
 		return AccessAndRefreshTokens{}, fmt.Errorf("failed to create refresh token: %w", err)
 	}
 
@@ -178,58 +184,105 @@ func createAndStoreTokens(userID int, email string, rtr RefreshTokenRepository) 
 	}, nil
 }
 
-// getUserByClaimEmail will get user by the claim email or it will create a new user and return this user.
-func getUserByClaimEmail(ur UserRepository, msftTokenRes MSFTTokenResult) (User, error) {
+// getUserByClaimEmail will get user by the claim email or if first time log in, it will create a new user.
+func getUserByClaimEmail(qtx *database.Queries, msftTokenRes MSFTTokenResult) (database.User, error) {
 	email := msftTokenRes.Email
-	var users Users
-	var err error
-	users, err = ur.GetUsersByQueryParams(GetAPIUsersParams{
-		Email: (*openapi_types.Email)(&email),
-	})
+	// Double the timeout due to more db operations
+	ctx, cancel := context.WithTimeout(context.TODO(), 20*time.Second)
+	defer cancel()
+
+	count, err := qtx.CountUserByEmail(ctx, email)
 	if err != nil {
-		return User{}, fmt.Errorf("failed to get user from claim email: %w", err)
+		return database.User{}, fmt.Errorf("failed to get user count by claim email: %w", err)
 	}
 
-	var u User
-	if len(users) == 0 {
-		u, err = ur.CreateUser(UserCreate{
-			Email:     openapi_types.Email(email),
+	// User doesn't exist, first time signing so create a new user
+	if count == 0 {
+		dbParams := database.CreateUserParams{
+			Email:     email,
 			FirstName: msftTokenRes.FirstName,
 			LastName:  msftTokenRes.LastName,
-		})
-		if err != nil {
-			return User{}, fmt.Errorf("failed to create user for claim email: %w", err)
 		}
-	} else {
-		u = users[0]
+		_, err = qtx.CreateUser(ctx, dbParams)
+		if err != nil {
+			return database.User{}, fmt.Errorf("failed to create user for claim email: %w", err)
+		}
 	}
 
-	if err = ur.UpdateUserHomeAccountID(u.Id, msftTokenRes.HomeAccountID); err != nil {
-		return User{}, fmt.Errorf("failed to update user home account id: %w", err)
+	var u database.User
+
+	u, err = qtx.GetUserByEmail(ctx, email)
+	if err != nil {
+		return database.User{}, fmt.Errorf("failed to get user with claim email: %w", err)
+	}
+
+	// Update user's home account id so it can be used when asking for a MSFT access token
+	dbParams := database.UpdateUserHomeAccountIDParams{
+		ID:                u.ID,
+		MsftHomeAccountID: sql.NullString{String: msftTokenRes.HomeAccountID, Valid: true},
+	}
+	var rowsAffected int64
+	rowsAffected, err = qtx.UpdateUserHomeAccountID(ctx, dbParams)
+	if err != nil {
+		return database.User{}, fmt.Errorf("failed to update user home account id: %w", err)
+	}
+
+	// UpdateUserHomeAccountID will either update 1 or 0 rows.
+	if rowsAffected > 1 {
+		err = database.WrongNumberSQLRowsError{
+			ActualRows:   rowsAffected,
+			ExpectedRows: []int64{0, 1},
+		}
+		return database.User{}, fmt.Errorf("failed to update home account id: %w", err)
 	}
 
 	return u, nil
 }
 
 func (s Server) GetAPIAuthCallback(w http.ResponseWriter, r *http.Request, params GetAPIAuthCallbackParams) {
-	msftTokenRes, err := MSFTAuthoriseByCode(context.Background(), s.MSALClient, params.Code)
+	msftTokenRes, err := msftAuthoriseByCode(context.Background(), s.MSALClient, params.Code)
 	if err != nil {
 		s.Logger.Error("failed to get microsoft tokens", zap.Error(err))
 		sendError(w, http.StatusInternalServerError, "Sorry, try again later. Failed to get Microsoft tokens.")
 		return
 	}
 
-	var u User
-	if u, err = getUserByClaimEmail(s.UserRepository, msftTokenRes); err != nil {
-		s.Logger.Error("failed to get user for claim email", zap.Error(err))
-		sendError(w, http.StatusInternalServerError, "Sorry, try again later")
+	tx, err := s.DB.DB.Begin()
+	if err != nil {
+		s.Logger.Error("failed to start db transaction", zap.Error(err))
+		sendError(w, http.StatusInternalServerError, "callback route: failed to start db transaction")
 		return
 	}
 
+	defer func() {
+		if err = tx.Rollback(); err != nil {
+			s.Logger.Error("failed to rollback db transaction")
+		}
+	}()
+	qtx := s.DB.WithTx(tx)
+
 	var tks AccessAndRefreshTokens
-	if tks, err = createAndStoreTokens(u.Id, string(u.Email), s.RefreshTokenRepository); err != nil {
-		s.Logger.Error("failed to create and store tokens", zap.Error(err))
-		sendError(w, http.StatusInternalServerError, "sorry, try again")
+	err = retry.Do(func() error {
+		var u database.User
+		if u, err = getUserByClaimEmail(qtx, msftTokenRes); err != nil {
+			s.Logger.Error("failed to get user for claim email", zap.Error(err))
+			return err
+		}
+
+		if tks, err = createAndStoreTokens(*qtx, u.ID, u.Email); err != nil {
+			s.Logger.Error("failed to create and store tokens", zap.Error(err))
+			return err
+		}
+
+		if err = tx.Commit(); err != nil {
+			s.Logger.Error("failed to commit db transaction", zap.Error(err))
+			return err
+		}
+		return nil
+	}, retry.Attempts(3), retry.Delay(time.Millisecond*500))
+	if err != nil {
+		s.Logger.Error("All retries to get user by claim email and store tokens failed", zap.Error(err))
+		sendError(w, http.StatusInternalServerError, "Sorry, try again later.")
 		return
 	}
 
@@ -254,8 +307,11 @@ func (s Server) PostAPIRefresh(w http.ResponseWriter, r *http.Request) {
 
 	userID := claims.UserID
 
-	var rt jwt.RefreshToken
-	if rt, err = s.RefreshTokenRepository.GetRefreshTokenByUserID(userID); err != nil {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*database.DatabaseTimeout)
+	defer cancel()
+
+	var rt database.RefreshToken
+	if rt, err = s.DB.GetRefreshTokenByUserID(ctx, userID); err != nil {
 		s.Logger.Error("failed to get refresh token for user", zap.Error(err))
 		sendError(w, http.StatusUnauthorized, "failed to refresh token")
 		return
@@ -269,8 +325,8 @@ func (s Server) PostAPIRefresh(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Generate new access token and new refresh token
-	var uq UserQuery
-	if uq, err = s.UserRepository.GetUserByID(userID); err != nil {
+	var uq database.User
+	if uq, err = s.DB.GetUserByID(ctx, userID); err != nil {
 		s.Logger.Error("Failed to refresh token", zap.Error(err))
 		sendError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -278,20 +334,45 @@ func (s Server) PostAPIRefresh(w http.ResponseWriter, r *http.Request) {
 
 	// Create new access token
 	var accessToken string
-	if accessToken, err = jwt.CreateNewJWT(userID, string(uq.Email), jwt.AccessTokenJWTSecretEnv); err != nil {
+	if accessToken, err = jwt.GenerateJWT(userID, uq.Email, jwt.AccessTokenJWTSecretEnv); err != nil {
 		s.Logger.Error("Failed to refresh token", zap.Error(err))
 		sendError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	// Create new refresh token
-	if refreshToken, err = s.RefreshTokenRepository.CreateRefreshToken(userID, string(uq.Email)); err != nil {
-		s.Logger.Error("Failed to refresh token", zap.Error(err))
+	var newRefreshToken string
+	tx, err := s.DB.DB.Begin()
+	if err != nil {
+		s.Logger.Error("Failed to start db transaction", zap.Error(err))
 		sendError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	defer func() {
+		if err = tx.Rollback(); err != nil {
+			s.Logger.Error("failed to rollback db transaction")
+		}
+	}()
+	qtx := s.DB.WithTx(tx)
 
-	CreateCookies(w, accessToken, refreshToken)
+	err = retry.Do(func() error {
+		// Create new refresh token
+		if newRefreshToken, err = jwt.GenerateAndStoreRefreshToken(ctx, qtx, userID, uq.Email); err != nil {
+			s.Logger.Error("Failed to refresh token", zap.Error(err))
+			return err
+		}
+
+		if err = tx.Commit(); err != nil {
+			s.Logger.Error("Failed to commit db transaction", zap.Error(err))
+			return err
+		}
+		return nil
+	}, retry.Attempts(3), retry.Delay(time.Millisecond*500))
+	if err != nil {
+		s.Logger.Error("all retries to generate and store token failed", zap.Error(err))
+		sendError(w, http.StatusInternalServerError, "Sorry, try again.")
+	}
+
+	CreateCookies(w, accessToken, newRefreshToken)
 
 	SetHeaderAndWriteResponse(w, http.StatusCreated, "Successfully refreshed tokens")
 }

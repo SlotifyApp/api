@@ -10,6 +10,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 	"github.com/AzureAD/microsoft-authentication-library-for-go/apps/confidential"
+	"github.com/SlotifyApp/slotify-backend/database"
 	"github.com/coreos/go-oidc/v3/oidc"
 	msgraphsdk "github.com/microsoftgraph/msgraph-sdk-go"
 )
@@ -82,22 +83,38 @@ func createMSALClient() (confidential.Client, error) {
 	return c, nil
 }
 
-// GetMSFTAccessToken gets a MSFT access token for a user.
-func GetMSFTAccessToken(ctx context.Context, c *confidential.Client,
-	ur UserRepositoryInterface, userID int,
+// getMSFTAccessToken gets a MSFT access token for a user.
+func getMSFTAccessToken(ctx context.Context, c *confidential.Client,
+	db *database.Database, userID uint32,
 ) (azcore.AccessToken, error) {
-	user, err := ur.GetUserByID(userID)
+	ctx, cancel := context.WithTimeout(ctx, database.DatabaseTimeout)
+	defer cancel()
+
+	user, err := db.GetUserByID(ctx, userID)
 	if err != nil {
-		return azcore.AccessToken{}, fmt.Errorf("failed to get user by id: %w", err)
+		switch {
+		case errors.Is(err, context.Canceled):
+			log.Print("getMSFTaccesstoken: context cancelled")
+			return azcore.AccessToken{},
+				fmt.Errorf("failed to get user by id: context cancelled: %w", err)
+		case errors.Is(err, context.DeadlineExceeded):
+			log.Print("getMSFTaccesstoken: query timed out")
+			return azcore.AccessToken{},
+				fmt.Errorf("failed to get user by id: query timed out: %w", err)
+		default:
+			log.Print("getMSFTaccesstoken: query timed out")
+			return azcore.AccessToken{},
+				fmt.Errorf("failed to get user by id: %w", err)
+		}
 	}
 
 	// HomeAccountID is NULL, should not happen. This is set when a user logs in.
-	if !user.HomeAccountID.Valid {
+	if !user.MsftHomeAccountID.Valid {
 		return azcore.AccessToken{}, errors.New("msft_home_account_id was null")
 	}
 
 	// msal attempts to get account cache, if this fails user has to reauthenticate
-	account, err := c.Account(ctx, user.HomeAccountID.String)
+	account, err := c.Account(ctx, user.MsftHomeAccountID.String)
 	if err != nil {
 		return azcore.AccessToken{}, fmt.Errorf("msal failed to get account by home account id: %w: %w", ErrMSALCache, err)
 	}
@@ -120,9 +137,9 @@ func GetMSFTAccessToken(ctx context.Context, c *confidential.Client,
 	return tk, nil
 }
 
-// MSFTAuthoriseByCode will exchange a authorisation code with an access token.
+// msftAuthoriseByCode will exchange a authorisation code with an access token.
 // The home account id is stored, using this an access token can be gained.
-func MSFTAuthoriseByCode(ctx context.Context, c *confidential.Client, authCode string) (MSFTTokenResult, error) {
+func msftAuthoriseByCode(ctx context.Context, c *confidential.Client, authCode string) (MSFTTokenResult, error) {
 	// MSAL fn to exchange auth code for token
 	res, err := c.AcquireTokenByAuthCode(ctx, authCode, "http://localhost:8080/api/auth/callback", getMSFTScopes())
 	if err != nil {
@@ -136,8 +153,6 @@ func MSFTAuthoriseByCode(ctx context.Context, c *confidential.Client, authCode s
 	if res.Account.IsZero() {
 		return MSFTTokenResult{}, errors.New("msft id token was zero value")
 	}
-
-	log.Printf("account: %+v", res.Account)
 
 	firstName := res.IDToken.GivenName
 	lastName := res.IDToken.FamilyName
@@ -165,8 +180,8 @@ func (satp SlotifyAccessTokenProvider) GetToken(_ context.Context,
 	return satp.accessToken, nil
 }
 
-// CreateMSFTGraphClient creates a MSGraph SDK Client.
-func CreateMSFTGraphClient(accessToken azcore.AccessToken) (*msgraphsdk.GraphServiceClient, error) {
+// createMSFTGraphClient creates a MSGraph SDK Client.
+func createMSFTGraphClient(accessToken azcore.AccessToken) (*msgraphsdk.GraphServiceClient, error) {
 	satp := SlotifyAccessTokenProvider{
 		accessToken: accessToken,
 	}

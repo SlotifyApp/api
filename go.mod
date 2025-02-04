@@ -53,6 +53,7 @@ require (
 
 require (
 	github.com/AzureAD/microsoft-authentication-library-for-go v1.3.3
+	github.com/avast/retry-go v3.0.0+incompatible
 	github.com/coreos/go-oidc/v3 v3.12.0
 	github.com/go-chi/chi/v5 v5.2.0
 	github.com/go-chi/httprate v0.14.1

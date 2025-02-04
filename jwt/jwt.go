@@ -1,6 +1,7 @@
 package jwt
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -8,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/SlotifyApp/slotify-backend/database"
 	goJWT "github.com/golang-jwt/jwt/v5"
 )
 
@@ -25,20 +27,12 @@ var (
 
 // CustomClaims is a struct for Slotify JWT claims.
 type CustomClaims struct {
-	UserID int `json:"user_id"`
+	UserID uint32 `json:"user_id"`
 	goJWT.RegisteredClaims
 }
 
-// RefreshToken is a struct for Slotify refresh tokens.
-type RefreshToken struct {
-	ID      int
-	UserID  int
-	Token   string
-	Revoked bool
-}
-
-// CreateNewJWT returns a signed JWT.
-func CreateNewJWT(userID int, email string, keyEnv string) (string, error) {
+// GenerateJWT returns a signed JWT.
+func GenerateJWT(userID uint32, email string, keyEnv string) (string, error) {
 	m := map[string]time.Duration{
 		AccessTokenJWTSecretEnv:  time.Hour,
 		RefreshTokenJWTSecretEnv: OneWeek,
@@ -123,7 +117,7 @@ func GetJWTFromRequest(req *http.Request) (string, error) {
 }
 
 // GetUserIDFromReq gets the user id from the request Authorization header.
-func GetUserIDFromReq(r *http.Request) (int, error) {
+func GetUserIDFromReq(r *http.Request) (uint32, error) {
 	var err error
 	var accessToken string
 	if accessToken, err = GetJWTFromRequest(r); err != nil {
@@ -135,4 +129,41 @@ func GetUserIDFromReq(r *http.Request) (int, error) {
 	}
 
 	return claims.UserID, nil
+}
+
+// GenerateAndStoreRefreshToken will generate a new refresh token and store it in the database.
+func GenerateAndStoreRefreshToken(ctx context.Context, qtx *database.Queries,
+	userID uint32, email string,
+) (string, error) {
+	refreshToken, err := GenerateJWT(userID, email, RefreshTokenJWTSecretEnv)
+	if err != nil {
+		return "", fmt.Errorf("failed to create refresh token: %w", err)
+	}
+
+	dbParams := database.CreateRefreshTokenParams{
+		UserID: userID,
+		Token:  refreshToken,
+	}
+
+	rowsAffected, err := qtx.CreateRefreshToken(ctx, dbParams)
+	if err != nil {
+		switch {
+		case errors.Is(err, context.Canceled):
+			return "", fmt.Errorf("context cancelled during create refresh token: %w", err)
+		case errors.Is(err, context.DeadlineExceeded):
+			return "", fmt.Errorf("create refresh token timed out: %w", err)
+		default:
+			return "", fmt.Errorf("failed to create refresh token: %w", err)
+		}
+	}
+
+	// Rows affected are 1 or 2 as REPLACE can affect 2 rows.
+	if rowsAffected < 1 || rowsAffected > 2 {
+		return "", database.WrongNumberSQLRowsError{
+			ActualRows:   rowsAffected,
+			ExpectedRows: []int64{1, 2},
+		}
+	}
+
+	return refreshToken, nil
 }

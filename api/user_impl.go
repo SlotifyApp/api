@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -9,16 +10,35 @@ import (
 
 	"github.com/SlotifyApp/slotify-backend/database"
 	"github.com/SlotifyApp/slotify-backend/jwt"
+	openapi_types "github.com/oapi-codegen/runtime/types"
 	"go.uber.org/zap"
 )
 
 // (GET /users) Get a user by query params.
 func (s Server) GetAPIUsers(w http.ResponseWriter, _ *http.Request, params GetAPIUsersParams) {
-	users, err := s.UserRepository.GetUsersByQueryParams(params)
+	ctx, cancel := context.WithTimeout(context.Background(), database.DatabaseTimeout)
+	defer cancel()
+
+	users, err := s.DB.ListUsers(ctx, database.ListUsersParams{
+		Email:     params.Email,
+		FirstName: params.FirstName,
+		LastName:  params.LastName,
+	})
 	if err != nil {
-		s.Logger.Error("user api: failed to get users", zap.Error(err))
-		sendError(w, http.StatusInternalServerError, "user api: failed to get users")
-		return
+		switch {
+		case errors.Is(err, context.Canceled):
+			s.Logger.Error("user api: failed to get users: context cancelled")
+			sendError(w, http.StatusInternalServerError, "user api: failed to get users")
+			return
+		case errors.Is(err, context.DeadlineExceeded):
+			s.Logger.Error("user api: failed to get users: query timed out")
+			sendError(w, http.StatusInternalServerError, "user api: failed to get users")
+			return
+		default:
+			s.Logger.Error("user api: failed to get users")
+			sendError(w, http.StatusInternalServerError, "user api: failed to get users")
+			return
+		}
 	}
 
 	SetHeaderAndWriteResponse(w, http.StatusOK, users)
@@ -39,55 +59,118 @@ func (s Server) PostAPIUsers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var user User
-	if user, err = s.UserRepository.CreateUser(userBody); err != nil {
-		if database.IsDuplicateEntrySQLError(err) {
+	var userID int64
+	ctx, cancel := context.WithTimeout(context.Background(), database.DatabaseTimeout)
+	defer cancel()
+	userID, err = s.DB.CreateUser(ctx, database.CreateUserParams{
+		Email:     string(userBody.Email),
+		FirstName: userBody.FirstName,
+		LastName:  userBody.LastName,
+	})
+	if err != nil {
+		switch {
+		case errors.Is(err, context.Canceled):
+			s.Logger.Error("user api: context cancelled", zap.Object("req_body", userBody), zap.Error(err))
+			sendError(w, http.StatusInternalServerError, "user api: context cancelled")
+		case errors.Is(err, context.DeadlineExceeded):
+			s.Logger.Error("user api: query timed out", zap.Object("req_body", userBody), zap.Error(err))
+			sendError(w, http.StatusInternalServerError, "DB query timed out")
+
+		case database.IsDuplicateEntrySQLError(err):
 			s.Logger.Error("user api: user already exists", zap.Object("req_body", userBody), zap.Error(err))
 			sendError(w, http.StatusBadRequest, fmt.Sprintf("user with email %s already exists", userBody.Email))
-			return
+		default:
+			s.Logger.Error("user api failed to create user", zap.Object("req_body", userBody), zap.Error(err))
+			sendError(w, http.StatusInternalServerError, "user api failed to create user")
 		}
-		s.Logger.Error("user api failed to create user", zap.Object("req_body", userBody), zap.Error(err))
-		sendError(w, http.StatusInternalServerError, "user api failed to create user")
 		return
 	}
 
-	SetHeaderAndWriteResponse(w, http.StatusCreated, user)
+	u := User{
+		//nolint: gosec // id is unsigned 32 bit int
+		Id:        uint32(userID),
+		FirstName: userBody.FirstName,
+		LastName:  userBody.LastName,
+		Email:     userBody.Email,
+	}
+
+	SetHeaderAndWriteResponse(w, http.StatusCreated, u)
 }
 
 // (DELETE /users/{userID}) Delete a user by id.
-func (s Server) DeleteAPIUsersUserID(w http.ResponseWriter, _ *http.Request, userID int) {
-	if err := s.UserRepository.DeleteUserByID(userID); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			errMsg := fmt.Sprintf("user api: user with id(%d) doesn't exist", userID)
-			s.Logger.Error(errMsg, zap.Int("userID", userID), zap.Error(err))
-			sendError(w, http.StatusBadRequest, errMsg)
+func (s Server) DeleteAPIUsersUserID(w http.ResponseWriter, _ *http.Request, userID uint32) {
+	ctx, cancel := context.WithTimeout(context.Background(), database.DatabaseTimeout)
+	defer cancel()
+
+	rowsDeleted, err := s.DB.DeleteUserByID(ctx, userID)
+	if err != nil {
+		switch {
+		case errors.Is(err, context.Canceled):
+			s.Logger.Error("user api: context cancelled", zap.Uint32("userID", userID), zap.Error(err))
+			sendError(w, http.StatusInternalServerError, "user api: context cancelled")
+			return
+		case errors.Is(err, context.DeadlineExceeded):
+			s.Logger.Error("user api: query timed out", zap.Uint32("userID", userID), zap.Error(err))
+			sendError(w, http.StatusInternalServerError, "user api: query timed out")
+			return
+		default:
+			s.Logger.Error("user api failed to delete user", zap.Uint32("userID", userID), zap.Error(err))
+			sendError(w, http.StatusInternalServerError, "user api failed to delete user")
 			return
 		}
-		s.Logger.Error("user api failed to delete user", zap.Int("userID", userID), zap.Error(err))
-		sendError(w, http.StatusInternalServerError, "user api failed to delete user")
+	}
+
+	if rowsDeleted != 1 {
+		err = database.WrongNumberSQLRowsError{
+			ActualRows:   rowsDeleted,
+			ExpectedRows: []int64{1},
+		}
+		errMsg := fmt.Sprintf("user api: user with id(%d) doesn't exist", userID)
+		s.Logger.Error(errMsg, zap.Uint32("userID", userID), zap.Error(err))
+		sendError(w, http.StatusBadRequest, errMsg)
 		return
 	}
+
 	SetHeaderAndWriteResponse(w, http.StatusOK, "user deleted successfully")
 }
 
 // (GET /users/{userID}) Get a user by id.
-func (s Server) GetAPIUsersUserID(w http.ResponseWriter, _ *http.Request, userID int) {
-	var uq UserQuery
-	var err error
-	if uq, err = s.UserRepository.GetUserByID(userID); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+func (s Server) GetAPIUsersUserID(w http.ResponseWriter, _ *http.Request, userID uint32) {
+	ctx, cancel := context.WithTimeout(context.Background(), database.DatabaseTimeout)
+	defer cancel()
+
+	dbUser, err := s.DB.GetUserByID(ctx, userID)
+	if err != nil {
+		switch {
+		case errors.Is(err, context.Canceled):
+			s.Logger.Error("user api: context cancelled", zap.Uint32("userID", userID), zap.Error(err))
+			sendError(w, http.StatusInternalServerError, "user api: context cancelled")
+
+		case errors.Is(err, context.DeadlineExceeded):
+			s.Logger.Error("user api: query timed out", zap.Uint32("userID", userID), zap.Error(err))
+			sendError(w, http.StatusInternalServerError, "user api: query timed out")
+
+		case errors.Is(err, sql.ErrNoRows):
 			errMsg := fmt.Sprintf("user api: user with id(%d) doesn't exist", userID)
-			s.Logger.Error(errMsg, zap.Int("userID", userID), zap.Error(err))
+			s.Logger.Error(errMsg, zap.Uint32("userID", userID), zap.Error(err))
 			sendError(w, http.StatusNotFound, errMsg)
-		} else {
+
+		default:
 			errMsg := fmt.Sprintf("user api: failed to get user with id(%d)", userID)
-			s.Logger.Error(errMsg, zap.Int("userID", userID), zap.Error(err))
+			s.Logger.Error(errMsg, zap.Uint32("userID", userID), zap.Error(err))
 			sendError(w, http.StatusBadRequest, errMsg)
 		}
 		return
 	}
 
-	SetHeaderAndWriteResponse(w, http.StatusOK, uq.User)
+	u := User{
+		Id:        dbUser.ID,
+		Email:     openapi_types.Email(dbUser.Email),
+		FirstName: dbUser.FirstName,
+		LastName:  dbUser.LastName,
+	}
+
+	SetHeaderAndWriteResponse(w, http.StatusOK, u)
 }
 
 // (GET /users/me).
@@ -99,21 +182,7 @@ func (s Server) GetAPIUsersMe(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var uq UserQuery
-	if uq, err = s.UserRepository.GetUserByID(userID); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			errMsg := fmt.Sprintf("user api: user with id(%d) doesn't exist", userID)
-			s.Logger.Error(errMsg, zap.Int("userID", userID), zap.Error(err))
-			sendError(w, http.StatusNotFound, errMsg)
-		} else {
-			errMsg := fmt.Sprintf("user api: failed to get user with id(%d)", userID)
-			s.Logger.Error(errMsg, zap.Int("userID", userID), zap.Error(err))
-			sendError(w, http.StatusBadRequest, errMsg)
-		}
-		return
-	}
-
-	SetHeaderAndWriteResponse(w, http.StatusOK, uq.User)
+	s.GetAPIUsersUserID(w, r, userID)
 }
 
 // (POST /users/logout).
@@ -127,10 +196,34 @@ func (s Server) PostAPIUsersMeLogout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	ctx, cancel := context.WithTimeout(context.Background(), database.DatabaseTimeout)
+	defer cancel()
 	// Remove refresh token from db
-	if err = s.RefreshTokenRepository.DeleteRefreshTokenByUserID(userID); err != nil {
-		// no need to return early here
-		s.Logger.Errorf("failed to logout user", zap.Int("userID", userID), zap.Error(err))
+	var rowsDeleted int64
+	rowsDeleted, err = s.DB.DeleteRefreshTokenByUserID(ctx, userID)
+	if err != nil {
+		switch {
+		case errors.Is(err, context.Canceled):
+			s.Logger.Errorf("user api: logout query context cancelled", zap.Uint32("userID", userID))
+			sendError(w, http.StatusInternalServerError, "user api: context cancelled")
+			return
+		case errors.Is(err, context.DeadlineExceeded):
+			s.Logger.Errorf("user api: logout query timed out", zap.Uint32("userID", userID))
+			sendError(w, http.StatusInternalServerError, "user api: query timed out")
+			return
+		default:
+			s.Logger.Errorf("user api: failed to logout user", zap.Uint32("userID", userID), zap.Error(err))
+			sendError(w, http.StatusInternalServerError, "user api failed to delete user")
+			return
+		}
+	}
+
+	if rowsDeleted != 1 {
+		err = database.WrongNumberSQLRowsError{
+			ActualRows:   rowsDeleted,
+			ExpectedRows: []int64{1},
+		}
+		s.Logger.Errorf("user api failed to logout user", zap.Error(err))
 	}
 
 	RemoveCookies(w)

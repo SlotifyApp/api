@@ -21,7 +21,11 @@ func TestTeam_GetTeams(t *testing.T) {
 	t.Parallel()
 
 	var err error
-	db, server := testutil.NewServerAndDB(t, context.Background())
+	database, server := testutil.NewServerAndDB(t, context.Background())
+	// For testing, we want the underlying db connection rather than the
+	// sqlc queries.
+	db := database.DB
+
 	t.Cleanup(func() {
 		testutil.CloseDB(db)
 	})
@@ -77,7 +81,8 @@ func TestTeam_GetTeams(t *testing.T) {
 func TestTeam_PostTeams(t *testing.T) {
 	t.Parallel()
 
-	db, server := testutil.NewServerAndDB(t, context.Background())
+	database, server := testutil.NewServerAndDB(t, context.Background())
+	db := database.DB
 	t.Cleanup(func() {
 		testutil.CloseDB(db)
 	})
@@ -147,7 +152,9 @@ func TestTeam_DeleteTeamsTeamID(t *testing.T) {
 	t.Parallel()
 
 	var err error
-	db, server := testutil.NewServerAndDB(t, context.Background())
+
+	database, server := testutil.NewServerAndDB(t, context.Background())
+	db := database.DB
 	t.Cleanup(func() {
 		testutil.CloseDB(db)
 	})
@@ -157,11 +164,11 @@ func TestTeam_DeleteTeamsTeamID(t *testing.T) {
 	tests := map[string]struct {
 		expectedRespBody any
 		httpStatus       int
-		teamID           int
+		teamID           uint32
 		testMsg          string
 	}{
 		"deleting team that doesn't exist": {
-			expectedRespBody: "team api: incorrect team ID",
+			expectedRespBody: "team api: incorrect team id",
 			httpStatus:       http.StatusBadRequest,
 			teamID:           10000,
 			testMsg:          "team that doesn't exist, returns client error",
@@ -196,7 +203,8 @@ func TestTeam_GetTeamsTeamID(t *testing.T) {
 	t.Parallel()
 
 	var err error
-	db, server := testutil.NewServerAndDB(t, context.Background())
+	database, server := testutil.NewServerAndDB(t, context.Background())
+	db := database.DB
 	t.Cleanup(func() {
 		testutil.CloseDB(db)
 	})
@@ -206,7 +214,7 @@ func TestTeam_GetTeamsTeamID(t *testing.T) {
 	tests := map[string]struct {
 		expectedRespBody any
 		httpStatus       int
-		teamID           int
+		teamID           uint32
 		testMsg          string
 	}{
 		"get team that exists": {
@@ -254,7 +262,8 @@ func TestTeam_PostTeamsTeamIDUsersUserID(t *testing.T) {
 	t.Parallel()
 
 	var err error
-	db, server := testutil.NewServerAndDB(t, context.Background())
+	database, server := testutil.NewServerAndDB(t, context.Background())
+	db := database.DB
 	t.Cleanup(func() {
 		testutil.CloseDB(db)
 	})
@@ -266,8 +275,8 @@ func TestTeam_PostTeamsTeamIDUsersUserID(t *testing.T) {
 	tests := map[string]struct {
 		expectedRespBody any
 		httpStatus       int
-		teamID           int
-		userID           int
+		teamID           uint32
+		userID           uint32
 		testMsg          string
 	}{
 		"insert an existing user into an existing team": {
@@ -328,7 +337,8 @@ func TestTeam_GetTeamsTeamIDUsers(t *testing.T) {
 	t.Parallel()
 
 	var err error
-	db, server := testutil.NewServerAndDB(t, context.Background())
+	database, server := testutil.NewServerAndDB(t, context.Background())
+	db := database.DB
 	t.Cleanup(func() {
 		testutil.CloseDB(db)
 	})
@@ -344,7 +354,7 @@ func TestTeam_GetTeamsTeamIDUsers(t *testing.T) {
 	tests := map[string]struct {
 		expectedRespBody any
 		httpStatus       int
-		teamID           int
+		teamID           uint32
 		testMsg          string
 	}{
 		"get members of a non-existing team": {
@@ -393,7 +403,8 @@ func TestTeam_GetAPITeamsMe(t *testing.T) {
 	t.Parallel()
 
 	var err error
-	db, server := testutil.NewServerAndDB(t, context.Background())
+	database, server := testutil.NewServerAndDB(t, context.Background())
+	db := database.DB
 	t.Cleanup(func() {
 		testutil.CloseDB(db)
 	})
@@ -420,7 +431,7 @@ func TestTeam_GetAPITeamsMe(t *testing.T) {
 			jwt:              jwt1,
 			testMsg:          "user who has no teams returns empty list",
 		},
-		"get teams of user who has many tams": {
+		"get teams of user who has many teams": {
 			expectedRespBody: api.Teams{insertedTeam1, insertedTeam2},
 			httpStatus:       http.StatusOK,
 			jwt:              jwt2,
