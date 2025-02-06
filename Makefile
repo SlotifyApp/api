@@ -13,6 +13,8 @@ generate_api_docs:
 
 .PHONY: generate
 generate:
+	# Generate sqlc files
+	docker run --rm -v $(shell pwd):/src -w /src sqlc/sqlc generate
 	# Generate server Go code based on openapi spec
 	go generate ./... 
 	go mod tidy

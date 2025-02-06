@@ -19,9 +19,16 @@ import (
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
+// CalendarEvent defines model for CalendarEvent.
+type CalendarEvent struct {
+	EndTime   *string `json:"endTime,omitempty"`
+	StartTime *string `json:"startTime,omitempty"`
+	Subject   *string `json:"subject,omitempty"`
+}
+
 // Team defines model for Team.
 type Team struct {
-	Id   int    `json:"id"`
+	Id   uint32 `json:"id"`
 	Name string `json:"name"`
 }
 
@@ -34,7 +41,7 @@ type TeamCreate struct {
 type User struct {
 	Email     openapi_types.Email `json:"email"`
 	FirstName string              `json:"firstName"`
-	Id        int                 `json:"id"`
+	Id        uint32              `json:"id"`
 	LastName  string              `json:"lastName"`
 }
 
@@ -45,14 +52,20 @@ type UserCreate struct {
 	LastName  string              `json:"lastName"`
 }
 
-// GetTeamsParams defines parameters for GetTeams.
-type GetTeamsParams struct {
+// GetAPIAuthCallbackParams defines parameters for GetAPIAuthCallback.
+type GetAPIAuthCallbackParams struct {
+	Code  string `form:"code" json:"code"`
+	State string `form:"state" json:"state"`
+}
+
+// GetAPITeamsParams defines parameters for GetAPITeams.
+type GetAPITeamsParams struct {
 	// Name Team name
 	Name *string `form:"name,omitempty" json:"name,omitempty"`
 }
 
-// GetUsersParams defines parameters for GetUsers.
-type GetUsersParams struct {
+// GetAPIUsersParams defines parameters for GetAPIUsers.
+type GetAPIUsersParams struct {
 	// Email Email of user
 	Email *openapi_types.Email `form:"email,omitempty" json:"email,omitempty"`
 
@@ -63,47 +76,65 @@ type GetUsersParams struct {
 	LastName *string `form:"lastName,omitempty" json:"lastName,omitempty"`
 }
 
-// PostTeamsJSONRequestBody defines body for PostTeams for application/json ContentType.
-type PostTeamsJSONRequestBody = TeamCreate
+// PostAPITeamsJSONRequestBody defines body for PostAPITeams for application/json ContentType.
+type PostAPITeamsJSONRequestBody = TeamCreate
 
-// PostUsersJSONRequestBody defines body for PostUsers for application/json ContentType.
-type PostUsersJSONRequestBody = UserCreate
+// PostAPIUsersJSONRequestBody defines body for PostAPIUsers for application/json ContentType.
+type PostAPIUsersJSONRequestBody = UserCreate
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// Auth route for authorisation code flow
+	// (GET /api/auth/callback)
+	GetAPIAuthCallback(w http.ResponseWriter, r *http.Request, params GetAPIAuthCallbackParams)
+	// get a user's calendar events
+	// (GET /api/calendar/me)
+	GetAPICalendarMe(w http.ResponseWriter, r *http.Request)
 	// Healthcheck route
-	// (GET /healthcheck)
-	GetHealthcheck(w http.ResponseWriter, r *http.Request)
+	// (GET /api/healthcheck)
+	GetAPIHealthcheck(w http.ResponseWriter, r *http.Request)
+	// Refresh Slotify access token and refresh token
+	// (POST /api/refresh)
+	PostAPIRefresh(w http.ResponseWriter, r *http.Request)
 	// Get a team by query params
-	// (GET /teams)
-	GetTeams(w http.ResponseWriter, r *http.Request, params GetTeamsParams)
+	// (GET /api/teams)
+	GetAPITeams(w http.ResponseWriter, r *http.Request, params GetAPITeamsParams)
 	// Create a new team
-	// (POST /teams)
-	PostTeams(w http.ResponseWriter, r *http.Request)
+	// (POST /api/teams)
+	PostAPITeams(w http.ResponseWriter, r *http.Request)
+	// Get all teams for user by id passed by JWT
+	// (GET /api/teams/me)
+	GetAPITeamsMe(w http.ResponseWriter, r *http.Request)
 	// Delete a team by id
-	// (DELETE /teams/{teamID})
-	DeleteTeamsTeamID(w http.ResponseWriter, r *http.Request, teamID int)
+	// (DELETE /api/teams/{teamID})
+	DeleteAPITeamsTeamID(w http.ResponseWriter, r *http.Request, teamID uint32)
 	// Get a team by id
-	// (GET /teams/{teamID})
-	GetTeamsTeamID(w http.ResponseWriter, r *http.Request, teamID int)
+	// (GET /api/teams/{teamID})
+	GetAPITeamsTeamID(w http.ResponseWriter, r *http.Request, teamID uint32)
 	// Get all members of a team
-	// (GET /teams/{teamID}/users)
-	GetTeamsTeamIDUsers(w http.ResponseWriter, r *http.Request, teamID int)
+	// (GET /api/teams/{teamID}/users)
+	GetAPITeamsTeamIDUsers(w http.ResponseWriter, r *http.Request, teamID uint32)
 	// Add a user to a team
-	// (POST /teams/{teamID}/users/{userID})
-	PostTeamsTeamIDUsersUserID(w http.ResponseWriter, r *http.Request, teamID int, userID int)
+	// (POST /api/teams/{teamID}/users/{userID})
+	PostAPITeamsTeamIDUsersUserID(w http.ResponseWriter, r *http.Request, teamID uint32, userID uint32)
 	// Get a user by query params
-	// (GET /users)
-	GetUsers(w http.ResponseWriter, r *http.Request, params GetUsersParams)
+	// (GET /api/users)
+	GetAPIUsers(w http.ResponseWriter, r *http.Request, params GetAPIUsersParams)
 	// Create a new user
-	// (POST /users)
-	PostUsers(w http.ResponseWriter, r *http.Request)
+	// (POST /api/users)
+	PostAPIUsers(w http.ResponseWriter, r *http.Request)
+	// Get the user by id passed by JWT
+	// (GET /api/users/me)
+	GetAPIUsersMe(w http.ResponseWriter, r *http.Request)
+	// Logout user
+	// (POST /api/users/me/logout)
+	PostAPIUsersMeLogout(w http.ResponseWriter, r *http.Request)
 	// Delete a user by id
-	// (DELETE /users/{userID})
-	DeleteUsersUserID(w http.ResponseWriter, r *http.Request, userID int)
+	// (DELETE /api/users/{userID})
+	DeleteAPIUsersUserID(w http.ResponseWriter, r *http.Request, userID uint32)
 	// Get a user by id
-	// (GET /users/{userID})
-	GetUsersUserID(w http.ResponseWriter, r *http.Request, userID int)
+	// (GET /api/users/{userID})
+	GetAPIUsersUserID(w http.ResponseWriter, r *http.Request, userID uint32)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -115,11 +146,46 @@ type ServerInterfaceWrapper struct {
 
 type MiddlewareFunc func(http.Handler) http.Handler
 
-// GetHealthcheck operation middleware
-func (siw *ServerInterfaceWrapper) GetHealthcheck(w http.ResponseWriter, r *http.Request) {
+// GetAPIAuthCallback operation middleware
+func (siw *ServerInterfaceWrapper) GetAPIAuthCallback(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetAPIAuthCallbackParams
+
+	// ------------- Required query parameter "code" -------------
+
+	if paramValue := r.URL.Query().Get("code"); paramValue != "" {
+
+	} else {
+		siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "code"})
+		return
+	}
+
+	err = runtime.BindQueryParameter("form", true, true, "code", r.URL.Query(), &params.Code)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "code", Err: err})
+		return
+	}
+
+	// ------------- Required query parameter "state" -------------
+
+	if paramValue := r.URL.Query().Get("state"); paramValue != "" {
+
+	} else {
+		siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "state"})
+		return
+	}
+
+	err = runtime.BindQueryParameter("form", true, true, "state", r.URL.Query(), &params.State)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "state", Err: err})
+		return
+	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetHealthcheck(w, r)
+		siw.Handler.GetAPIAuthCallback(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -129,13 +195,55 @@ func (siw *ServerInterfaceWrapper) GetHealthcheck(w http.ResponseWriter, r *http
 	handler.ServeHTTP(w, r)
 }
 
-// GetTeams operation middleware
-func (siw *ServerInterfaceWrapper) GetTeams(w http.ResponseWriter, r *http.Request) {
+// GetAPICalendarMe operation middleware
+func (siw *ServerInterfaceWrapper) GetAPICalendarMe(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAPICalendarMe(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAPIHealthcheck operation middleware
+func (siw *ServerInterfaceWrapper) GetAPIHealthcheck(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAPIHealthcheck(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PostAPIRefresh operation middleware
+func (siw *ServerInterfaceWrapper) PostAPIRefresh(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PostAPIRefresh(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAPITeams operation middleware
+func (siw *ServerInterfaceWrapper) GetAPITeams(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 
 	// Parameter object where we will unmarshal all parameters from the context
-	var params GetTeamsParams
+	var params GetAPITeamsParams
 
 	// ------------- Optional query parameter "name" -------------
 
@@ -146,7 +254,7 @@ func (siw *ServerInterfaceWrapper) GetTeams(w http.ResponseWriter, r *http.Reque
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetTeams(w, r, params)
+		siw.Handler.GetAPITeams(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -156,11 +264,11 @@ func (siw *ServerInterfaceWrapper) GetTeams(w http.ResponseWriter, r *http.Reque
 	handler.ServeHTTP(w, r)
 }
 
-// PostTeams operation middleware
-func (siw *ServerInterfaceWrapper) PostTeams(w http.ResponseWriter, r *http.Request) {
+// PostAPITeams operation middleware
+func (siw *ServerInterfaceWrapper) PostAPITeams(w http.ResponseWriter, r *http.Request) {
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.PostTeams(w, r)
+		siw.Handler.PostAPITeams(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -170,13 +278,27 @@ func (siw *ServerInterfaceWrapper) PostTeams(w http.ResponseWriter, r *http.Requ
 	handler.ServeHTTP(w, r)
 }
 
-// DeleteTeamsTeamID operation middleware
-func (siw *ServerInterfaceWrapper) DeleteTeamsTeamID(w http.ResponseWriter, r *http.Request) {
+// GetAPITeamsMe operation middleware
+func (siw *ServerInterfaceWrapper) GetAPITeamsMe(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAPITeamsMe(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteAPITeamsTeamID operation middleware
+func (siw *ServerInterfaceWrapper) DeleteAPITeamsTeamID(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 
 	// ------------- Path parameter "teamID" -------------
-	var teamID int
+	var teamID uint32
 
 	err = runtime.BindStyledParameterWithOptions("simple", "teamID", mux.Vars(r)["teamID"], &teamID, runtime.BindStyledParameterOptions{Explode: false, Required: true})
 	if err != nil {
@@ -185,7 +307,7 @@ func (siw *ServerInterfaceWrapper) DeleteTeamsTeamID(w http.ResponseWriter, r *h
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.DeleteTeamsTeamID(w, r, teamID)
+		siw.Handler.DeleteAPITeamsTeamID(w, r, teamID)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -195,13 +317,13 @@ func (siw *ServerInterfaceWrapper) DeleteTeamsTeamID(w http.ResponseWriter, r *h
 	handler.ServeHTTP(w, r)
 }
 
-// GetTeamsTeamID operation middleware
-func (siw *ServerInterfaceWrapper) GetTeamsTeamID(w http.ResponseWriter, r *http.Request) {
+// GetAPITeamsTeamID operation middleware
+func (siw *ServerInterfaceWrapper) GetAPITeamsTeamID(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 
 	// ------------- Path parameter "teamID" -------------
-	var teamID int
+	var teamID uint32
 
 	err = runtime.BindStyledParameterWithOptions("simple", "teamID", mux.Vars(r)["teamID"], &teamID, runtime.BindStyledParameterOptions{Explode: false, Required: true})
 	if err != nil {
@@ -210,7 +332,7 @@ func (siw *ServerInterfaceWrapper) GetTeamsTeamID(w http.ResponseWriter, r *http
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetTeamsTeamID(w, r, teamID)
+		siw.Handler.GetAPITeamsTeamID(w, r, teamID)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -220,13 +342,13 @@ func (siw *ServerInterfaceWrapper) GetTeamsTeamID(w http.ResponseWriter, r *http
 	handler.ServeHTTP(w, r)
 }
 
-// GetTeamsTeamIDUsers operation middleware
-func (siw *ServerInterfaceWrapper) GetTeamsTeamIDUsers(w http.ResponseWriter, r *http.Request) {
+// GetAPITeamsTeamIDUsers operation middleware
+func (siw *ServerInterfaceWrapper) GetAPITeamsTeamIDUsers(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 
 	// ------------- Path parameter "teamID" -------------
-	var teamID int
+	var teamID uint32
 
 	err = runtime.BindStyledParameterWithOptions("simple", "teamID", mux.Vars(r)["teamID"], &teamID, runtime.BindStyledParameterOptions{Explode: false, Required: true})
 	if err != nil {
@@ -235,7 +357,7 @@ func (siw *ServerInterfaceWrapper) GetTeamsTeamIDUsers(w http.ResponseWriter, r 
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetTeamsTeamIDUsers(w, r, teamID)
+		siw.Handler.GetAPITeamsTeamIDUsers(w, r, teamID)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -245,13 +367,13 @@ func (siw *ServerInterfaceWrapper) GetTeamsTeamIDUsers(w http.ResponseWriter, r 
 	handler.ServeHTTP(w, r)
 }
 
-// PostTeamsTeamIDUsersUserID operation middleware
-func (siw *ServerInterfaceWrapper) PostTeamsTeamIDUsersUserID(w http.ResponseWriter, r *http.Request) {
+// PostAPITeamsTeamIDUsersUserID operation middleware
+func (siw *ServerInterfaceWrapper) PostAPITeamsTeamIDUsersUserID(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 
 	// ------------- Path parameter "teamID" -------------
-	var teamID int
+	var teamID uint32
 
 	err = runtime.BindStyledParameterWithOptions("simple", "teamID", mux.Vars(r)["teamID"], &teamID, runtime.BindStyledParameterOptions{Explode: false, Required: true})
 	if err != nil {
@@ -260,7 +382,7 @@ func (siw *ServerInterfaceWrapper) PostTeamsTeamIDUsersUserID(w http.ResponseWri
 	}
 
 	// ------------- Path parameter "userID" -------------
-	var userID int
+	var userID uint32
 
 	err = runtime.BindStyledParameterWithOptions("simple", "userID", mux.Vars(r)["userID"], &userID, runtime.BindStyledParameterOptions{Explode: false, Required: true})
 	if err != nil {
@@ -269,7 +391,7 @@ func (siw *ServerInterfaceWrapper) PostTeamsTeamIDUsersUserID(w http.ResponseWri
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.PostTeamsTeamIDUsersUserID(w, r, teamID, userID)
+		siw.Handler.PostAPITeamsTeamIDUsersUserID(w, r, teamID, userID)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -279,13 +401,13 @@ func (siw *ServerInterfaceWrapper) PostTeamsTeamIDUsersUserID(w http.ResponseWri
 	handler.ServeHTTP(w, r)
 }
 
-// GetUsers operation middleware
-func (siw *ServerInterfaceWrapper) GetUsers(w http.ResponseWriter, r *http.Request) {
+// GetAPIUsers operation middleware
+func (siw *ServerInterfaceWrapper) GetAPIUsers(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 
 	// Parameter object where we will unmarshal all parameters from the context
-	var params GetUsersParams
+	var params GetAPIUsersParams
 
 	// ------------- Optional query parameter "email" -------------
 
@@ -312,7 +434,7 @@ func (siw *ServerInterfaceWrapper) GetUsers(w http.ResponseWriter, r *http.Reque
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetUsers(w, r, params)
+		siw.Handler.GetAPIUsers(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -322,11 +444,11 @@ func (siw *ServerInterfaceWrapper) GetUsers(w http.ResponseWriter, r *http.Reque
 	handler.ServeHTTP(w, r)
 }
 
-// PostUsers operation middleware
-func (siw *ServerInterfaceWrapper) PostUsers(w http.ResponseWriter, r *http.Request) {
+// PostAPIUsers operation middleware
+func (siw *ServerInterfaceWrapper) PostAPIUsers(w http.ResponseWriter, r *http.Request) {
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.PostUsers(w, r)
+		siw.Handler.PostAPIUsers(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -336,13 +458,41 @@ func (siw *ServerInterfaceWrapper) PostUsers(w http.ResponseWriter, r *http.Requ
 	handler.ServeHTTP(w, r)
 }
 
-// DeleteUsersUserID operation middleware
-func (siw *ServerInterfaceWrapper) DeleteUsersUserID(w http.ResponseWriter, r *http.Request) {
+// GetAPIUsersMe operation middleware
+func (siw *ServerInterfaceWrapper) GetAPIUsersMe(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAPIUsersMe(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PostAPIUsersMeLogout operation middleware
+func (siw *ServerInterfaceWrapper) PostAPIUsersMeLogout(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PostAPIUsersMeLogout(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteAPIUsersUserID operation middleware
+func (siw *ServerInterfaceWrapper) DeleteAPIUsersUserID(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 
 	// ------------- Path parameter "userID" -------------
-	var userID int
+	var userID uint32
 
 	err = runtime.BindStyledParameterWithOptions("simple", "userID", mux.Vars(r)["userID"], &userID, runtime.BindStyledParameterOptions{Explode: false, Required: true})
 	if err != nil {
@@ -351,7 +501,7 @@ func (siw *ServerInterfaceWrapper) DeleteUsersUserID(w http.ResponseWriter, r *h
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.DeleteUsersUserID(w, r, userID)
+		siw.Handler.DeleteAPIUsersUserID(w, r, userID)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -361,13 +511,13 @@ func (siw *ServerInterfaceWrapper) DeleteUsersUserID(w http.ResponseWriter, r *h
 	handler.ServeHTTP(w, r)
 }
 
-// GetUsersUserID operation middleware
-func (siw *ServerInterfaceWrapper) GetUsersUserID(w http.ResponseWriter, r *http.Request) {
+// GetAPIUsersUserID operation middleware
+func (siw *ServerInterfaceWrapper) GetAPIUsersUserID(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 
 	// ------------- Path parameter "userID" -------------
-	var userID int
+	var userID uint32
 
 	err = runtime.BindStyledParameterWithOptions("simple", "userID", mux.Vars(r)["userID"], &userID, runtime.BindStyledParameterOptions{Explode: false, Required: true})
 	if err != nil {
@@ -376,7 +526,7 @@ func (siw *ServerInterfaceWrapper) GetUsersUserID(w http.ResponseWriter, r *http
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetUsersUserID(w, r, userID)
+		siw.Handler.GetAPIUsersUserID(w, r, userID)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -499,27 +649,39 @@ func HandlerWithOptions(si ServerInterface, options GorillaServerOptions) http.H
 		ErrorHandlerFunc:   options.ErrorHandlerFunc,
 	}
 
-	r.HandleFunc(options.BaseURL+"/healthcheck", wrapper.GetHealthcheck).Methods("GET")
+	r.HandleFunc(options.BaseURL+"/api/auth/callback", wrapper.GetAPIAuthCallback).Methods("GET")
 
-	r.HandleFunc(options.BaseURL+"/teams", wrapper.GetTeams).Methods("GET")
+	r.HandleFunc(options.BaseURL+"/api/calendar/me", wrapper.GetAPICalendarMe).Methods("GET")
 
-	r.HandleFunc(options.BaseURL+"/teams", wrapper.PostTeams).Methods("POST")
+	r.HandleFunc(options.BaseURL+"/api/healthcheck", wrapper.GetAPIHealthcheck).Methods("GET")
 
-	r.HandleFunc(options.BaseURL+"/teams/{teamID}", wrapper.DeleteTeamsTeamID).Methods("DELETE")
+	r.HandleFunc(options.BaseURL+"/api/refresh", wrapper.PostAPIRefresh).Methods("POST")
 
-	r.HandleFunc(options.BaseURL+"/teams/{teamID}", wrapper.GetTeamsTeamID).Methods("GET")
+	r.HandleFunc(options.BaseURL+"/api/teams", wrapper.GetAPITeams).Methods("GET")
 
-	r.HandleFunc(options.BaseURL+"/teams/{teamID}/users", wrapper.GetTeamsTeamIDUsers).Methods("GET")
+	r.HandleFunc(options.BaseURL+"/api/teams", wrapper.PostAPITeams).Methods("POST")
 
-	r.HandleFunc(options.BaseURL+"/teams/{teamID}/users/{userID}", wrapper.PostTeamsTeamIDUsersUserID).Methods("POST")
+	r.HandleFunc(options.BaseURL+"/api/teams/me", wrapper.GetAPITeamsMe).Methods("GET")
 
-	r.HandleFunc(options.BaseURL+"/users", wrapper.GetUsers).Methods("GET")
+	r.HandleFunc(options.BaseURL+"/api/teams/{teamID}", wrapper.DeleteAPITeamsTeamID).Methods("DELETE")
 
-	r.HandleFunc(options.BaseURL+"/users", wrapper.PostUsers).Methods("POST")
+	r.HandleFunc(options.BaseURL+"/api/teams/{teamID}", wrapper.GetAPITeamsTeamID).Methods("GET")
 
-	r.HandleFunc(options.BaseURL+"/users/{userID}", wrapper.DeleteUsersUserID).Methods("DELETE")
+	r.HandleFunc(options.BaseURL+"/api/teams/{teamID}/users", wrapper.GetAPITeamsTeamIDUsers).Methods("GET")
 
-	r.HandleFunc(options.BaseURL+"/users/{userID}", wrapper.GetUsersUserID).Methods("GET")
+	r.HandleFunc(options.BaseURL+"/api/teams/{teamID}/users/{userID}", wrapper.PostAPITeamsTeamIDUsersUserID).Methods("POST")
+
+	r.HandleFunc(options.BaseURL+"/api/users", wrapper.GetAPIUsers).Methods("GET")
+
+	r.HandleFunc(options.BaseURL+"/api/users", wrapper.PostAPIUsers).Methods("POST")
+
+	r.HandleFunc(options.BaseURL+"/api/users/me", wrapper.GetAPIUsersMe).Methods("GET")
+
+	r.HandleFunc(options.BaseURL+"/api/users/me/logout", wrapper.PostAPIUsersMeLogout).Methods("POST")
+
+	r.HandleFunc(options.BaseURL+"/api/users/{userID}", wrapper.DeleteAPIUsersUserID).Methods("DELETE")
+
+	r.HandleFunc(options.BaseURL+"/api/users/{userID}", wrapper.GetAPIUsersUserID).Methods("GET")
 
 	return r
 }
@@ -527,24 +689,32 @@ func HandlerWithOptions(si ServerInterface, options GorillaServerOptions) http.H
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"H4sIAAAAAAAC/9RYXW/bNhT9KwS3hxUQImfNXvTWLFtmYCgKNHkq+sBIVzZbkVRJqoFh6L8P90qyJVuy",
-	"5I+02UvlSuT9Oude8mTNY6Nyo0F7x6M1d/ESlKCfDyAUPnNrcrBeAr2VCf6rpJaqUDy6Drhf5cAjLrWH",
-	"BVheBlwLBbiq/uK8lXrByzLgFr4V0kLCo09oqV76eWPEPH2B2KMN9P6nBeFhP4Zp9gdNPzqw+0ZBCZnh",
-	"j9RYJTyP6jfBrpuAp9I6/74/iGBShTIxaKCvSk0kW8ctE0MpDlXvYolOT+LI+HG71Kkhw9Jn+O1jZrxM",
-	"V+xWxF9BJ+zdhzkP+HewThrNI359NbuaYVQmBy1yySP+ll4FPBd+SZmHSxCZX8ZLiL/i/xfg8YHFEV4a",
-	"PU94xO/B/9Nahom43GhXFe/32QwfsdEeNO0WeZ7JmPaHXxzG0nRRX13KgCfgYitzX8Xd8sVcEcfgXFpk",
-	"VEFXKCXsameRNYUH+h56EModSuSBFmAFrFDgwToefVrvRICLmK5AkfjiWwF21fRmxOtPwzl9PrNG0kOV",
-	"xq8WUh7xX8LtTArrgRTSNCo3VBHWilVfPSllpoSPl1IvmF8Co3xYqwZlwG+qGLt7b0XCkLbgPPsNrhZX",
-	"AZP6u8hkwnxTpDc70NyDZ6L6/LRquyI3uXE9yHwwbgNN7e/WJKujijZWq7r7y24reltAuQfX9UU9D6HC",
-	"YgopadE8W7WwuFxPnYJjVS8mmIZnWtVqsXCNj/ldWVEmg2qsdkG9o/cE6wOtHuu794UCK2M2v2MmJaJS",
-	"cN6w2kXdjji+tt3oG9tdUNv9eejoObtZR4tf1aGu9ADUx8ElkzfV3pv9vdXwMp6lptDJDqZVKK32lAka",
-	"Ojgtz8UOjb9K4E5p23vjh3CcgEXA/+iD+6NR4Gk4P4P27NkavWCYp9WCzB+YrzLpa8uwcATTegq0j7R2",
-	"BN8urq8T0EnHJt11JxybVJUOzFsUb2ZvX2w+B02LM+marm8x53I++1jXR7UsYwrUE1bDpDXzhjkXrvFR",
-	"nwwjh32Lfo+0aToJ0Uk/CYvG0okkDP6PzB8FG+vbJbNIEjyTzDazCadRi/w99o2tbxMDp8+7JGGCoEO/",
-	"bSaNjqtJM+ovFFUIVpsdO3f3Rnhtazcm+vYZ8TeKNrozjThrq7thsPbs/yummd8Ixp+uRY4bqi+jReZ3",
-	"/UqE+HaUEmnI9hJKpPV3iB+sRCqMBkbDiBI5F4mOliiqQJq275wYh7XEEUfF/n20mTuHtMS5h8cP0xLF",
-	"7jw/BSwyQmAN3F+JGqNaommww1riItgNaomfDdwpjYda4iI4bpvuFBy7U5L0RFn+FwAA//+hVjwMBhcA",
-	"AA==",
+	"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",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file
