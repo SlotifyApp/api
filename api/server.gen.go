@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"path"
 	"strings"
+	"time"
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/gorilla/mux"
@@ -24,6 +25,13 @@ type CalendarEvent struct {
 	EndTime   *string `json:"endTime,omitempty"`
 	StartTime *string `json:"startTime,omitempty"`
 	Subject   *string `json:"subject,omitempty"`
+}
+
+// Notification defines model for Notification.
+type Notification struct {
+	Created time.Time `json:"created"`
+	Id      uint32    `json:"id"`
+	Message string    `json:"message"`
 }
 
 // Team defines model for Team.
@@ -90,18 +98,33 @@ type ServerInterface interface {
 	// get a user's calendar events
 	// (GET /api/calendar/me)
 	GetAPICalendarMe(w http.ResponseWriter, r *http.Request)
+	// Subscribe to notifications
+	// (GET /api/events)
+	RenderEvent(w http.ResponseWriter, r *http.Request)
 	// Healthcheck route
 	// (GET /api/healthcheck)
 	GetAPIHealthcheck(w http.ResponseWriter, r *http.Request)
+	// CORS preflight for marking a notification as read
+	// (OPTIONS /api/notifications/{notificationID}/read)
+	OptionsAPINotificationsNotificationIDRead(w http.ResponseWriter, r *http.Request, notificationID uint32)
+	// mark a notification as being read
+	// (PATCH /api/notifications/{notificationID}/read)
+	PatchAPINotificationsNotificationIDRead(w http.ResponseWriter, r *http.Request, notificationID uint32)
 	// Refresh Slotify access token and refresh token
 	// (POST /api/refresh)
 	PostAPIRefresh(w http.ResponseWriter, r *http.Request)
 	// Get a team by query params
 	// (GET /api/teams)
 	GetAPITeams(w http.ResponseWriter, r *http.Request, params GetAPITeamsParams)
+	// CORS preflight for teams
+	// (OPTIONS /api/teams)
+	OptionsAPITeams(w http.ResponseWriter, r *http.Request)
 	// Create a new team
 	// (POST /api/teams)
 	PostAPITeams(w http.ResponseWriter, r *http.Request)
+	// Get all joinable teams for a user excluding teams they are already a part of
+	// (GET /api/teams/joinable/me)
+	GetAPITeamsJoinableMe(w http.ResponseWriter, r *http.Request)
 	// Get all teams for user by id passed by JWT
 	// (GET /api/teams/me)
 	GetAPITeamsMe(w http.ResponseWriter, r *http.Request)
@@ -114,6 +137,9 @@ type ServerInterface interface {
 	// Get all members of a team
 	// (GET /api/teams/{teamID}/users)
 	GetAPITeamsTeamIDUsers(w http.ResponseWriter, r *http.Request, teamID uint32)
+	// Add current user to a team
+	// (POST /api/teams/{teamID}/users/me)
+	PostAPITeamsTeamIDUsersMe(w http.ResponseWriter, r *http.Request, teamID uint32)
 	// Add a user to a team
 	// (POST /api/teams/{teamID}/users/{userID})
 	PostAPITeamsTeamIDUsersUserID(w http.ResponseWriter, r *http.Request, teamID uint32, userID uint32)
@@ -129,6 +155,9 @@ type ServerInterface interface {
 	// Logout user
 	// (POST /api/users/me/logout)
 	PostAPIUsersMeLogout(w http.ResponseWriter, r *http.Request)
+	// get user's unread notifications
+	// (GET /api/users/me/notifications)
+	GetAPIUsersMeNotifications(w http.ResponseWriter, r *http.Request)
 	// Delete a user by id
 	// (DELETE /api/users/{userID})
 	DeleteAPIUsersUserID(w http.ResponseWriter, r *http.Request, userID uint32)
@@ -209,11 +238,75 @@ func (siw *ServerInterfaceWrapper) GetAPICalendarMe(w http.ResponseWriter, r *ht
 	handler.ServeHTTP(w, r)
 }
 
+// RenderEvent operation middleware
+func (siw *ServerInterfaceWrapper) RenderEvent(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RenderEvent(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetAPIHealthcheck operation middleware
 func (siw *ServerInterfaceWrapper) GetAPIHealthcheck(w http.ResponseWriter, r *http.Request) {
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetAPIHealthcheck(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// OptionsAPINotificationsNotificationIDRead operation middleware
+func (siw *ServerInterfaceWrapper) OptionsAPINotificationsNotificationIDRead(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "notificationID" -------------
+	var notificationID uint32
+
+	err = runtime.BindStyledParameterWithOptions("simple", "notificationID", mux.Vars(r)["notificationID"], &notificationID, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "notificationID", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.OptionsAPINotificationsNotificationIDRead(w, r, notificationID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PatchAPINotificationsNotificationIDRead operation middleware
+func (siw *ServerInterfaceWrapper) PatchAPINotificationsNotificationIDRead(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "notificationID" -------------
+	var notificationID uint32
+
+	err = runtime.BindStyledParameterWithOptions("simple", "notificationID", mux.Vars(r)["notificationID"], &notificationID, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "notificationID", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PatchAPINotificationsNotificationIDRead(w, r, notificationID)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -264,11 +357,39 @@ func (siw *ServerInterfaceWrapper) GetAPITeams(w http.ResponseWriter, r *http.Re
 	handler.ServeHTTP(w, r)
 }
 
+// OptionsAPITeams operation middleware
+func (siw *ServerInterfaceWrapper) OptionsAPITeams(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.OptionsAPITeams(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // PostAPITeams operation middleware
 func (siw *ServerInterfaceWrapper) PostAPITeams(w http.ResponseWriter, r *http.Request) {
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.PostAPITeams(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAPITeamsJoinableMe operation middleware
+func (siw *ServerInterfaceWrapper) GetAPITeamsJoinableMe(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAPITeamsJoinableMe(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -358,6 +479,31 @@ func (siw *ServerInterfaceWrapper) GetAPITeamsTeamIDUsers(w http.ResponseWriter,
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetAPITeamsTeamIDUsers(w, r, teamID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PostAPITeamsTeamIDUsersMe operation middleware
+func (siw *ServerInterfaceWrapper) PostAPITeamsTeamIDUsersMe(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "teamID" -------------
+	var teamID uint32
+
+	err = runtime.BindStyledParameterWithOptions("simple", "teamID", mux.Vars(r)["teamID"], &teamID, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "teamID", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PostAPITeamsTeamIDUsersMe(w, r, teamID)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -477,6 +623,20 @@ func (siw *ServerInterfaceWrapper) PostAPIUsersMeLogout(w http.ResponseWriter, r
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.PostAPIUsersMeLogout(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAPIUsersMeNotifications operation middleware
+func (siw *ServerInterfaceWrapper) GetAPIUsersMeNotifications(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAPIUsersMeNotifications(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -653,13 +813,23 @@ func HandlerWithOptions(si ServerInterface, options GorillaServerOptions) http.H
 
 	r.HandleFunc(options.BaseURL+"/api/calendar/me", wrapper.GetAPICalendarMe).Methods("GET")
 
+	r.HandleFunc(options.BaseURL+"/api/events", wrapper.RenderEvent).Methods("GET")
+
 	r.HandleFunc(options.BaseURL+"/api/healthcheck", wrapper.GetAPIHealthcheck).Methods("GET")
+
+	r.HandleFunc(options.BaseURL+"/api/notifications/{notificationID}/read", wrapper.OptionsAPINotificationsNotificationIDRead).Methods("OPTIONS")
+
+	r.HandleFunc(options.BaseURL+"/api/notifications/{notificationID}/read", wrapper.PatchAPINotificationsNotificationIDRead).Methods("PATCH")
 
 	r.HandleFunc(options.BaseURL+"/api/refresh", wrapper.PostAPIRefresh).Methods("POST")
 
 	r.HandleFunc(options.BaseURL+"/api/teams", wrapper.GetAPITeams).Methods("GET")
 
+	r.HandleFunc(options.BaseURL+"/api/teams", wrapper.OptionsAPITeams).Methods("OPTIONS")
+
 	r.HandleFunc(options.BaseURL+"/api/teams", wrapper.PostAPITeams).Methods("POST")
+
+	r.HandleFunc(options.BaseURL+"/api/teams/joinable/me", wrapper.GetAPITeamsJoinableMe).Methods("GET")
 
 	r.HandleFunc(options.BaseURL+"/api/teams/me", wrapper.GetAPITeamsMe).Methods("GET")
 
@@ -668,6 +838,8 @@ func HandlerWithOptions(si ServerInterface, options GorillaServerOptions) http.H
 	r.HandleFunc(options.BaseURL+"/api/teams/{teamID}", wrapper.GetAPITeamsTeamID).Methods("GET")
 
 	r.HandleFunc(options.BaseURL+"/api/teams/{teamID}/users", wrapper.GetAPITeamsTeamIDUsers).Methods("GET")
+
+	r.HandleFunc(options.BaseURL+"/api/teams/{teamID}/users/me", wrapper.PostAPITeamsTeamIDUsersMe).Methods("POST")
 
 	r.HandleFunc(options.BaseURL+"/api/teams/{teamID}/users/{userID}", wrapper.PostAPITeamsTeamIDUsersUserID).Methods("POST")
 
@@ -679,6 +851,8 @@ func HandlerWithOptions(si ServerInterface, options GorillaServerOptions) http.H
 
 	r.HandleFunc(options.BaseURL+"/api/users/me/logout", wrapper.PostAPIUsersMeLogout).Methods("POST")
 
+	r.HandleFunc(options.BaseURL+"/api/users/me/notifications", wrapper.GetAPIUsersMeNotifications).Methods("GET")
+
 	r.HandleFunc(options.BaseURL+"/api/users/{userID}", wrapper.DeleteAPIUsersUserID).Methods("DELETE")
 
 	r.HandleFunc(options.BaseURL+"/api/users/{userID}", wrapper.GetAPIUsersUserID).Methods("GET")
@@ -689,32 +863,43 @@ func HandlerWithOptions(si ServerInterface, options GorillaServerOptions) http.H
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"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",
+	"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",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file

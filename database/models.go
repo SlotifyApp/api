@@ -6,7 +6,14 @@ package database
 
 import (
 	"database/sql"
+	"time"
 )
+
+type Notification struct {
+	ID      uint32    `json:"id"`
+	Message string    `json:"message"`
+	Created time.Time `json:"created"`
+}
 
 type RefreshToken struct {
 	ID      uint32 `json:"id"`
@@ -31,4 +38,10 @@ type User struct {
 type UserToTeam struct {
 	UserID uint32 `json:"userId"`
 	TeamID uint32 `json:"teamId"`
+}
+
+type Usertonotification struct {
+	UserID         uint32 `json:"userId"`
+	NotificationID uint32 `json:"notificationId"`
+	IsRead         bool   `json:"isRead"`
 }

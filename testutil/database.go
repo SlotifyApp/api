@@ -103,7 +103,8 @@ func NewServerAndDB(t *testing.T, ctx context.Context) (*database.Database, *api
 	require.NoError(t, err, "error creating database handle")
 	require.NotNil(t, db, "db handle cannot be nil")
 
-	server, err := api.NewServerWithContext(ctx, db, api.WithNotInitMSALClient())
+	server, err := api.NewServerWithContext(ctx, db,
+		api.WithNotInitMSALClient(), api.WithNotificationService(MockNotificationService{}))
 
 	require.NoError(t, err, "error creating server ")
 	require.NotNil(t, db, "server cannot be nil")

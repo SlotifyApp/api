@@ -9,13 +9,16 @@ repos:
       - id: golangci-lint
         name: Run golangci-lint in Docker
         entry: make lint
+        stages: [push]
         language: system
         pass_filenames: false
+        stages: [push]
       - id: API documentation
         name: Regenerate API documentation
         entry: make generate_api_docs
         language: system
         pass_filenames: false
+        stages: [push]
       - id: Test
         name: Running tests
         entry: make test

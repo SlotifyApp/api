@@ -255,8 +255,9 @@ func (s Server) GetAPIAuthCallback(w http.ResponseWriter, r *http.Request, param
 	}
 
 	defer func() {
+		// TODO: Check condition
 		if err = tx.Rollback(); err != nil {
-			s.Logger.Error("failed to rollback db transaction")
+			s.Logger.Error("failed to rollback db transaction", zap.Error(err))
 		}
 	}()
 	qtx := s.DB.WithTx(tx)

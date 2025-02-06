@@ -10,17 +10,24 @@ All URIs are relative to *http://localhost*
 | [**getAPICalendarMe**](DefaultApi.md#getAPICalendarMe) | **GET** /api/calendar/me | get a user&#39;s calendar events |
 | [**getAPIHealthcheck**](DefaultApi.md#getAPIHealthcheck) | **GET** /api/healthcheck | Healthcheck route |
 | [**getAPITeams**](DefaultApi.md#getAPITeams) | **GET** /api/teams | Get a team by query params |
+| [**getAPITeamsJoinableMe**](DefaultApi.md#getAPITeamsJoinableMe) | **GET** /api/teams/joinable/me | Get all joinable teams for a user excluding teams they are already a part of |
 | [**getAPITeamsMe**](DefaultApi.md#getAPITeamsMe) | **GET** /api/teams/me | Get all teams for user by id passed by JWT |
 | [**getAPITeamsTeamID**](DefaultApi.md#getAPITeamsTeamID) | **GET** /api/teams/{teamID} | Get a team by id |
 | [**getAPITeamsTeamIDUsers**](DefaultApi.md#getAPITeamsTeamIDUsers) | **GET** /api/teams/{teamID}/users | Get all members of a team |
 | [**getAPIUsers**](DefaultApi.md#getAPIUsers) | **GET** /api/users | Get a user by query params |
 | [**getAPIUsersMe**](DefaultApi.md#getAPIUsersMe) | **GET** /api/users/me | Get the user by id passed by JWT |
+| [**getAPIUsersMeNotifications**](DefaultApi.md#getAPIUsersMeNotifications) | **GET** /api/users/me/notifications | get user&#39;s unread notifications |
 | [**getAPIUsersUserID**](DefaultApi.md#getAPIUsersUserID) | **GET** /api/users/{userID} | Get a user by id |
+| [**optionsAPINotificationsNotificationIDRead**](DefaultApi.md#optionsAPINotificationsNotificationIDRead) | **OPTIONS** /api/notifications/{notificationID}/read | CORS preflight for marking a notification as read |
+| [**optionsAPITeams**](DefaultApi.md#optionsAPITeams) | **OPTIONS** /api/teams | CORS preflight for teams |
+| [**patchAPINotificationsNotificationIDRead**](DefaultApi.md#patchAPINotificationsNotificationIDRead) | **PATCH** /api/notifications/{notificationID}/read | mark a notification as being read |
 | [**postAPIRefresh**](DefaultApi.md#postAPIRefresh) | **POST** /api/refresh | Refresh Slotify access token and refresh token |
 | [**postAPITeams**](DefaultApi.md#postAPITeams) | **POST** /api/teams | Create a new team |
+| [**postAPITeamsTeamIDUsersMe**](DefaultApi.md#postAPITeamsTeamIDUsersMe) | **POST** /api/teams/{teamID}/users/me | Add current user to a team |
 | [**postAPITeamsTeamIDUsersUserID**](DefaultApi.md#postAPITeamsTeamIDUsersUserID) | **POST** /api/teams/{teamID}/users/{userID} | Add a user to a team |
 | [**postAPIUsers**](DefaultApi.md#postAPIUsers) | **POST** /api/users | Create a new user |
 | [**postAPIUsersMeLogout**](DefaultApi.md#postAPIUsersMeLogout) | **POST** /api/users/me/logout | Logout user |
+| [**renderEvent**](DefaultApi.md#renderEvent) | **GET** /api/events | Subscribe to notifications |
 
 
 <a name="deleteAPITeamsTeamID"></a>
@@ -168,6 +175,28 @@ No authorization required
 - **Content-Type**: Not defined
 - **Accept**: application/json
 
+<a name="getAPITeamsJoinableMe"></a>
+# **getAPITeamsJoinableMe**
+> List getAPITeamsJoinableMe()
+
+Get all joinable teams for a user excluding teams they are already a part of
+
+### Parameters
+This endpoint does not need any parameter.
+
+### Return type
+
+[**List**](../Models/Team.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: application/json
+
 <a name="getAPITeamsMe"></a>
 # **getAPITeamsMe**
 > List getAPITeamsMe()
@@ -289,6 +318,28 @@ No authorization required
 - **Content-Type**: Not defined
 - **Accept**: application/json
 
+<a name="getAPIUsersMeNotifications"></a>
+# **getAPIUsersMeNotifications**
+> List getAPIUsersMeNotifications()
+
+get user&#39;s unread notifications
+
+### Parameters
+This endpoint does not need any parameter.
+
+### Return type
+
+[**List**](../Models/Notification.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: application/json
+
 <a name="getAPIUsersUserID"></a>
 # **getAPIUsersUserID**
 > User getAPIUsersUserID(userID)
@@ -304,6 +355,78 @@ Get a user by id
 ### Return type
 
 [**User**](../Models/User.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: application/json
+
+<a name="optionsAPINotificationsNotificationIDRead"></a>
+# **optionsAPINotificationsNotificationIDRead**
+> optionsAPINotificationsNotificationIDRead(notificationID)
+
+CORS preflight for marking a notification as read
+
+### Parameters
+
+|Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **notificationID** | **Integer**|  | [default to null] |
+
+### Return type
+
+null (empty response body)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: Not defined
+
+<a name="optionsAPITeams"></a>
+# **optionsAPITeams**
+> optionsAPITeams()
+
+CORS preflight for teams
+
+### Parameters
+This endpoint does not need any parameter.
+
+### Return type
+
+null (empty response body)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: Not defined
+
+<a name="patchAPINotificationsNotificationIDRead"></a>
+# **patchAPINotificationsNotificationIDRead**
+> String patchAPINotificationsNotificationIDRead(notificationID)
+
+mark a notification as being read
+
+### Parameters
+
+|Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **notificationID** | **Integer**|  | [default to null] |
+
+### Return type
+
+**String**
 
 ### Authorization
 
@@ -361,9 +484,34 @@ No authorization required
 - **Content-Type**: application/json
 - **Accept**: application/json
 
+<a name="postAPITeamsTeamIDUsersMe"></a>
+# **postAPITeamsTeamIDUsersMe**
+> Team postAPITeamsTeamIDUsersMe(teamID)
+
+Add current user to a team
+
+### Parameters
+
+|Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **teamID** | **Integer**| ID of the team | [default to null] |
+
+### Return type
+
+[**Team**](../Models/Team.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: application/json
+
 <a name="postAPITeamsTeamIDUsersUserID"></a>
 # **postAPITeamsTeamIDUsersUserID**
-> String postAPITeamsTeamIDUsersUserID(userID, teamID)
+> Team postAPITeamsTeamIDUsersUserID(userID, teamID)
 
 Add a user to a team
 
@@ -376,7 +524,7 @@ Add a user to a team
 
 ### Return type
 
-**String**
+[**Team**](../Models/Team.md)
 
 ### Authorization
 
@@ -433,4 +581,28 @@ No authorization required
 
 - **Content-Type**: Not defined
 - **Accept**: application/json
+
+<a name="renderEvent"></a>
+# **renderEvent**
+> renderEvent_200_response renderEvent()
+
+Subscribe to notifications
+
+    Establishes a stream connection to receive real-time updates about rendering tasks via Server-Sent Events (SSE).
+
+### Parameters
+This endpoint does not need any parameter.
+
+### Return type
+
+[**renderEvent_200_response**](../Models/renderEvent_200_response.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: text/event-stream
 

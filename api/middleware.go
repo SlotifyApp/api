@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"time"
@@ -19,10 +20,11 @@ const (
 )
 
 func CORSMiddleware(next http.Handler) http.Handler {
+	log.Printf("In CorsMiddleware")
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000") // Allow frontend origin
 		w.Header().Set("Access-Control-Allow-Credentials", "true")             // Allow cookies to be sent
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, DELETE, UPDATE, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, DELETE, UPDATE, PATCH, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 
 		if r.Method == http.MethodOptions {
@@ -40,6 +42,7 @@ func AuthMiddleware(next http.Handler) http.Handler {
 		"/api/auth/callback": true,
 		"/api/healthcheck":   true,
 	}
+
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if excludedPaths[r.URL.Path] {
 			next.ServeHTTP(w, r)
@@ -82,6 +85,8 @@ func AuthMiddleware(next http.Handler) http.Handler {
 	})
 }
 
+type UserCtxKey struct{}
+
 func JWTMiddleware(next http.Handler) http.Handler {
 	excludedPaths := map[string]bool{
 		"/api/auth/callback": true,
@@ -97,17 +102,16 @@ func JWTMiddleware(next http.Handler) http.Handler {
 		}
 
 		log.Print("JWTMiddleware executed")
-		accessToken, err := jwt.GetJWTFromRequest(r)
+		userID, err := jwt.GetUserIDFromReq(r)
 		if err != nil {
-			log.Printf("jwt middleware error: %s", err.Error())
-			http.Error(w, err.Error(), http.StatusUnauthorized)
+			log.Print("failed to get userid from request access token")
+			sendError(w, http.StatusUnauthorized, "Try again later.")
 			return
 		}
-		if _, err = jwt.ParseJWT(accessToken, jwt.AccessTokenJWTSecretEnv); err != nil {
-			log.Printf("jwt middleware error: %s", err.Error())
-			http.Error(w, "Failed to parse JWT", http.StatusUnauthorized)
-			return
-		}
+
+		// set userID in context so it's available in our requests
+		ctx := context.WithValue(r.Context(), UserCtxKey{}, userID)
+		r = r.WithContext(ctx)
 
 		next.ServeHTTP(w, r)
 	})
@@ -120,7 +124,7 @@ func ApplyMiddlewares(r *mux.Router, swagger *openapi3.T) {
 		oapi_middleware.OapiRequestValidator(swagger),
 		JWTMiddleware,
 		chi_middleware.Logger,
-		chi_middleware.AllowContentType("application/json"),
+		chi_middleware.AllowContentType("application/json", "text/event-stream"),
 		httprate.LimitByIP(requestLimit, 1*time.Minute),
 		chi_middleware.Recoverer,
 	}

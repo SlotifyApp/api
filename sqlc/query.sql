@@ -45,6 +45,12 @@ JOIN UserToTeam utt ON t.id=utt.team_id
 JOIN User u ON u.id=utt.user_id 
 WHERE t.id=?;
 
+-- name: GetJoinableTeams :many
+SELECT t.* FROM Team t
+LEFT JOIN UserToTeam utt ON
+     t.id = utt.team_id AND utt.user_id = ? 
+WHERE utt.user_id IS NULL;
+
 -- name: GetTeamByID :one
 SELECT * FROM Team WHERE id=?;
 
@@ -70,3 +76,18 @@ SELECT * FROM RefreshToken WHERE user_id=?;
 -- name: DeleteRefreshTokenByUserID :execrows
 DELETE FROM RefreshToken WHERE user_id=?;
 
+-- name: CreateNotification :execlastid
+INSERT INTO Notification (message, created) VALUES(?, ?);
+
+-- name: CreateUserNotification :execrows
+INSERT INTO UserToNotification (user_id, notification_id, is_read) VALUES(?, ?, FALSE);
+
+-- name: GetUnreadUserNotifications :many
+SELECT n.* FROM UserToNotification utn
+JOIN Notification n ON n.id=utn.notification_id 
+WHERE utn.user_id=? AND utn.is_read=FALSE
+ORDER BY n.created DESC;
+
+-- name: MarkNotificationAsRead :execrows
+UPDATE UserToNotification SET is_read=TRUE
+WHERE user_id=? AND notification_id=?;

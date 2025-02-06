@@ -37,12 +37,20 @@ func main() {
 	api.ApplyMiddlewares(r, swagger)
 
 	h := api.HandlerFromMux(server, r)
-
 	s := &http.Server{
 		Handler:           h,
 		Addr:              "0.0.0.0:8080",
 		ReadHeaderTimeout: readHeaderTimeout * time.Second,
+		ReadTimeout:       0, // No timeout (important for long-lived SSE)
+		WriteTimeout:      0, // No timeout (important for long-lived SSE)
+		IdleTimeout:       0, // No timeout
 	}
+	s.RegisterOnShutdown(func() {
+		if err = db.DB.Close(); err != nil {
+			log.Printf("failed to close database: %+v", err)
+		}
+		log.Printf("Shutting down server gracefully...")
+	})
 
 	server.Logger.Info("http server starting up")
 
