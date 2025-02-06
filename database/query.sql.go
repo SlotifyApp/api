@@ -8,6 +8,7 @@ package database
 import (
 	"context"
 	"database/sql"
+	"time"
 )
 
 const addTeam = `-- name: AddTeam :execlastid
@@ -72,6 +73,23 @@ func (q *Queries) CountUserByID(ctx context.Context, id uint32) (int64, error) {
 	return count, err
 }
 
+const createNotification = `-- name: CreateNotification :execlastid
+INSERT INTO Notification (message, created) VALUES(?, ?)
+`
+
+type CreateNotificationParams struct {
+	Message string    `json:"message"`
+	Created time.Time `json:"created"`
+}
+
+func (q *Queries) CreateNotification(ctx context.Context, arg CreateNotificationParams) (int64, error) {
+	result, err := q.exec(ctx, q.createNotificationStmt, createNotification, arg.Message, arg.Created)
+	if err != nil {
+		return 0, err
+	}
+	return result.LastInsertId()
+}
+
 const createRefreshToken = `-- name: CreateRefreshToken :execrows
 REPLACE INTO RefreshToken (user_id, token) VALUES (?, ?)
 `
@@ -105,6 +123,23 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (int64, 
 		return 0, err
 	}
 	return result.LastInsertId()
+}
+
+const createUserNotification = `-- name: CreateUserNotification :execrows
+INSERT INTO UserToNotification (user_id, notification_id, is_read) VALUES(?, ?, FALSE)
+`
+
+type CreateUserNotificationParams struct {
+	UserID         uint32 `json:"userId"`
+	NotificationID uint32 `json:"notificationId"`
+}
+
+func (q *Queries) CreateUserNotification(ctx context.Context, arg CreateUserNotificationParams) (int64, error) {
+	result, err := q.exec(ctx, q.createUserNotificationStmt, createUserNotification, arg.UserID, arg.NotificationID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 const deleteRefreshTokenByUserID = `-- name: DeleteRefreshTokenByUserID :execrows
@@ -185,6 +220,36 @@ func (q *Queries) GetAllTeamMembers(ctx context.Context, id uint32) ([]GetAllTea
 	return items, nil
 }
 
+const getJoinableTeams = `-- name: GetJoinableTeams :many
+SELECT t.id, t.name FROM Team t
+LEFT JOIN UserToTeam utt ON
+     t.id = utt.team_id AND utt.user_id = ? 
+WHERE utt.user_id IS NULL
+`
+
+func (q *Queries) GetJoinableTeams(ctx context.Context, userID uint32) ([]Team, error) {
+	rows, err := q.query(ctx, q.getJoinableTeamsStmt, getJoinableTeams, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Team{}
+	for rows.Next() {
+		var i Team
+		if err := rows.Scan(&i.ID, &i.Name); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getRefreshTokenByUserID = `-- name: GetRefreshTokenByUserID :one
 SELECT id, user_id, token, revoked FROM RefreshToken WHERE user_id=?
 `
@@ -210,6 +275,36 @@ func (q *Queries) GetTeamByID(ctx context.Context, id uint32) (Team, error) {
 	var i Team
 	err := row.Scan(&i.ID, &i.Name)
 	return i, err
+}
+
+const getUnreadUserNotifications = `-- name: GetUnreadUserNotifications :many
+SELECT n.id, n.message, n.created FROM UserToNotification utn
+JOIN Notification n ON n.id=utn.notification_id 
+WHERE utn.user_id=? AND utn.is_read=FALSE
+ORDER BY n.created DESC
+`
+
+func (q *Queries) GetUnreadUserNotifications(ctx context.Context, userID uint32) ([]Notification, error) {
+	rows, err := q.query(ctx, q.getUnreadUserNotificationsStmt, getUnreadUserNotifications, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Notification{}
+	for rows.Next() {
+		var i Notification
+		if err := rows.Scan(&i.ID, &i.Message, &i.Created); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
@@ -349,6 +444,24 @@ func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]ListUse
 		return nil, err
 	}
 	return items, nil
+}
+
+const markNotificationAsRead = `-- name: MarkNotificationAsRead :execrows
+UPDATE UserToNotification SET is_read=TRUE
+WHERE user_id=? AND notification_id=?
+`
+
+type MarkNotificationAsReadParams struct {
+	UserID         uint32 `json:"userId"`
+	NotificationID uint32 `json:"notificationId"`
+}
+
+func (q *Queries) MarkNotificationAsRead(ctx context.Context, arg MarkNotificationAsReadParams) (int64, error) {
+	result, err := q.exec(ctx, q.markNotificationAsReadStmt, markNotificationAsRead, arg.UserID, arg.NotificationID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 const updateUserHomeAccountID = `-- name: UpdateUserHomeAccountID :execrows

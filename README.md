@@ -14,6 +14,7 @@ git clone --recurse-submodules
 
 ```bash
     pip install pre-commit
+    pre-commit install --hook-type pre-push
 ```
 
 4. Install the hooks:
@@ -90,3 +91,25 @@ is done through a [authorisation code flow](https://auth0.com/docs/get-started/a
 
 Slotify's API has its own protection in the form of a JWT access and refresh token. This is stored in the frontend
 as http-only cookies which are sent with every fetch request.
+
+## Notifications
+
+We have real-time notifications set up.
+
+### Usage:
+
+```go
+    // This is it
+    // s is the Server type
+    s.NotificationService.SendNotification(...)
+```
+
+### How do they work?
+
+Our notification system uses [server-side events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events).
+
+A map of clients is mapped to each user, a client is registered when a client uses the website and makes a call to the
+`/api/events` eventstream route. From there, notifications can be sent from server to client in real time.
+
+If a notification is meant for a user who doesn't have a client (ie. not currently using the website, imagine an offline user
+was added to a team), then on the next login these notifications are fetched from the database and displayed.

@@ -6,26 +6,37 @@ import (
 	"fmt"
 	"log"
 
-	"go.uber.org/zap"
-
 	"github.com/AzureAD/microsoft-authentication-library-for-go/apps/confidential"
 	"github.com/SlotifyApp/slotify-backend/database"
+	"github.com/SlotifyApp/slotify-backend/logger"
+	"github.com/SlotifyApp/slotify-backend/notification"
 )
 
 type options struct {
-	logger         *zap.SugaredLogger
-	msalClient     *confidential.Client
-	initMSALClient *bool
+	logger              *logger.Logger
+	msalClient          *confidential.Client
+	initMSALClient      *bool
+	notificationService notification.Service
 }
 
 type ServerOption func(opts *options) error
 
-func WithLogger(logger *zap.SugaredLogger) ServerOption {
+func WithLogger(logger *logger.Logger) ServerOption {
 	return func(options *options) error {
 		if logger == nil {
 			return errors.New("logger must not be nil")
 		}
 		options.logger = logger
+		return nil
+	}
+}
+
+func WithNotificationService(notifService notification.Service) ServerOption {
+	return func(options *options) error {
+		if notifService == nil {
+			return errors.New("notifService must not be nil")
+		}
+		options.notificationService = notifService
 		return nil
 	}
 }
@@ -50,9 +61,10 @@ func WithNotInitMSALClient() ServerOption {
 }
 
 type Server struct {
-	Logger     *zap.SugaredLogger
-	DB         *database.Database
-	MSALClient *confidential.Client
+	Logger              *logger.Logger
+	DB                  *database.Database
+	MSALClient          *confidential.Client
+	NotificationService notification.Service
 }
 
 func NewServerWithContext(_ context.Context, db *database.Database, serverOpts ...ServerOption) (*Server, error) {
@@ -63,17 +75,14 @@ func NewServerWithContext(_ context.Context, db *database.Database, serverOpts .
 			return nil, err
 		}
 	}
-	var serverLogger *zap.SugaredLogger
+	var serverLogger logger.Logger
 	if opts.logger == nil {
-		logger, _ := zap.NewProduction()
-		defer func() {
-			if err := logger.Sync(); err != nil {
-				log.Printf("failed to sync zap logger: %s", err.Error())
-			}
-		}()
-		serverLogger = logger.Sugar()
+		var err error
+		if serverLogger, err = logger.NewLogger(); err != nil {
+			log.Fatalf("failed to create new logger: %s", err.Error())
+		}
 	} else {
-		serverLogger = opts.logger
+		serverLogger = *opts.logger
 	}
 
 	// default to initialising MSAL client unless specified
@@ -96,13 +105,21 @@ func NewServerWithContext(_ context.Context, db *database.Database, serverOpts .
 		msalClient = opts.msalClient
 	}
 
+	var notificationService notification.Service
+	if opts.notificationService == nil {
+		notificationService = notification.NewSSENotificationService()
+	} else {
+		notificationService = opts.notificationService
+	}
+
 	if db == nil {
 		return nil, errors.New("db must be provided")
 	}
 
 	return &Server{
-		Logger:     serverLogger,
-		DB:         db,
-		MSALClient: msalClient,
+		Logger:              &serverLogger,
+		DB:                  db,
+		MSALClient:          msalClient,
+		NotificationService: notificationService,
 	}, nil
 }

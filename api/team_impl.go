@@ -7,17 +7,54 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/SlotifyApp/slotify-backend/database"
 	"github.com/SlotifyApp/slotify-backend/jwt"
 	"go.uber.org/zap"
 )
 
+func (s Server) GetApiTeamsJoinableMe(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value("userID").(uint32)
+	if !ok {
+		s.Logger.Error("failed to get userid from request context")
+		sendError(w, http.StatusUnauthorized, "Try again later.")
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), database.DatabaseTimeout)
+	defer cancel()
+
+	teams, err := s.DB.GetJoinableTeams(ctx, userID)
+	if err != nil {
+		switch {
+		case errors.Is(err, context.Canceled):
+			s.Logger.Error("getting users joinable teams failed: context was cancelled",
+				zap.Uint32("userID", userID))
+			sendError(w, http.StatusUnauthorized, "Try again later.")
+			return
+		case errors.Is(err, context.DeadlineExceeded):
+			s.Logger.Error("getting users joinable teams: query timed out",
+				zap.Uint32("userID", userID))
+			sendError(w, http.StatusUnauthorized, "Try again later.")
+			return
+		default:
+			s.Logger.Error("failed to get users teams", zap.Uint32("userID", userID))
+			sendError(w, http.StatusInternalServerError,
+				fmt.Sprintf("Sorry, failed to get user id(%d)'s joinable teams", userID))
+			return
+		}
+	}
+
+	SetHeaderAndWriteResponse(w, http.StatusOK, teams)
+}
+
 // (GET /api/teams/me).
 func (s Server) GetAPITeamsMe(w http.ResponseWriter, r *http.Request) {
+	// TODO: get user id from request context
 	userID, err := jwt.GetUserIDFromReq(r)
 	if err != nil {
-		s.Logger.Error("failed to get userid from request access token")
+		s.Logger.Error("failed to get userid from request context")
 		sendError(w, http.StatusUnauthorized, "Try again later.")
 		return
 	}
@@ -61,8 +98,15 @@ func (s Server) GetAPITeams(w http.ResponseWriter, _ *http.Request, params GetAP
 	SetHeaderAndWriteResponse(w, http.StatusOK, teams)
 }
 
-// (POST /teams) Create a new team.
+// (POST /teams) Create a new team and add the user who created the team.
 func (s Server) PostAPITeams(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value("userID").(uint32)
+	if !ok {
+		s.Logger.Error("failed to get userid from request context")
+		sendError(w, http.StatusUnauthorized, "Try again later.")
+		return
+	}
+
 	var teamBody PostAPITeamsJSONRequestBody
 	var err error
 	if err = json.NewDecoder(r.Body).Decode(&teamBody); err != nil {
@@ -89,7 +133,8 @@ func (s Server) PostAPITeams(w http.ResponseWriter, r *http.Request) {
 			return
 		case database.IsDuplicateEntrySQLError(err):
 			s.Logger.Error("team api: team already exists", zap.Object("req_body", teamBody), zap.Error(err))
-			sendError(w, http.StatusBadRequest, fmt.Sprintf("team with name %s already exists", teamBody.Name))
+			sendError(w, http.StatusBadRequest,
+				fmt.Sprintf("team with name %s already exists", teamBody.Name))
 			return
 		default:
 			s.Logger.Error("failed to create team", zap.Object("body", teamBody), zap.Error(err))
@@ -103,7 +148,21 @@ func (s Server) PostAPITeams(w http.ResponseWriter, r *http.Request) {
 		Id:   uint32(teamID),
 		Name: teamBody.Name,
 	}
-	SetHeaderAndWriteResponse(w, http.StatusCreated, team)
+
+	notifParams := database.CreateNotificationParams{
+		Message: fmt.Sprintf("You successfully created Team %s!", team.Name),
+		Created: time.Now(),
+	}
+
+	if err := s.NotificationService.SendNotification(*s.Logger, s.DB, userID, notifParams); err != nil {
+		s.Logger.Errorf("team api: failed to send notification",
+			zap.Error(err))
+	}
+
+	// TODO: Actually have a db transaction here containing both creating the team
+	// or joining the team fails
+	// Add user who made the team to the team itself
+	s.PostApiTeamsTeamIDUsersMe(w, r, team.Id)
 }
 
 // (DELETE /teams/{teamID}) Delete a team by id.
@@ -222,9 +281,21 @@ func (s Server) GetAPITeamsTeamIDUsers(w http.ResponseWriter, _ *http.Request, t
 	SetHeaderAndWriteResponse(w, http.StatusOK, users)
 }
 
+// (POST /api/teams/{teamID}/users/me).
+func (s Server) PostApiTeamsTeamIDUsersMe(w http.ResponseWriter, r *http.Request, teamID uint32) {
+	userID, ok := r.Context().Value("userID").(uint32)
+	if !ok {
+		s.Logger.Error("failed to get userid from request context")
+		sendError(w, http.StatusUnauthorized, "Try again later.")
+		return
+	}
+
+	s.PostAPITeamsTeamIDUsersUserID(w, r, teamID, userID)
+}
+
 // (POST /teams/{teamID}/users/{userID}) Add a user to a team.
-func (s Server) PostAPITeamsTeamIDUsersUserID(w http.ResponseWriter, _ *http.Request, teamID uint32, userID uint32) {
-	ctx, cancel := context.WithTimeout(context.Background(), database.DatabaseTimeout)
+func (s Server) PostAPITeamsTeamIDUsersUserID(w http.ResponseWriter, r *http.Request, teamID uint32, userID uint32) {
+	ctx, cancel := context.WithTimeout(r.Context(), 10*database.DatabaseTimeout)
 	defer cancel()
 
 	rowsAffected, err := s.DB.AddUserToTeam(ctx, database.AddUserToTeamParams{
@@ -265,6 +336,83 @@ func (s Server) PostAPITeamsTeamIDUsersUserID(w http.ResponseWriter, _ *http.Req
 		return
 	}
 
-	SetHeaderAndWriteResponse(w, http.StatusOK,
-		fmt.Sprintf("team api: member with id %d added to team with id %d", userID, teamID))
+	t, err := s.DB.GetTeamByID(ctx, teamID)
+	if err != nil {
+		switch {
+		case errors.Is(err, context.Canceled):
+			s.Logger.Error("team api: add user to team: get team by id: context cancelled",
+				zap.Uint32("userID", userID), zap.Uint32("teamID", teamID), zap.Error(err))
+			sendError(w, http.StatusInternalServerError, "team api: context cancelled")
+			return
+		case errors.Is(err, context.DeadlineExceeded):
+			s.Logger.Error("team api: add user to team: get team by id query timed out",
+				zap.Uint32("userID", userID), zap.Uint32("teamID", teamID), zap.Error(err))
+			sendError(w, http.StatusInternalServerError, "team api: add team query timed out")
+			return
+		default:
+			s.Logger.Errorf("team api: add user to team: get team by id query timed out",
+				zap.Error(err))
+			sendError(w, http.StatusInternalServerError,
+				"team api: added team but failed to get team by id")
+			return
+		}
+	}
+
+	members, err := s.DB.GetAllTeamMembers(ctx, teamID)
+	if err != nil {
+		s.Logger.Errorf("team api: failed to get all team members for PostAPITeamsTeamIDUsersUserID",
+			zap.Error(err))
+		// Still return ok because the actual endpoint worked, its just notifications that didnt
+		SetHeaderAndWriteResponse(w, http.StatusOK, t)
+		return
+	}
+
+	u, err := s.DB.GetUserByID(ctx, userID)
+	if err != nil {
+		s.Logger.Errorf("team api: failed to get user details for PostAPITeamsTeamIDUsersUserID",
+			zap.Error(err))
+		// Still return ok because the actual endpoint worked, its just notifications that didnt
+		SetHeaderAndWriteResponse(w, http.StatusOK, t)
+		return
+	}
+
+	// TODO: Share notification between users, currently we have a 1-to-1 mapping
+	allMemberNotif := database.CreateNotificationParams{
+		Message: fmt.Sprintf("Say hi to %s, he just joined Team %s", u.FirstName+" "+u.LastName, t.Name),
+		Created: time.Now(),
+	}
+
+	for _, m := range members {
+		// This is the user that just joined
+		if m.ID == userID {
+			notifParams := database.CreateNotificationParams{
+				Message: fmt.Sprintf("You were added to Team %s!", t.Name),
+				Created: time.Now(),
+			}
+			if err := s.NotificationService.SendNotification(*s.Logger, s.DB, userID, notifParams); err != nil {
+				s.Logger.Errorf("team api: failed to send notification PostAPITeamsTeamIDUsersUserID to user that just joined team",
+					zap.Error(err))
+			}
+		} else {
+			// TODO: Batch insert for notifications
+			if err := s.NotificationService.SendNotification(*s.Logger, s.DB, m.ID, allMemberNotif); err != nil {
+				s.Logger.Errorf(
+					"team api: failed to send notification to all exisiting users of team, adding team member",
+					zap.Error(err))
+			}
+		}
+	}
+
+	SetHeaderAndWriteResponse(w, http.StatusCreated, t)
+}
+
+func (s Server) OptionsAPITeams(w http.ResponseWriter, r *http.Request) {
+	// Set CORS headers
+	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")        // Your frontend's origin
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, OPTIONS")   // Allowed methods
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization") // Allowed headers
+	w.Header().Set("Access-Control-Allow-Credentials", "true")                    // Allow credentials (cookies, etc.)
+
+	// Send a 204 No Content response to indicate that the preflight request was successful
+	w.WriteHeader(http.StatusNoContent)
 }

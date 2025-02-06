@@ -86,6 +86,7 @@ func TestTeam_PostTeams(t *testing.T) {
 	t.Cleanup(func() {
 		testutil.CloseDB(db)
 	})
+	user := testutil.InsertUser(t, db)
 	// Setup
 	insertedTeam := testutil.InsertTeam(t, db)
 	newTeamName := gofakeit.ProductName()
@@ -124,6 +125,9 @@ func TestTeam_PostTeams(t *testing.T) {
 			rr := httptest.NewRecorder()
 			req := httptest.NewRequest(http.MethodPost, "/api/teams", bytes.NewReader(body))
 			req.Header.Add("Content-Type", "application/json")
+
+			ctx := context.WithValue(req.Context(), "userID", user.Id)
+			req = req.WithContext(ctx)
 
 			server.PostAPITeams(rr, req)
 
@@ -279,15 +283,17 @@ func TestTeam_PostTeamsTeamIDUsersUserID(t *testing.T) {
 		userID           uint32
 		testMsg          string
 	}{
-		"insert an existing user into an existing team": {
-			expectedRespBody: fmt.Sprintf("team api: member with id %d added to team with id %d",
-				userInserted.Id, teamInserted.Id),
-			httpStatus: http.StatusOK,
+		"insert a user into a team": {
+			expectedRespBody: api.Team{
+				Id:   teamInserted.Id,
+				Name: teamInserted.Name,
+			},
+			httpStatus: http.StatusCreated,
 			userID:     userInserted.Id,
 			teamID:     teamInserted.Id,
 			testMsg:    "can add user to team where both exist successfully",
 		},
-		"insert an existing user into a non-existing team": {
+		"insert a user into a non-existent team": {
 			expectedRespBody: fmt.Sprintf("team api: team id(%d) or user id(%d) was invalid",
 				1000, userInserted.Id),
 			httpStatus: http.StatusForbidden,
@@ -296,7 +302,7 @@ func TestTeam_PostTeamsTeamIDUsersUserID(t *testing.T) {
 			testMsg:    "cannot add user to team where team does not exist",
 		},
 
-		"insert an non-existing user into a existing team": {
+		"insert an non-existent user into a team": {
 			expectedRespBody: fmt.Sprintf("team api: team id(%d) or user id(%d) was invalid", teamInserted.Id, 10000),
 			httpStatus:       http.StatusForbidden,
 			userID:           10000,
@@ -324,11 +330,19 @@ func TestTeam_PostTeamsTeamIDUsersUserID(t *testing.T) {
 
 			testutil.OpenAPIValidateTest(t, rr, req)
 
-			var respBody string
-			require.Equal(t, tt.httpStatus, rr.Result().StatusCode)
-			err = json.NewDecoder(rr.Result().Body).Decode(&respBody)
-			require.NoError(t, err, "response cannot be decoded into string")
-			require.Equal(t, tt.expectedRespBody, respBody, tt.testMsg)
+			if tt.httpStatus == http.StatusCreated {
+				var team api.Team
+				require.Equal(t, tt.httpStatus, rr.Result().StatusCode)
+				err = json.NewDecoder(rr.Result().Body).Decode(&team)
+				require.NoError(t, err, "response cannot be decoded into Team struct")
+				require.Equal(t, tt.expectedRespBody, team, tt.testMsg)
+			} else {
+				var respBody string
+				require.Equal(t, tt.httpStatus, rr.Result().StatusCode)
+				err = json.NewDecoder(rr.Result().Body).Decode(&respBody)
+				require.NoError(t, err, "response cannot be decoded into string")
+				require.Equal(t, tt.expectedRespBody, respBody, tt.testMsg)
+			}
 		})
 	}
 }
