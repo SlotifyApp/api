@@ -14,8 +14,8 @@ import (
 	"go.uber.org/zap"
 )
 
-func (s Server) GetApiTeamsJoinableMe(w http.ResponseWriter, r *http.Request) {
-	userID, ok := r.Context().Value("userID").(uint32)
+func (s Server) GetAPITeamsJoinableMe(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value(UserCtxKey{}).(uint32)
 	if !ok {
 		s.Logger.Error("failed to get userid from request context")
 		sendError(w, http.StatusUnauthorized, "Try again later.")
@@ -100,7 +100,7 @@ func (s Server) GetAPITeams(w http.ResponseWriter, _ *http.Request, params GetAP
 
 // (POST /teams) Create a new team and add the user who created the team.
 func (s Server) PostAPITeams(w http.ResponseWriter, r *http.Request) {
-	userID, ok := r.Context().Value("userID").(uint32)
+	userID, ok := r.Context().Value(UserCtxKey{}).(uint32)
 	if !ok {
 		s.Logger.Error("failed to get userid from request context")
 		sendError(w, http.StatusUnauthorized, "Try again later.")
@@ -154,7 +154,7 @@ func (s Server) PostAPITeams(w http.ResponseWriter, r *http.Request) {
 		Created: time.Now(),
 	}
 
-	if err := s.NotificationService.SendNotification(*s.Logger, s.DB, userID, notifParams); err != nil {
+	if err = s.NotificationService.SendNotification(s.Logger, s.DB, userID, notifParams); err != nil {
 		s.Logger.Errorf("team api: failed to send notification",
 			zap.Error(err))
 	}
@@ -162,7 +162,7 @@ func (s Server) PostAPITeams(w http.ResponseWriter, r *http.Request) {
 	// TODO: Actually have a db transaction here containing both creating the team
 	// or joining the team fails
 	// Add user who made the team to the team itself
-	s.PostApiTeamsTeamIDUsersMe(w, r, team.Id)
+	s.PostAPITeamsTeamIDUsersMe(w, r, team.Id)
 }
 
 // (DELETE /teams/{teamID}) Delete a team by id.
@@ -282,8 +282,8 @@ func (s Server) GetAPITeamsTeamIDUsers(w http.ResponseWriter, _ *http.Request, t
 }
 
 // (POST /api/teams/{teamID}/users/me).
-func (s Server) PostApiTeamsTeamIDUsersMe(w http.ResponseWriter, r *http.Request, teamID uint32) {
-	userID, ok := r.Context().Value("userID").(uint32)
+func (s Server) PostAPITeamsTeamIDUsersMe(w http.ResponseWriter, r *http.Request, teamID uint32) {
+	userID, ok := r.Context().Value(UserCtxKey{}).(uint32)
 	if !ok {
 		s.Logger.Error("failed to get userid from request context")
 		sendError(w, http.StatusUnauthorized, "Try again later.")
@@ -294,6 +294,7 @@ func (s Server) PostApiTeamsTeamIDUsersMe(w http.ResponseWriter, r *http.Request
 }
 
 // (POST /teams/{teamID}/users/{userID}) Add a user to a team.
+// nolint: funlen // TODO: Refactor this
 func (s Server) PostAPITeamsTeamIDUsersUserID(w http.ResponseWriter, r *http.Request, teamID uint32, userID uint32) {
 	ctx, cancel := context.WithTimeout(r.Context(), 10*database.DatabaseTimeout)
 	defer cancel()
@@ -389,13 +390,13 @@ func (s Server) PostAPITeamsTeamIDUsersUserID(w http.ResponseWriter, r *http.Req
 				Message: fmt.Sprintf("You were added to Team %s!", t.Name),
 				Created: time.Now(),
 			}
-			if err := s.NotificationService.SendNotification(*s.Logger, s.DB, userID, notifParams); err != nil {
+			if err = s.NotificationService.SendNotification(s.Logger, s.DB, userID, notifParams); err != nil {
 				s.Logger.Errorf("team api: failed to send notification PostAPITeamsTeamIDUsersUserID to user that just joined team",
 					zap.Error(err))
 			}
 		} else {
 			// TODO: Batch insert for notifications
-			if err := s.NotificationService.SendNotification(*s.Logger, s.DB, m.ID, allMemberNotif); err != nil {
+			if err = s.NotificationService.SendNotification(s.Logger, s.DB, m.ID, allMemberNotif); err != nil {
 				s.Logger.Errorf(
 					"team api: failed to send notification to all exisiting users of team, adding team member",
 					zap.Error(err))
@@ -406,7 +407,7 @@ func (s Server) PostAPITeamsTeamIDUsersUserID(w http.ResponseWriter, r *http.Req
 	SetHeaderAndWriteResponse(w, http.StatusCreated, t)
 }
 
-func (s Server) OptionsAPITeams(w http.ResponseWriter, r *http.Request) {
+func (s Server) OptionsAPITeams(w http.ResponseWriter, _ *http.Request) {
 	// Set CORS headers
 	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")        // Your frontend's origin
 	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, OPTIONS")   // Allowed methods

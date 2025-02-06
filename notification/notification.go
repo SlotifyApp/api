@@ -19,9 +19,9 @@ type ClientSet map[http.ResponseWriter]struct{}
 
 // Service shows behaviour for a notification service impl.
 type Service interface {
-	DeleteUserConn(logger logger.Logger, userID uint32, w http.ResponseWriter)
+	DeleteUserConn(logger *logger.Logger, userID uint32, w http.ResponseWriter)
 	RegisterUserClient(logger *logger.Logger, userID uint32, w http.ResponseWriter) error
-	SendNotification(logger logger.Logger, db *database.Database,
+	SendNotification(logger *logger.Logger, db *database.Database,
 		userID uint32, notif database.CreateNotificationParams) error
 }
 
@@ -42,7 +42,9 @@ func NewSSENotificationService() *SSENotificationService {
 }
 
 // RegisterUserClient registers a user client to send notifications to.
-func (sse *SSENotificationService) RegisterUserClient(logger *logger.Logger, userID uint32, w http.ResponseWriter) error {
+func (sse *SSENotificationService) RegisterUserClient(logger *logger.Logger,
+	userID uint32, w http.ResponseWriter,
+) error {
 	if w == nil {
 		return ErrNotifClientNil
 	}
@@ -65,7 +67,7 @@ func (sse *SSENotificationService) RegisterUserClient(logger *logger.Logger, use
 }
 
 // DeleteUserClients attempts to deletes a user from the conns map, if there is no user this is a no-op.
-func (sse *SSENotificationService) DeleteUserConn(logger logger.Logger, userID uint32, w http.ResponseWriter) {
+func (sse *SSENotificationService) DeleteUserConn(logger *logger.Logger, userID uint32, w http.ResponseWriter) {
 	sse.mu.Lock()
 
 	defer sse.mu.Unlock()
@@ -78,7 +80,9 @@ func (sse *SSENotificationService) DeleteUserConn(logger logger.Logger, userID u
 }
 
 // Store the notification in the database.
-func storeNotification(ctx context.Context, db *database.Database, userID uint32, notif database.CreateNotificationParams) (*database.Notification, error) {
+func storeNotification(ctx context.Context, db *database.Database,
+	userID uint32, notif database.CreateNotificationParams,
+) (*database.Notification, error) {
 	notifID, err := db.CreateNotification(ctx, notif)
 	if err != nil {
 		switch {
@@ -93,7 +97,8 @@ func storeNotification(ctx context.Context, db *database.Database, userID uint32
 
 	// Add to user table
 	dbParams := database.CreateUserNotificationParams{
-		UserID:         userID,
+		UserID: userID,
+		//nolint: gosec // id is unsigned 32 bit int
 		NotificationID: uint32(notifID),
 	}
 	rows, err := db.CreateUserNotification(ctx, dbParams)
@@ -114,6 +119,7 @@ func storeNotification(ctx context.Context, db *database.Database, userID uint32
 	}
 
 	return &database.Notification{
+		//nolint: gosec // id is unsigned 32 bit int
 		ID:      uint32(notifID),
 		Message: notif.Message,
 		Created: notif.Created,
@@ -122,8 +128,9 @@ func storeNotification(ctx context.Context, db *database.Database, userID uint32
 
 // SendNotification sends a notification to ALL clients of a user.
 // The notification is also stored in the database regardless of whether the user has a client or not.
-func (sse *SSENotificationService) SendNotification(logger logger.Logger,
-	db *database.Database, userID uint32, notif database.CreateNotificationParams) error {
+func (sse *SSENotificationService) SendNotification(logger *logger.Logger,
+	db *database.Database, userID uint32, notif database.CreateNotificationParams,
+) error {
 	sse.mu.Lock()
 	clients := sse.conns[userID]
 
@@ -152,14 +159,20 @@ func (sse *SSENotificationService) SendNotification(logger logger.Logger,
 			sse.DeleteUserConn(logger, userID, c)
 			continue
 		}
-		notifJSON, err := json.Marshal(*storedNotif)
-		if err != nil {
+		var notifJSON []byte
+		if notifJSON, err = json.Marshal(*storedNotif); err != nil {
 			return fmt.Errorf("failed to encode notification as json: %w", err)
 		}
+
 		fmt.Fprintf(c, "event: calendar_notification\n")
 		fmt.Fprintf(c, "data: %s\n\n", notifJSON)
 
-		c.(http.Flusher).Flush()
+		f, ok := c.(http.Flusher)
+
+		if !ok {
+			return errors.New("client doesn't implement flusher interface")
+		}
+		f.Flush()
 	}
 	return nil
 }

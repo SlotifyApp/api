@@ -12,15 +12,15 @@ import (
 // This is used for testing.
 type MockNotificationService struct{}
 
-func (MockNotificationService) DeleteUserConn(logger logger.Logger, userID uint32, w http.ResponseWriter) {
+func (MockNotificationService) DeleteUserConn(_ *logger.Logger, _ uint32, _ http.ResponseWriter) {
 }
 
-func (MockNotificationService) RegisterUserClient(logger *logger.Logger, userID uint32, w http.ResponseWriter) error {
+func (MockNotificationService) RegisterUserClient(_ *logger.Logger, _ uint32, _ http.ResponseWriter) error {
 	return nil
 }
 
-func (MockNotificationService) SendNotification(logger logger.Logger, db *database.Database,
-	userID uint32, notif database.CreateNotificationParams,
+func (MockNotificationService) SendNotification(_ *logger.Logger, _ *database.Database,
+	_ uint32, _ database.CreateNotificationParams,
 ) error {
 	return nil
 }

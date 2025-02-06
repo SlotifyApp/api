@@ -126,7 +126,7 @@ func TestTeam_PostTeams(t *testing.T) {
 			req := httptest.NewRequest(http.MethodPost, "/api/teams", bytes.NewReader(body))
 			req.Header.Add("Content-Type", "application/json")
 
-			ctx := context.WithValue(req.Context(), "userID", user.Id)
+			ctx := context.WithValue(req.Context(), api.UserCtxKey{}, user.Id)
 			req = req.WithContext(ctx)
 
 			server.PostAPITeams(rr, req)

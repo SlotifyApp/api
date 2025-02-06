@@ -41,17 +41,15 @@ func (s Server) RenderEvent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	clientGone := r.Context().Done()
+	// Block until the request is 'done', eg. client navigates away
+	<-r.Context().Done()
 
-	select {
-	case <-clientGone:
-		s.Logger.Info("client disconnected")
-		s.NotificationService.DeleteUserConn(*s.Logger, userID, w)
-	}
+	s.Logger.Info("client disconnected")
+	s.NotificationService.DeleteUserConn(s.Logger, userID, w)
 }
 
 // (OPTIONS /api/notifications/{notificationID}/read).
-func (s Server) OptionsAPINotificationsNotificationIDRead(w http.ResponseWriter, r *http.Request, notificationID uint32) {
+func (s Server) OptionsAPINotificationsNotificationIDRead(w http.ResponseWriter, _ *http.Request, _ uint32) {
 	// Set CORS headers
 	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")        // Your frontend's origin
 	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, OPTIONS")   // Allowed methods
@@ -63,7 +61,7 @@ func (s Server) OptionsAPINotificationsNotificationIDRead(w http.ResponseWriter,
 }
 
 // (PATCH /api/notifications/{notificationID}/read).
-func (s Server) PatchApiNotificationsNotificationIDRead(w http.ResponseWriter, r *http.Request, notificationID uint32) {
+func (s Server) PatchAPINotificationsNotificationIDRead(w http.ResponseWriter, r *http.Request, notificationID uint32) {
 	ctx, cancel := context.WithTimeout(r.Context(), database.DatabaseTimeout)
 	defer cancel()
 
@@ -100,7 +98,7 @@ func (s Server) PatchApiNotificationsNotificationIDRead(w http.ResponseWriter, r
 }
 
 // (GET /api/notifications/{notificationID}/read).
-func (s Server) GetApiUsersMeNotifications(w http.ResponseWriter, r *http.Request) {
+func (s Server) GetAPIUsersMeNotifications(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), database.DatabaseTimeout)
 	defer cancel()
 

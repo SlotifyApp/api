@@ -109,7 +109,7 @@ type ServerInterface interface {
 	OptionsAPINotificationsNotificationIDRead(w http.ResponseWriter, r *http.Request, notificationID uint32)
 	// mark a notification as being read
 	// (PATCH /api/notifications/{notificationID}/read)
-	PatchApiNotificationsNotificationIDRead(w http.ResponseWriter, r *http.Request, notificationID uint32)
+	PatchAPINotificationsNotificationIDRead(w http.ResponseWriter, r *http.Request, notificationID uint32)
 	// Refresh Slotify access token and refresh token
 	// (POST /api/refresh)
 	PostAPIRefresh(w http.ResponseWriter, r *http.Request)
@@ -124,7 +124,7 @@ type ServerInterface interface {
 	PostAPITeams(w http.ResponseWriter, r *http.Request)
 	// Get all joinable teams for a user excluding teams they are already a part of
 	// (GET /api/teams/joinable/me)
-	GetApiTeamsJoinableMe(w http.ResponseWriter, r *http.Request)
+	GetAPITeamsJoinableMe(w http.ResponseWriter, r *http.Request)
 	// Get all teams for user by id passed by JWT
 	// (GET /api/teams/me)
 	GetAPITeamsMe(w http.ResponseWriter, r *http.Request)
@@ -139,7 +139,7 @@ type ServerInterface interface {
 	GetAPITeamsTeamIDUsers(w http.ResponseWriter, r *http.Request, teamID uint32)
 	// Add current user to a team
 	// (POST /api/teams/{teamID}/users/me)
-	PostApiTeamsTeamIDUsersMe(w http.ResponseWriter, r *http.Request, teamID uint32)
+	PostAPITeamsTeamIDUsersMe(w http.ResponseWriter, r *http.Request, teamID uint32)
 	// Add a user to a team
 	// (POST /api/teams/{teamID}/users/{userID})
 	PostAPITeamsTeamIDUsersUserID(w http.ResponseWriter, r *http.Request, teamID uint32, userID uint32)
@@ -157,7 +157,7 @@ type ServerInterface interface {
 	PostAPIUsersMeLogout(w http.ResponseWriter, r *http.Request)
 	// get user's unread notifications
 	// (GET /api/users/me/notifications)
-	GetApiUsersMeNotifications(w http.ResponseWriter, r *http.Request)
+	GetAPIUsersMeNotifications(w http.ResponseWriter, r *http.Request)
 	// Delete a user by id
 	// (DELETE /api/users/{userID})
 	DeleteAPIUsersUserID(w http.ResponseWriter, r *http.Request, userID uint32)
@@ -291,8 +291,8 @@ func (siw *ServerInterfaceWrapper) OptionsAPINotificationsNotificationIDRead(w h
 	handler.ServeHTTP(w, r)
 }
 
-// PatchApiNotificationsNotificationIDRead operation middleware
-func (siw *ServerInterfaceWrapper) PatchApiNotificationsNotificationIDRead(w http.ResponseWriter, r *http.Request) {
+// PatchAPINotificationsNotificationIDRead operation middleware
+func (siw *ServerInterfaceWrapper) PatchAPINotificationsNotificationIDRead(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 
@@ -306,7 +306,7 @@ func (siw *ServerInterfaceWrapper) PatchApiNotificationsNotificationIDRead(w htt
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.PatchApiNotificationsNotificationIDRead(w, r, notificationID)
+		siw.Handler.PatchAPINotificationsNotificationIDRead(w, r, notificationID)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -385,11 +385,11 @@ func (siw *ServerInterfaceWrapper) PostAPITeams(w http.ResponseWriter, r *http.R
 	handler.ServeHTTP(w, r)
 }
 
-// GetApiTeamsJoinableMe operation middleware
-func (siw *ServerInterfaceWrapper) GetApiTeamsJoinableMe(w http.ResponseWriter, r *http.Request) {
+// GetAPITeamsJoinableMe operation middleware
+func (siw *ServerInterfaceWrapper) GetAPITeamsJoinableMe(w http.ResponseWriter, r *http.Request) {
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetApiTeamsJoinableMe(w, r)
+		siw.Handler.GetAPITeamsJoinableMe(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -488,8 +488,8 @@ func (siw *ServerInterfaceWrapper) GetAPITeamsTeamIDUsers(w http.ResponseWriter,
 	handler.ServeHTTP(w, r)
 }
 
-// PostApiTeamsTeamIDUsersMe operation middleware
-func (siw *ServerInterfaceWrapper) PostApiTeamsTeamIDUsersMe(w http.ResponseWriter, r *http.Request) {
+// PostAPITeamsTeamIDUsersMe operation middleware
+func (siw *ServerInterfaceWrapper) PostAPITeamsTeamIDUsersMe(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 
@@ -503,7 +503,7 @@ func (siw *ServerInterfaceWrapper) PostApiTeamsTeamIDUsersMe(w http.ResponseWrit
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.PostApiTeamsTeamIDUsersMe(w, r, teamID)
+		siw.Handler.PostAPITeamsTeamIDUsersMe(w, r, teamID)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -632,11 +632,11 @@ func (siw *ServerInterfaceWrapper) PostAPIUsersMeLogout(w http.ResponseWriter, r
 	handler.ServeHTTP(w, r)
 }
 
-// GetApiUsersMeNotifications operation middleware
-func (siw *ServerInterfaceWrapper) GetApiUsersMeNotifications(w http.ResponseWriter, r *http.Request) {
+// GetAPIUsersMeNotifications operation middleware
+func (siw *ServerInterfaceWrapper) GetAPIUsersMeNotifications(w http.ResponseWriter, r *http.Request) {
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetApiUsersMeNotifications(w, r)
+		siw.Handler.GetAPIUsersMeNotifications(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -819,7 +819,7 @@ func HandlerWithOptions(si ServerInterface, options GorillaServerOptions) http.H
 
 	r.HandleFunc(options.BaseURL+"/api/notifications/{notificationID}/read", wrapper.OptionsAPINotificationsNotificationIDRead).Methods("OPTIONS")
 
-	r.HandleFunc(options.BaseURL+"/api/notifications/{notificationID}/read", wrapper.PatchApiNotificationsNotificationIDRead).Methods("PATCH")
+	r.HandleFunc(options.BaseURL+"/api/notifications/{notificationID}/read", wrapper.PatchAPINotificationsNotificationIDRead).Methods("PATCH")
 
 	r.HandleFunc(options.BaseURL+"/api/refresh", wrapper.PostAPIRefresh).Methods("POST")
 
@@ -829,7 +829,7 @@ func HandlerWithOptions(si ServerInterface, options GorillaServerOptions) http.H
 
 	r.HandleFunc(options.BaseURL+"/api/teams", wrapper.PostAPITeams).Methods("POST")
 
-	r.HandleFunc(options.BaseURL+"/api/teams/joinable/me", wrapper.GetApiTeamsJoinableMe).Methods("GET")
+	r.HandleFunc(options.BaseURL+"/api/teams/joinable/me", wrapper.GetAPITeamsJoinableMe).Methods("GET")
 
 	r.HandleFunc(options.BaseURL+"/api/teams/me", wrapper.GetAPITeamsMe).Methods("GET")
 
@@ -839,7 +839,7 @@ func HandlerWithOptions(si ServerInterface, options GorillaServerOptions) http.H
 
 	r.HandleFunc(options.BaseURL+"/api/teams/{teamID}/users", wrapper.GetAPITeamsTeamIDUsers).Methods("GET")
 
-	r.HandleFunc(options.BaseURL+"/api/teams/{teamID}/users/me", wrapper.PostApiTeamsTeamIDUsersMe).Methods("POST")
+	r.HandleFunc(options.BaseURL+"/api/teams/{teamID}/users/me", wrapper.PostAPITeamsTeamIDUsersMe).Methods("POST")
 
 	r.HandleFunc(options.BaseURL+"/api/teams/{teamID}/users/{userID}", wrapper.PostAPITeamsTeamIDUsersUserID).Methods("POST")
 
@@ -851,7 +851,7 @@ func HandlerWithOptions(si ServerInterface, options GorillaServerOptions) http.H
 
 	r.HandleFunc(options.BaseURL+"/api/users/me/logout", wrapper.PostAPIUsersMeLogout).Methods("POST")
 
-	r.HandleFunc(options.BaseURL+"/api/users/me/notifications", wrapper.GetApiUsersMeNotifications).Methods("GET")
+	r.HandleFunc(options.BaseURL+"/api/users/me/notifications", wrapper.GetAPIUsersMeNotifications).Methods("GET")
 
 	r.HandleFunc(options.BaseURL+"/api/users/{userID}", wrapper.DeleteAPIUsersUserID).Methods("DELETE")
 
@@ -863,44 +863,43 @@ func HandlerWithOptions(si ServerInterface, options GorillaServerOptions) http.H
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"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",
-	"//+A4r3++TQAAA==",
+	"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",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file

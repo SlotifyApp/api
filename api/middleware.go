@@ -85,6 +85,8 @@ func AuthMiddleware(next http.Handler) http.Handler {
 	})
 }
 
+type UserCtxKey struct{}
+
 func JWTMiddleware(next http.Handler) http.Handler {
 	excludedPaths := map[string]bool{
 		"/api/auth/callback": true,
@@ -108,7 +110,7 @@ func JWTMiddleware(next http.Handler) http.Handler {
 		}
 
 		// set userID in context so it's available in our requests
-		ctx := context.WithValue(r.Context(), "userID", userID)
+		ctx := context.WithValue(r.Context(), UserCtxKey{}, userID)
 		r = r.WithContext(ctx)
 
 		next.ServeHTTP(w, r)
