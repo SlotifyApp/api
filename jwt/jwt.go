@@ -10,7 +10,10 @@ import (
 	"time"
 
 	"github.com/SlotifyApp/slotify-backend/database"
+	"github.com/SlotifyApp/slotify-backend/logger"
+	"github.com/avast/retry-go"
 	goJWT "github.com/golang-jwt/jwt/v5"
+	"go.uber.org/zap"
 )
 
 const (
@@ -24,6 +27,11 @@ var (
 	ErrNoAuthHeader      = errors.New("header Authorization is missing")
 	ErrInvalidAuthHeader = errors.New("header Authorization is malformed")
 )
+
+type AccessAndRefreshTokens struct {
+	AccessToken  string
+	RefreshToken string
+}
 
 // CustomClaims is a struct for Slotify JWT claims.
 type CustomClaims struct {
@@ -131,13 +139,13 @@ func GetUserIDFromReq(r *http.Request) (uint32, error) {
 	return claims.UserID, nil
 }
 
-// GenerateAndStoreRefreshToken will generate a new refresh token and store it in the database.
-func GenerateAndStoreRefreshToken(ctx context.Context, qtx *database.Queries,
+// generateAndStoreRefreshToken will generate a new refresh token and store it in the database.
+func generateAndStoreRefreshToken(ctx context.Context, qtx *database.Queries,
 	userID uint32, email string,
 ) (string, error) {
 	refreshToken, err := GenerateJWT(userID, email, RefreshTokenJWTSecretEnv)
 	if err != nil {
-		return "", fmt.Errorf("failed to create refresh token: %w", err)
+		return "", fmt.Errorf("failed to generate refresh JWT token: %w", err)
 	}
 
 	dbParams := database.CreateRefreshTokenParams{
@@ -151,9 +159,9 @@ func GenerateAndStoreRefreshToken(ctx context.Context, qtx *database.Queries,
 		case errors.Is(err, context.Canceled):
 			return "", fmt.Errorf("context cancelled during create refresh token: %w", err)
 		case errors.Is(err, context.DeadlineExceeded):
-			return "", fmt.Errorf("create refresh token timed out: %w", err)
+			return "", fmt.Errorf("store refresh token timed out: %w", err)
 		default:
-			return "", fmt.Errorf("failed to create refresh token: %w", err)
+			return "", fmt.Errorf("failed to store refresh token: %w", err)
 		}
 	}
 
@@ -166,4 +174,35 @@ func GenerateAndStoreRefreshToken(ctx context.Context, qtx *database.Queries,
 	}
 
 	return refreshToken, nil
+}
+
+// CreateAccessAndRefreshTokens will generate an access and refresh token and store the refresh token.
+func CreateAccessAndRefreshTokens(ctx context.Context, logger *logger.Logger, qtx *database.Queries,
+	userID uint32, email string) (AccessAndRefreshTokens, error) {
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
+	defer cancel()
+
+	accessToken, err := GenerateJWT(userID, email, AccessTokenJWTSecretEnv)
+	if err != nil {
+		return AccessAndRefreshTokens{}, fmt.Errorf("failed to create jwt: %w", err)
+	}
+
+	var refreshToken string
+	err = retry.Do(func() error {
+		// Create new refresh token
+		if refreshToken, err = generateAndStoreRefreshToken(ctx, qtx, userID, email); err != nil {
+			return fmt.Errorf("failed to generate and store refresh token: %w", err)
+		}
+		return nil
+	}, retry.Attempts(3), retry.Delay(time.Millisecond*500))
+
+	if err != nil {
+		logger.Error("all retries to generate and store token failed", zap.Error(err))
+		return AccessAndRefreshTokens{}, fmt.Errorf("all retries to generate and store token failed: %w", err)
+	}
+
+	return AccessAndRefreshTokens{
+		AccessToken:  accessToken,
+		RefreshToken: refreshToken,
+	}, nil
 }

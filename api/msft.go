@@ -137,7 +137,7 @@ func getMSFTAccessToken(ctx context.Context, c *confidential.Client,
 	return tk, nil
 }
 
-// msftAuthoriseByCode will exchange a authorisation code with an access token.
+// msftAuthoriseByCode will exchange a authorisation code for a MSFT access token.
 // The home account id is stored, using this an access token can be gained.
 func msftAuthoriseByCode(ctx context.Context, c *confidential.Client, authCode string) (MSFTTokenResult, error) {
 	// MSAL fn to exchange auth code for token
