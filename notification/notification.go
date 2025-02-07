@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"net/http"
 	"sync"
 	"time"
@@ -19,9 +18,9 @@ type ClientSet map[http.ResponseWriter]struct{}
 
 // Service shows behaviour for a notification service impl.
 type Service interface {
-	DeleteUserConn(logger *logger.Logger, userID uint32, w http.ResponseWriter)
-	RegisterUserClient(logger *logger.Logger, userID uint32, w http.ResponseWriter) error
-	SendNotification(logger *logger.Logger, db *database.Database,
+	DeleteUserConn(l *logger.Logger, userID uint32, w http.ResponseWriter)
+	RegisterUserClient(l *logger.Logger, userID uint32, w http.ResponseWriter) error
+	SendNotification(ctx context.Context, l *logger.Logger, db database.NotificationDatabase,
 		userID uint32, notif database.CreateNotificationParams) error
 }
 
@@ -39,6 +38,15 @@ func NewSSENotificationService() *SSENotificationService {
 	return &SSENotificationService{
 		conns: make(map[uint32]ClientSet),
 	}
+}
+
+// GetUserClients exposes the clients map.
+func (sse *SSENotificationService) GetUserClients() map[uint32]ClientSet {
+	sse.mu.Lock()
+
+	defer sse.mu.Unlock()
+
+	return sse.conns
 }
 
 // RegisterUserClient registers a user client to send notifications to.
@@ -79,67 +87,20 @@ func (sse *SSENotificationService) DeleteUserConn(logger *logger.Logger, userID 
 	delete(sse.conns[userID], w)
 }
 
-// Store the notification in the database.
-func storeNotification(ctx context.Context, db *database.Database,
-	userID uint32, notif database.CreateNotificationParams,
-) (*database.Notification, error) {
-	notifID, err := db.CreateNotification(ctx, notif)
-	if err != nil {
-		switch {
-		case errors.Is(err, context.Canceled):
-			return nil, fmt.Errorf("context cancelled during creating notif in notification table: %w", err)
-		case errors.Is(err, context.DeadlineExceeded):
-			return nil, fmt.Errorf("deadline exceeded during creating notif in notification table: %w", err)
-		default:
-			return nil, fmt.Errorf("failed to add notification to notification table: %w", err)
-		}
-	}
-
-	// Add to user table
-	dbParams := database.CreateUserNotificationParams{
-		UserID: userID,
-		//nolint: gosec // id is unsigned 32 bit int
-		NotificationID: uint32(notifID),
-	}
-	rows, err := db.CreateUserNotification(ctx, dbParams)
-
-	if rows != 1 {
-		return nil, database.WrongNumberSQLRowsError{ActualRows: rows, ExpectedRows: []int64{1}}
-	}
-
-	if err != nil {
-		switch {
-		case errors.Is(err, context.Canceled):
-			return nil, fmt.Errorf("context cancelled during creating notif in UserToNotification table: %w", err)
-		case errors.Is(err, context.DeadlineExceeded):
-			return nil, fmt.Errorf("deadline exceeded during creating notif in UserToNotification table: %w", err)
-		default:
-			return nil, fmt.Errorf("failed to add notification to UserToNotification table: %w", err)
-		}
-	}
-
-	return &database.Notification{
-		//nolint: gosec // id is unsigned 32 bit int
-		ID:      uint32(notifID),
-		Message: notif.Message,
-		Created: notif.Created,
-	}, nil
-}
-
 // SendNotification sends a notification to ALL clients of a user.
 // The notification is also stored in the database regardless of whether the user has a client or not.
-func (sse *SSENotificationService) SendNotification(logger *logger.Logger,
-	db *database.Database, userID uint32, notif database.CreateNotificationParams,
+func (sse *SSENotificationService) SendNotification(ctx context.Context, logger *logger.Logger,
+	db database.NotificationDatabase, userID uint32, notif database.CreateNotificationParams,
 ) error {
 	sse.mu.Lock()
 	clients := sse.conns[userID]
 
 	sse.mu.Unlock()
 
-	ctx, cancel := context.WithTimeout(context.TODO(), time.Minute)
+	ctx, cancel := context.WithTimeout(ctx, time.Minute)
 	defer cancel()
 
-	storedNotif, err := storeNotification(ctx, db, userID, notif)
+	storedNotif, err := database.StoreNotification(ctx, db, userID, notif)
 	if err != nil {
 		return fmt.Errorf("failed to store notification for user: %w", err)
 	}
@@ -150,7 +111,7 @@ func (sse *SSENotificationService) SendNotification(logger *logger.Logger,
 		return nil
 	}
 
-	log.Printf("Sending notification: clients: %+v, len(clients): %d", clients, len(clients))
+	logger.Infof("Sending notification: clients: %+v, len(clients): %d", clients, len(clients))
 
 	for c := range clients {
 		logger.Info("attempting to flush to client")

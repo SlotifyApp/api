@@ -154,7 +154,7 @@ func (s Server) PostAPITeams(w http.ResponseWriter, r *http.Request) {
 		Created: time.Now(),
 	}
 
-	if err = s.NotificationService.SendNotification(s.Logger, s.DB, userID, notifParams); err != nil {
+	if err = s.NotificationService.SendNotification(ctx, s.Logger, s.DB, userID, notifParams); err != nil {
 		s.Logger.Errorf("team api: failed to send notification",
 			zap.Error(err))
 	}
@@ -390,13 +390,13 @@ func (s Server) PostAPITeamsTeamIDUsersUserID(w http.ResponseWriter, r *http.Req
 				Message: fmt.Sprintf("You were added to Team %s!", t.Name),
 				Created: time.Now(),
 			}
-			if err = s.NotificationService.SendNotification(s.Logger, s.DB, userID, notifParams); err != nil {
+			if err = s.NotificationService.SendNotification(ctx, s.Logger, s.DB, userID, notifParams); err != nil {
 				s.Logger.Errorf("team api: failed to send notification PostAPITeamsTeamIDUsersUserID to user that just joined team",
 					zap.Error(err))
 			}
 		} else {
 			// TODO: Batch insert for notifications
-			if err = s.NotificationService.SendNotification(s.Logger, s.DB, m.ID, allMemberNotif); err != nil {
+			if err = s.NotificationService.SendNotification(ctx, s.Logger, s.DB, m.ID, allMemberNotif); err != nil {
 				s.Logger.Errorf(
 					"team api: failed to send notification to all exisiting users of team, adding team member",
 					zap.Error(err))

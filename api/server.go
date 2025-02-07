@@ -75,14 +75,14 @@ func NewServerWithContext(_ context.Context, db *database.Database, serverOpts .
 			return nil, err
 		}
 	}
-	var serverLogger logger.Logger
+	var serverLogger *logger.Logger
 	if opts.logger == nil {
 		var err error
 		if serverLogger, err = logger.NewLogger(); err != nil {
 			log.Fatalf("failed to create new logger: %s", err.Error())
 		}
 	} else {
-		serverLogger = *opts.logger
+		serverLogger = opts.logger
 	}
 
 	// default to initialising MSAL client unless specified
@@ -117,7 +117,7 @@ func NewServerWithContext(_ context.Context, db *database.Database, serverOpts .
 	}
 
 	return &Server{
-		Logger:              &serverLogger,
+		Logger:              serverLogger,
 		DB:                  db,
 		MSALClient:          msalClient,
 		NotificationService: notificationService,

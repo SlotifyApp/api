@@ -178,7 +178,8 @@ func generateAndStoreRefreshToken(ctx context.Context, qtx *database.Queries,
 
 // CreateAccessAndRefreshTokens will generate an access and refresh token and store the refresh token.
 func CreateAccessAndRefreshTokens(ctx context.Context, logger *logger.Logger, qtx *database.Queries,
-	userID uint32, email string) (AccessAndRefreshTokens, error) {
+	userID uint32, email string,
+) (AccessAndRefreshTokens, error) {
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
 
@@ -195,7 +196,6 @@ func CreateAccessAndRefreshTokens(ctx context.Context, logger *logger.Logger, qt
 		}
 		return nil
 	}, retry.Attempts(3), retry.Delay(time.Millisecond*500))
-
 	if err != nil {
 		logger.Error("all retries to generate and store token failed", zap.Error(err))
 		return AccessAndRefreshTokens{}, fmt.Errorf("all retries to generate and store token failed: %w", err)
