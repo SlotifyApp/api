@@ -100,8 +100,8 @@ func ParseJWT(tk string, keyEnv string) (CustomClaims, error) {
 	return CustomClaims{}, fmt.Errorf("failed to parse jwt, token valid: %t", token.Valid)
 }
 
-// GetJWTFromRequest extracts a JWT string from an Authorization: Bearer <jwt> header.
-func GetJWTFromRequest(req *http.Request) (string, error) {
+// getJWTFromRequest extracts a JWT string from an Authorization: Bearer <jwt> header.
+func getJWTFromRequest(req *http.Request) (string, error) {
 	authHdr := req.Header.Get("Authorization")
 	// Check for the Authorization header.
 	if authHdr == "" {
@@ -120,7 +120,7 @@ func GetJWTFromRequest(req *http.Request) (string, error) {
 func GetUserIDFromReq(r *http.Request) (uint32, error) {
 	var err error
 	var accessToken string
-	if accessToken, err = GetJWTFromRequest(r); err != nil {
+	if accessToken, err = getJWTFromRequest(r); err != nil {
 		return 0, fmt.Errorf("failed to getuserid from req: %w", err)
 	}
 	var claims CustomClaims

@@ -162,15 +162,14 @@ type AccessAndRefreshTokens struct {
 }
 
 // createAndStoreTokens will generate an access and refresh token and store the refresh token.
-func createAndStoreTokens(qtx database.Queries, userID uint32, email string) (AccessAndRefreshTokens, error) {
-	var accessToken string
-	var err error
-	if accessToken, err = jwt.GenerateJWT(userID, email, jwt.AccessTokenJWTSecretEnv); err != nil {
+func createAndStoreTokens(ctx context.Context, qtx database.Queries, userID uint32, email string) (AccessAndRefreshTokens, error) {
+	ctx, cancel := context.WithTimeout(ctx, database.DatabaseTimeout)
+	defer cancel()
+
+	accessToken, err := jwt.GenerateJWT(userID, email, jwt.AccessTokenJWTSecretEnv)
+	if err != nil {
 		return AccessAndRefreshTokens{}, fmt.Errorf("failed to create jwt: %w", err)
 	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), database.DatabaseTimeout)
-	defer cancel()
 
 	var refreshToken string
 	refreshToken, err = jwt.GenerateAndStoreRefreshToken(ctx, &qtx, userID, email)
@@ -240,7 +239,7 @@ func getUserByClaimEmail(qtx *database.Queries, msftTokenRes MSFTTokenResult) (d
 }
 
 func (s Server) GetAPIAuthCallback(w http.ResponseWriter, r *http.Request, params GetAPIAuthCallbackParams) {
-	msftTokenRes, err := msftAuthoriseByCode(context.Background(), s.MSALClient, params.Code)
+	msftTokenRes, err := msftAuthoriseByCode(r.Context(), s.MSALClient, params.Code)
 	if err != nil {
 		s.Logger.Error("failed to get microsoft tokens", zap.Error(err))
 		sendError(w, http.StatusInternalServerError, "Sorry, try again later. Failed to get Microsoft tokens.")
@@ -270,7 +269,7 @@ func (s Server) GetAPIAuthCallback(w http.ResponseWriter, r *http.Request, param
 			return err
 		}
 
-		if tks, err = createAndStoreTokens(*qtx, u.ID, u.Email); err != nil {
+		if tks, err = createAndStoreTokens(r.Context(), *qtx, u.ID, u.Email); err != nil {
 			s.Logger.Error("failed to create and store tokens", zap.Error(err))
 			return err
 		}
@@ -293,6 +292,9 @@ func (s Server) GetAPIAuthCallback(w http.ResponseWriter, r *http.Request, param
 }
 
 func (s Server) PostAPIRefresh(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), 5*database.DatabaseTimeout)
+	defer cancel()
+
 	var refreshToken string
 	if refreshToken = r.Header.Get(refreshTokenHeader); refreshToken == "" {
 		s.Logger.Error("refresh token was empty")
@@ -307,9 +309,6 @@ func (s Server) PostAPIRefresh(w http.ResponseWriter, r *http.Request) {
 	}
 
 	userID := claims.UserID
-
-	ctx, cancel := context.WithTimeout(context.Background(), 2*database.DatabaseTimeout)
-	defer cancel()
 
 	var rt database.RefreshToken
 	if rt, err = s.DB.GetRefreshTokenByUserID(ctx, userID); err != nil {

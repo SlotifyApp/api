@@ -5,14 +5,13 @@ import (
 	"net/http"
 
 	"github.com/SlotifyApp/slotify-backend/database"
-	"github.com/SlotifyApp/slotify-backend/jwt"
 	"go.uber.org/zap"
 )
 
 func (s Server) RenderEvent(w http.ResponseWriter, r *http.Request) {
-	userID, err := jwt.GetUserIDFromReq(r)
-	if err != nil {
-		s.Logger.Error("failed to get userid from request access token")
+	userID, ok := r.Context().Value(UserCtxKey{}).(uint32)
+	if !ok {
+		s.Logger.Error("failed to get userid from request context")
 		sendError(w, http.StatusUnauthorized, "Try again later.")
 		return
 	}
@@ -35,7 +34,7 @@ func (s Server) RenderEvent(w http.ResponseWriter, r *http.Request) {
 
 	f.Flush()
 
-	if err = s.NotificationService.RegisterUserClient(s.Logger, userID, w); err != nil {
+	if err := s.NotificationService.RegisterUserClient(s.Logger, userID, w); err != nil {
 		s.Logger.Errorf("failed to register user client", zap.Error(err))
 		sendError(w, http.StatusUnauthorized, "failed to register user client")
 		return
@@ -65,9 +64,9 @@ func (s Server) PatchAPINotificationsNotificationIDRead(w http.ResponseWriter, r
 	ctx, cancel := context.WithTimeout(r.Context(), database.DatabaseTimeout)
 	defer cancel()
 
-	userID, err := jwt.GetUserIDFromReq(r)
-	if err != nil {
-		s.Logger.Error("failed to get userid from request access token")
+	userID, ok := r.Context().Value(UserCtxKey{}).(uint32)
+	if !ok {
+		s.Logger.Error("failed to get userid from request context")
 		sendError(w, http.StatusUnauthorized, "Try again later.")
 		return
 	}
@@ -102,9 +101,9 @@ func (s Server) GetAPIUsersMeNotifications(w http.ResponseWriter, r *http.Reques
 	ctx, cancel := context.WithTimeout(r.Context(), database.DatabaseTimeout)
 	defer cancel()
 
-	userID, err := jwt.GetUserIDFromReq(r)
-	if err != nil {
-		s.Logger.Error("failed to get userid from request access token")
+	userID, ok := r.Context().Value(UserCtxKey{}).(uint32)
+	if !ok {
+		s.Logger.Error("failed to get userid from request context")
 		sendError(w, http.StatusUnauthorized, "Try again later.")
 		return
 	}

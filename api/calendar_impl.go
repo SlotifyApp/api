@@ -3,21 +3,24 @@ package api
 import (
 	"context"
 	"net/http"
+	"time"
 
-	"github.com/SlotifyApp/slotify-backend/jwt"
 	"go.uber.org/zap"
 )
 
 // (GET /calendar/me).
 func (s Server) GetAPICalendarMe(w http.ResponseWriter, r *http.Request) {
-	userID, err := jwt.GetUserIDFromReq(r)
-	if err != nil {
-		s.Logger.Error("failed to get userid from request access token")
+	ctx, cancel := context.WithTimeout(r.Context(), time.Second*30)
+	defer cancel()
+
+	userID, ok := r.Context().Value(UserCtxKey{}).(uint32)
+	if !ok {
+		s.Logger.Error("failed to get userid from request context")
 		sendError(w, http.StatusUnauthorized, "Try again later.")
 		return
 	}
 
-	at, err := getMSFTAccessToken(context.Background(), s.MSALClient, s.DB, userID)
+	at, err := getMSFTAccessToken(ctx, s.MSALClient, s.DB, userID)
 	if err != nil {
 		s.Logger.Error("failed to get microsoft access token", zap.Error(err))
 		sendError(w, http.StatusUnauthorized, "Try again later.")
@@ -32,7 +35,7 @@ func (s Server) GetAPICalendarMe(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	events, err := graph.Me().Calendar().Events().Get(context.Background(), nil)
+	events, err := graph.Me().Calendar().Events().Get(ctx, nil)
 	if err != nil {
 		s.Logger.Error("failed to call graph client route", zap.Error(err))
 		sendError(w, http.StatusInternalServerError, "failed to call graph client route")

@@ -9,14 +9,13 @@ import (
 	"net/http"
 
 	"github.com/SlotifyApp/slotify-backend/database"
-	"github.com/SlotifyApp/slotify-backend/jwt"
 	openapi_types "github.com/oapi-codegen/runtime/types"
 	"go.uber.org/zap"
 )
 
 // (GET /users) Get a user by query params.
-func (s Server) GetAPIUsers(w http.ResponseWriter, _ *http.Request, params GetAPIUsersParams) {
-	ctx, cancel := context.WithTimeout(context.Background(), database.DatabaseTimeout)
+func (s Server) GetAPIUsers(w http.ResponseWriter, r *http.Request, params GetAPIUsersParams) {
+	ctx, cancel := context.WithTimeout(r.Context(), database.DatabaseTimeout)
 	defer cancel()
 
 	users, err := s.DB.ListUsers(ctx, database.ListUsersParams{
@@ -46,6 +45,9 @@ func (s Server) GetAPIUsers(w http.ResponseWriter, _ *http.Request, params GetAP
 
 // (POST /users) Create a new user.
 func (s Server) PostAPIUsers(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), database.DatabaseTimeout)
+	defer cancel()
+
 	var userBody PostAPIUsersJSONRequestBody
 	var err error
 	defer func() {
@@ -60,8 +62,6 @@ func (s Server) PostAPIUsers(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var userID int64
-	ctx, cancel := context.WithTimeout(context.Background(), database.DatabaseTimeout)
-	defer cancel()
 	userID, err = s.DB.CreateUser(ctx, database.CreateUserParams{
 		Email:     string(userBody.Email),
 		FirstName: userBody.FirstName,
@@ -98,8 +98,8 @@ func (s Server) PostAPIUsers(w http.ResponseWriter, r *http.Request) {
 }
 
 // (DELETE /users/{userID}) Delete a user by id.
-func (s Server) DeleteAPIUsersUserID(w http.ResponseWriter, _ *http.Request, userID uint32) {
-	ctx, cancel := context.WithTimeout(context.Background(), database.DatabaseTimeout)
+func (s Server) DeleteAPIUsersUserID(w http.ResponseWriter, r *http.Request, userID uint32) {
+	ctx, cancel := context.WithTimeout(r.Context(), database.DatabaseTimeout)
 	defer cancel()
 
 	rowsDeleted, err := s.DB.DeleteUserByID(ctx, userID)
@@ -135,8 +135,8 @@ func (s Server) DeleteAPIUsersUserID(w http.ResponseWriter, _ *http.Request, use
 }
 
 // (GET /users/{userID}) Get a user by id.
-func (s Server) GetAPIUsersUserID(w http.ResponseWriter, _ *http.Request, userID uint32) {
-	ctx, cancel := context.WithTimeout(context.Background(), database.DatabaseTimeout)
+func (s Server) GetAPIUsersUserID(w http.ResponseWriter, r *http.Request, userID uint32) {
+	ctx, cancel := context.WithTimeout(r.Context(), database.DatabaseTimeout)
 	defer cancel()
 
 	dbUser, err := s.DB.GetUserByID(ctx, userID)
@@ -175,9 +175,9 @@ func (s Server) GetAPIUsersUserID(w http.ResponseWriter, _ *http.Request, userID
 
 // (GET /users/me).
 func (s Server) GetAPIUsersMe(w http.ResponseWriter, r *http.Request) {
-	userID, err := jwt.GetUserIDFromReq(r)
-	if err != nil {
-		s.Logger.Error("failed to get userid from request access token")
+	userID, ok := r.Context().Value(UserCtxKey{}).(uint32)
+	if !ok {
+		s.Logger.Error("failed to get userid from request context")
 		sendError(w, http.StatusUnauthorized, "Try again later.")
 		return
 	}
@@ -187,20 +187,19 @@ func (s Server) GetAPIUsersMe(w http.ResponseWriter, r *http.Request) {
 
 // (POST /users/logout).
 func (s Server) PostAPIUsersMeLogout(w http.ResponseWriter, r *http.Request) {
-	userID, err := jwt.GetUserIDFromReq(r)
-	if err != nil {
-		s.Logger.Error("jwt not valid in logout", zap.Error(err))
+	ctx, cancel := context.WithTimeout(r.Context(), database.DatabaseTimeout)
+	defer cancel()
+
+	userID, ok := r.Context().Value(UserCtxKey{}).(uint32)
+	if !ok {
+		s.Logger.Error("failed to get userid from request context")
 		RemoveCookies(w)
 		// still logout successfully, dont return error on logout
 		SetHeaderAndWriteResponse(w, http.StatusOK, "Logging out")
 		return
 	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), database.DatabaseTimeout)
-	defer cancel()
 	// Remove refresh token from db
-	var rowsDeleted int64
-	rowsDeleted, err = s.DB.DeleteRefreshTokenByUserID(ctx, userID)
+	rowsDeleted, err := s.DB.DeleteRefreshTokenByUserID(ctx, userID)
 	if err != nil {
 		switch {
 		case errors.Is(err, context.Canceled):
