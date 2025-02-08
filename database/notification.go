@@ -37,6 +37,7 @@ func StoreNotification(ctx context.Context, db NotificationDatabase,
 		//nolint: gosec // id is unsigned 32 bit int
 		NotificationID: uint32(notifID),
 	}
+
 	rows, err := db.CreateUserNotification(ctx, dbParams)
 
 	if rows != 1 {

@@ -3,6 +3,7 @@ package testutil
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -10,9 +11,12 @@ import (
 
 	"github.com/SlotifyApp/slotify-backend/api"
 	"github.com/SlotifyApp/slotify-backend/database"
+	"github.com/SlotifyApp/slotify-backend/mocks"
+	"github.com/SlotifyApp/slotify-backend/notification"
 	"github.com/brianvoe/gofakeit/v7"
 	openapi_types "github.com/oapi-codegen/runtime/types"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 )
 
 // GetCount gets the row count of a given SQL table.
@@ -96,15 +100,45 @@ func InsertTeam(t *testing.T, db *sql.DB) api.Team {
 	}
 }
 
+type options struct {
+	notificationService notification.Service
+}
+
+func WithNotificationService(notifService notification.Service) TestServerOption {
+	return func(options *options) error {
+		if notifService == nil {
+			return errors.New("notifService must not be nil")
+		}
+		options.notificationService = notifService
+		return nil
+	}
+}
+
+type TestServerOption func(opts *options) error
+
 // NewServerAndDB creates a server and a db, test fails
 // if any errors are returned.
-func NewServerAndDB(t *testing.T, ctx context.Context) (*database.Database, *api.Server) {
+func NewServerAndDB(t *testing.T, ctx context.Context, testServerOpts ...TestServerOption) (*database.Database, *api.Server) {
+	var opts options
+	for _, opt := range testServerOpts {
+		err := opt(&opts)
+		require.NoError(t, err, "failure applying options")
+	}
+
+	var notificationService notification.Service
+	if opts.notificationService == nil {
+		ctrl := gomock.NewController(t)
+		notificationService = mocks.NewMockService(ctrl)
+	} else {
+		notificationService = opts.notificationService
+	}
+
 	db, err := database.NewDatabaseWithContext(ctx)
 	require.NoError(t, err, "error creating database handle")
 	require.NotNil(t, db, "db handle cannot be nil")
 
 	server, err := api.NewServerWithContext(ctx, db,
-		api.WithNotInitMSALClient(), api.WithNotificationService(MockNotificationService{}))
+		api.WithNotInitMSALClient(), api.WithNotificationService(notificationService))
 
 	require.NoError(t, err, "error creating server ")
 	require.NotNil(t, db, "server cannot be nil")

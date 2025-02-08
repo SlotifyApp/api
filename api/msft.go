@@ -13,6 +13,8 @@ import (
 	"github.com/SlotifyApp/slotify-backend/database"
 	"github.com/coreos/go-oidc/v3/oidc"
 	msgraphsdk "github.com/microsoftgraph/msgraph-sdk-go"
+	"github.com/microsoftgraph/msgraph-sdk-go/models"
+	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
 const (
@@ -157,7 +159,7 @@ func msftAuthoriseByCode(ctx context.Context, c *confidential.Client, authCode s
 	firstName := res.IDToken.GivenName
 	lastName := res.IDToken.FamilyName
 	// If the id token doesn't contain given and family names, then attempt to
-	// manually split by getting Name
+	// manually split Name
 	if firstName == "" && lastName == "" {
 		firstName, lastName = splitName(res.IDToken.Name)
 	}
@@ -170,24 +172,56 @@ func msftAuthoriseByCode(ctx context.Context, c *confidential.Client, authCode s
 	}, nil
 }
 
-type SlotifyAccessTokenProvider struct {
+// AccessTokenProvider allows for passing in an access token directly into the MSGraph SDK.
+type AccessTokenProvider struct {
 	accessToken azcore.AccessToken
 }
 
-func (satp SlotifyAccessTokenProvider) GetToken(_ context.Context,
+func (atp AccessTokenProvider) GetToken(_ context.Context,
 	_ policy.TokenRequestOptions,
 ) (azcore.AccessToken, error) {
-	return satp.accessToken, nil
+	return atp.accessToken, nil
 }
 
-// createMSFTGraphClient creates a MSGraph SDK Client.
+// createMSFTGraphClient creates a MSGraph SDK Client using the AccessTokenProvider.
 func createMSFTGraphClient(accessToken azcore.AccessToken) (*msgraphsdk.GraphServiceClient, error) {
-	satp := SlotifyAccessTokenProvider{
+	atp := AccessTokenProvider{
 		accessToken: accessToken,
 	}
-	client, err := msgraphsdk.NewGraphServiceClientWithCredentials(satp, getMSFTScopes())
+	client, err := msgraphsdk.NewGraphServiceClientWithCredentials(atp, getMSFTScopes())
 	if err != nil {
 		return nil, fmt.Errorf("failed to create new msgraph service: %w", err)
 	}
 	return client, nil
+}
+
+func parseMSFTAttendees(e models.Eventable) []Attendee {
+	msftAttendees := e.GetAttendees()
+	var attendees []Attendee
+	// Go through MSFT attendees and parse information we need
+	for _, a := range msftAttendees {
+		var email openapi_types.Email
+		emailStr := a.GetEmailAddress().GetAddress()
+		if a.GetEmailAddress() != nil && a.GetEmailAddress().GetAddress() != nil {
+			email = openapi_types.Email(*emailStr)
+		}
+
+		var responseStatus AttendeeResponseStatus
+		if e.GetResponseStatus() != nil && e.GetResponseStatus().GetResponse() != nil {
+			responseStatus = AttendeeResponseStatus(e.GetResponseStatus().GetResponse().String())
+		}
+
+		var attendeeType AttendeeType
+		if e.GetTypeEscaped() != nil {
+			attendeeType = AttendeeType(e.GetTypeEscaped().String())
+		}
+
+		attendee := Attendee{
+			Email:          &email,
+			ResponseStatus: &responseStatus,
+			Type:           &attendeeType,
+		}
+		attendees = append(attendees, attendee)
+	}
+	return attendees
 }

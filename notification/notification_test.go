@@ -2,7 +2,6 @@ package notification_test
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -11,9 +10,11 @@ import (
 	"time"
 
 	"github.com/SlotifyApp/slotify-backend/database"
+	"github.com/SlotifyApp/slotify-backend/mocks"
 	"github.com/SlotifyApp/slotify-backend/notification"
 	"github.com/SlotifyApp/slotify-backend/testutil"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 )
 
 func Test_SSERegisterUserClient(t *testing.T) {
@@ -240,39 +241,155 @@ func Test_SSESendNotification(t *testing.T) {
 	t.Parallel()
 	l := testutil.NewLogger(t)
 
-	var notifID int64 = 1
-	var userID uint32 = 1
-	w1 := httptest.NewRecorder()
-
-	mockNotificationDB := testutil.NewMockNotificationDatabase(1, notifID)
-
-	sseNotificationService := notification.NewSSENotificationService()
-	require.NoError(t, sseNotificationService.RegisterUserClient(l, userID, w1),
-		"registering client should not return erro")
-
-	created := time.Now()
-	message := "This is a notification"
-	notifParams := database.CreateNotificationParams{
-		Message: message,
-		Created: created,
+	// test 1 set up
+	var userID1 uint32 = 1
+	var notifID1 int64 = 1
+	created1 := time.Now()
+	notifMessage1 := "This is my notification 1"
+	expectedBody := testutil.GetExpectedNotificationSSE(notifID1, notifMessage1, created1)
+	tests := map[string]struct {
+		userID          uint32
+		testMsg         string
+		notifID         int64
+		expectedBody    string
+		created         time.Time
+		notifMessage    string
+		expectedDBCalls int
+	}{
+		"send notifications to a user with 1 client": {
+			userID:          userID1,
+			testMsg:         "correct response body with evenstream with 1 client",
+			notifID:         notifID1,
+			expectedBody:    expectedBody,
+			created:         created1,
+			notifMessage:    notifMessage1,
+			expectedDBCalls: 1,
+		},
 	}
 
-	err := sseNotificationService.SendNotification(context.Background(), l, mockNotificationDB, userID, notifParams)
-	require.NoError(t, err,
-		"send notification should execute successfully and produce no error")
+	for testName, tt := range tests {
+		t.Run(testName, func(t *testing.T) {
+			t.Parallel()
+			notifParams := database.CreateNotificationParams{
+				Message: tt.notifMessage,
+				Created: tt.created,
+			}
 
-	present := sseNotificationService.GetUserClients()[userID][w1]
-	require.Equal(t, struct{}{}, present, "client was correctly registered for user")
+			dbUserNotifParams := database.CreateUserNotificationParams{
+				UserID: tt.userID,
 
-	resp := w1.Result()
-	require.True(t, w1.Flushed, "notification was flushed to body")
-	var body []byte
-	body, err = io.ReadAll(resp.Body)
-	require.NoError(t, err, "failed to read response body")
+				NotificationID: uint32(tt.notifID),
+			}
 
-	expectedData := fmt.Sprintf(
-		"event: calendar_notification\ndata: {\"id\":%d,\"message\":\"%s\",\"created\":\"%s\"}\n\n",
-		notifID, message, created.Format(time.RFC3339Nano))
+			ctrl := gomock.NewController(t)
+			mockNotificationDB := mocks.NewMockNotificationDatabase(ctrl)
+			mockNotificationDB.EXPECT().CreateNotification(
+				gomock.Any(), gomock.Eq(notifParams)).Return(tt.notifID, nil).Times(tt.expectedDBCalls)
 
-	require.Equal(t, expectedData, string(body), "body of event stream is correct")
+			mockNotificationDB.EXPECT().CreateUserNotification(
+				gomock.Any(), gomock.Eq(dbUserNotifParams)).Return(int64(1), nil).Times(tt.expectedDBCalls)
+
+			sseNotificationService := notification.NewSSENotificationService()
+			client := httptest.NewRecorder()
+			require.NoError(t, sseNotificationService.RegisterUserClient(l, tt.userID, client),
+				"registering client should not return erro")
+
+			present := sseNotificationService.GetUserClients()[tt.userID][client]
+			require.Equal(t, struct{}{}, present, "client was correctly registered for user")
+
+			err := sseNotificationService.SendNotification(context.Background(), l, mockNotificationDB, tt.userID, notifParams)
+			require.NoError(t, err,
+				"send notification should execute successfully and produce no error")
+
+			resp := client.Result()
+			require.True(t, client.Flushed, "notification was flushed to body")
+			var body []byte
+			body, err = io.ReadAll(resp.Body)
+			require.NoError(t, err, "failed to read response body")
+
+			expectedData := testutil.GetExpectedNotificationSSE(tt.notifID, tt.notifMessage, tt.created)
+
+			require.Equal(t, expectedData, string(body), "body of event stream is correct")
+		})
+	}
+
+	t.Run("send 2 notifications to a user with 1 client", func(t *testing.T) {
+		var notifID int64 = 1
+		var userID uint32 = 1
+		client := httptest.NewRecorder()
+		created := time.Now()
+		message1 := "This is a notification"
+		notifParams1 := database.CreateNotificationParams{
+			Message: message1,
+			Created: created,
+		}
+
+		message2 := "This is my second notification"
+		notifParams2 := database.CreateNotificationParams{
+			Message: message2,
+			Created: created,
+		}
+
+		dbUserNotifParams := database.CreateUserNotificationParams{
+			UserID: userID,
+
+			NotificationID: uint32(notifID),
+		}
+
+		ctrl := gomock.NewController(t)
+		mockNotificationDB := mocks.NewMockNotificationDatabase(ctrl)
+
+		firstCreateNotifCall := mockNotificationDB.
+			EXPECT().
+			CreateNotification(gomock.Any(), gomock.Eq(notifParams1)).
+			Return(notifID, nil)
+
+		mockNotificationDB.
+			EXPECT().
+			CreateNotification(gomock.Any(), gomock.Eq(notifParams2)).
+			Return(notifID, nil).
+			After(firstCreateNotifCall)
+
+		mockNotificationDB.
+			EXPECT().
+			CreateUserNotification(gomock.Any(), gomock.Eq(dbUserNotifParams)).
+			Return(int64(1), nil).
+			Times(2)
+
+		sseNotificationService := notification.NewSSENotificationService()
+		require.NoError(t, sseNotificationService.RegisterUserClient(l, userID, client),
+			"registering client should not return erro")
+
+		// check clients were registered correctly
+		present := sseNotificationService.GetUserClients()[userID][client]
+		require.Equal(t, struct{}{}, present, "client was correctly registered for user")
+
+		// send both notifications
+		err := sseNotificationService.
+			SendNotification(context.Background(), l, mockNotificationDB, userID, notifParams1)
+
+		require.NoError(t, err,
+			"send notification should execute successfully and produce no error")
+
+		err = sseNotificationService.
+			SendNotification(context.Background(), l, mockNotificationDB, userID, notifParams2)
+
+		require.NoError(t, err,
+			"send notification should execute successfully and produce no error")
+
+		resp := client.Result()
+		require.True(t, client.Flushed, "notification was flushed to body")
+		var body []byte
+		body, err = io.ReadAll(resp.Body)
+		require.NoError(t, err, "failed to read response body")
+
+		expectedData := testutil.
+			GetExpectedNotificationSSE(notifID, message1, created) +
+			testutil.GetExpectedNotificationSSE(notifID, message2, created)
+
+		require.Equal(t,
+			expectedData,
+			string(body),
+			"body of event stream is correct for multiple notifications")
+	})
 }

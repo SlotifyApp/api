@@ -6,10 +6,13 @@ import (
 	"time"
 
 	"go.uber.org/zap"
+
+	graphusers "github.com/microsoftgraph/msgraph-sdk-go/users"
+	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
 // (GET /calendar/me).
-func (s Server) GetAPICalendarMe(w http.ResponseWriter, r *http.Request) {
+func (s Server) GetAPICalendarMe(w http.ResponseWriter, r *http.Request, params GetAPICalendarMeParams) {
 	ctx, cancel := context.WithTimeout(r.Context(), time.Second*30)
 	defer cancel()
 
@@ -35,7 +38,19 @@ func (s Server) GetAPICalendarMe(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	events, err := graph.Me().Calendar().Events().Get(ctx, nil)
+	start := params.Start.Format(time.RFC3339)
+	end := params.End.Format(time.RFC3339)
+
+	requestParameters := &graphusers.ItemCalendarCalendarViewRequestBuilderGetQueryParameters{
+		StartDateTime: &start,
+		EndDateTime:   &end,
+	}
+
+	configuration := &graphusers.ItemCalendarCalendarViewRequestBuilderGetRequestConfiguration{
+		QueryParameters: requestParameters,
+	}
+
+	events, err := graph.Me().Calendar().CalendarView().Get(context.Background(), configuration)
 	if err != nil {
 		s.Logger.Error("failed to call graph client route", zap.Error(err))
 		sendError(w, http.StatusInternalServerError, "failed to call graph client route")
@@ -43,10 +58,59 @@ func (s Server) GetAPICalendarMe(w http.ResponseWriter, r *http.Request) {
 	}
 	calendarEvents := []CalendarEvent{}
 	for _, e := range events.GetValue() {
+		attendees := parseMSFTAttendees(e)
+
+		msftLocations := e.GetLocations()
+		var locations []Location
+		for _, l := range msftLocations {
+			var roomType LocationRoomType
+			if l.GetLocationType() != nil {
+				roomType = LocationRoomType(l.GetLocationType().String())
+			}
+
+			var street *string
+			if l.GetAddress() != nil {
+				street = l.GetAddress().GetStreet()
+			}
+
+			parsedLoc := Location{
+				Id:       l.GetUniqueId(),
+				Name:     l.GetDisplayName(),
+				Street:   street,
+				RoomType: &roomType,
+			}
+
+			locations = append(locations, parsedLoc)
+		}
+
+		var joinURL *string
+		if e.GetOnlineMeeting() != nil {
+			joinURL = e.GetOnlineMeeting().GetJoinUrl()
+		}
+
+		var endTime *string
+		if e.GetEnd() != nil {
+			endTime = e.GetEnd().GetDateTime()
+		}
+
+		var startTime *string
+		if e.GetStart() != nil {
+			startTime = e.GetStart().GetDateTime()
+		}
+
 		ce := CalendarEvent{
-			StartTime: e.GetStart().GetDateTime(),
-			EndTime:   e.GetEnd().GetDateTime(),
-			Subject:   e.GetSubject(),
+			Attendees:   &attendees,
+			Body:        e.GetBodyPreview(),
+			Created:     e.GetCreatedDateTime(),
+			EndTime:     endTime,
+			Id:          e.GetId(),
+			IsCancelled: e.GetIsCancelled(),
+			JoinURL:     joinURL,
+			Locations:   &locations,
+			Organizer:   (*openapi_types.Email)(e.GetOrganizer().GetEmailAddress().GetAddress()),
+			StartTime:   startTime,
+			Subject:     e.GetSubject(),
+			WebLink:     e.GetWebLink(),
 		}
 		calendarEvents = append(calendarEvents, ce)
 	}

@@ -24,6 +24,8 @@ lint:
 	docker run -t --rm -v $(shell pwd):/app -w /app golangci/golangci-lint:v1.63.4 golangci-lint run -v --fix ./...
 
 run:
+	# First docker compose down, some data can be persisted in the db
+	docker compose -f ./shared/docker/compose.local.yml down || true
 	# Docker compose up- start up API and DB in containers
 	go generate ./... && go mod tidy && docker compose -f ./shared/docker/compose.local.yml up --build
 

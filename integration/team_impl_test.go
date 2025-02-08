@@ -12,9 +12,11 @@ import (
 	"testing"
 
 	"github.com/SlotifyApp/slotify-backend/api"
+	"github.com/SlotifyApp/slotify-backend/mocks"
 	"github.com/SlotifyApp/slotify-backend/testutil"
 	"github.com/brianvoe/gofakeit/v7"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 )
 
 func TestTeam_GetTeams(t *testing.T) {
@@ -81,7 +83,19 @@ func TestTeam_GetTeams(t *testing.T) {
 func TestTeam_PostTeams(t *testing.T) {
 	t.Parallel()
 
-	database, server := testutil.NewServerAndDB(t, context.Background())
+	ctrl := gomock.NewController(t)
+	mockNotifService := mocks.NewMockService(ctrl)
+
+	mockNotifService.
+		EXPECT().
+		SendNotification(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(nil).
+		AnyTimes()
+
+	database, server := testutil.NewServerAndDB(t,
+		context.Background(),
+		testutil.WithNotificationService(mockNotifService))
+
 	db := database.DB
 	t.Cleanup(func() {
 		testutil.CloseDB(db)
@@ -265,8 +279,20 @@ func TestTeam_GetTeamsTeamID(t *testing.T) {
 func TestTeam_PostTeamsTeamIDUsersUserID(t *testing.T) {
 	t.Parallel()
 
+	ctrl := gomock.NewController(t)
+	mockNotifService := mocks.NewMockService(ctrl)
+
+	mockNotifService.
+		EXPECT().
+		SendNotification(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(nil).
+		AnyTimes()
+
 	var err error
-	database, server := testutil.NewServerAndDB(t, context.Background())
+	database, server := testutil.NewServerAndDB(t,
+		context.Background(),
+		testutil.WithNotificationService(mockNotifService))
+
 	db := database.DB
 	t.Cleanup(func() {
 		testutil.CloseDB(db)
