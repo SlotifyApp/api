@@ -36,7 +36,9 @@ All URIs are relative to *http://localhost*
 <a name="documentation-for-models"></a>
 ## Documentation for Models
 
+ - [Attendee](./Models/Attendee.md)
  - [CalendarEvent](./Models/CalendarEvent.md)
+ - [Location](./Models/Location.md)
  - [Notification](./Models/Notification.md)
  - [Team](./Models/Team.md)
  - [TeamCreate](./Models/TeamCreate.md)

@@ -195,6 +195,7 @@ func createMSFTGraphClient(accessToken azcore.AccessToken) (*msgraphsdk.GraphSer
 	return client, nil
 }
 
+// parseMSFTAttendees filters out attributes of MSFT attendees.
 func parseMSFTAttendees(e models.Eventable) []Attendee {
 	msftAttendees := e.GetAttendees()
 	var attendees []Attendee
@@ -224,4 +225,31 @@ func parseMSFTAttendees(e models.Eventable) []Attendee {
 		attendees = append(attendees, attendee)
 	}
 	return attendees
+}
+
+// parseMSFTLocations filters out attributes of MSFT locations.
+func parseMSFTLocations(e models.Eventable) []Location {
+	msftLocations := e.GetLocations()
+	var locations []Location
+	for _, l := range msftLocations {
+		var roomType LocationRoomType
+		if l.GetLocationType() != nil {
+			roomType = LocationRoomType(l.GetLocationType().String())
+		}
+
+		var street *string
+		if l.GetAddress() != nil {
+			street = l.GetAddress().GetStreet()
+		}
+
+		parsedLoc := Location{
+			Id:       l.GetUniqueId(),
+			Name:     l.GetDisplayName(),
+			Street:   street,
+			RoomType: &roomType,
+		}
+
+		locations = append(locations, parsedLoc)
+	}
+	return locations
 }

@@ -108,12 +108,16 @@ No authorization required
 
 <a name="getAPICalendarMe"></a>
 # **getAPICalendarMe**
-> List getAPICalendarMe()
+> List getAPICalendarMe(start, end)
 
 get a user&#39;s calendar events
 
 ### Parameters
-This endpoint does not need any parameter.
+
+|Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **start** | **Date**|  | [default to null] |
+| **end** | **Date**|  | [default to null] |
 
 ### Return type
 

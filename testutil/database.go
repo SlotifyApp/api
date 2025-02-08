@@ -118,7 +118,10 @@ type TestServerOption func(opts *options) error
 
 // NewServerAndDB creates a server and a db, test fails
 // if any errors are returned.
-func NewServerAndDB(t *testing.T, ctx context.Context, testServerOpts ...TestServerOption) (*database.Database, *api.Server) {
+func NewServerAndDB(t *testing.T,
+	ctx context.Context,
+	testServerOpts ...TestServerOption,
+) (*database.Database, *api.Server) {
 	var opts options
 	for _, opt := range testServerOpts {
 		err := opt(&opts)

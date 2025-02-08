@@ -31,7 +31,6 @@ func (s Server) GetAPICalendarMe(w http.ResponseWriter, r *http.Request, params 
 	}
 
 	graph, err := createMSFTGraphClient(at)
-
 	if err != nil || graph == nil {
 		s.Logger.Error("failed to create msft graph client", zap.Error(err))
 		sendError(w, http.StatusInternalServerError, "msft graph could not be created")
@@ -56,32 +55,11 @@ func (s Server) GetAPICalendarMe(w http.ResponseWriter, r *http.Request, params 
 		sendError(w, http.StatusInternalServerError, "failed to call graph client route")
 		return
 	}
+
 	calendarEvents := []CalendarEvent{}
 	for _, e := range events.GetValue() {
 		attendees := parseMSFTAttendees(e)
-
-		msftLocations := e.GetLocations()
-		var locations []Location
-		for _, l := range msftLocations {
-			var roomType LocationRoomType
-			if l.GetLocationType() != nil {
-				roomType = LocationRoomType(l.GetLocationType().String())
-			}
-
-			var street *string
-			if l.GetAddress() != nil {
-				street = l.GetAddress().GetStreet()
-			}
-
-			parsedLoc := Location{
-				Id:       l.GetUniqueId(),
-				Name:     l.GetDisplayName(),
-				Street:   street,
-				RoomType: &roomType,
-			}
-
-			locations = append(locations, parsedLoc)
-		}
+		locations := parseMSFTLocations(e)
 
 		var joinURL *string
 		if e.GetOnlineMeeting() != nil {
