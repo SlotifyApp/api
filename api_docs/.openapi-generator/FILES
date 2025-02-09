@@ -1,5 +1,7 @@
 Apis/DefaultApi.md
+Models/Attendee.md
 Models/CalendarEvent.md
+Models/Location.md
 Models/Notification.md
 Models/Team.md
 Models/TeamCreate.md

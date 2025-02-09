@@ -10,6 +10,7 @@ require (
 	github.com/golang-jwt/jwt/v5 v5.2.1
 	github.com/oapi-codegen/runtime v1.1.1
 	github.com/stretchr/testify v1.10.0
+	go.uber.org/mock v0.5.0
 	go.uber.org/zap v1.27.0
 )
 

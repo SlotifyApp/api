@@ -110,10 +110,10 @@ func JWTMiddleware(next http.Handler) http.Handler {
 		}
 
 		// set userID in context so it's available in our requests
+		// and the access token doesn't need to be parsed again
 		ctx := context.WithValue(r.Context(), UserCtxKey{}, userID)
-		r = r.WithContext(ctx)
 
-		next.ServeHTTP(w, r)
+		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
 
