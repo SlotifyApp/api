@@ -19,6 +19,7 @@ All URIs are relative to *http://localhost*
 *DefaultApi* | [**getAPIUsers**](Apis/DefaultApi.md#getapiusers) | **GET** /api/users | Get a user by query params |
 *DefaultApi* | [**getAPIUsersMe**](Apis/DefaultApi.md#getapiusersme) | **GET** /api/users/me | Get the user by id passed by JWT |
 *DefaultApi* | [**getAPIUsersUserID**](Apis/DefaultApi.md#getapiusersuserid) | **GET** /api/users/{userID} | Get a user by id |
+*DefaultApi* | [**postAPIAlgo**](Apis/DefaultApi.md#postapialgo) | **POST** /api/algo |  |
 *DefaultApi* | [**postAPIRefresh**](Apis/DefaultApi.md#postapirefresh) | **POST** /api/refresh | Refresh Slotify access token and refresh token |
 *DefaultApi* | [**postAPITeams**](Apis/DefaultApi.md#postapiteams) | **POST** /api/teams | Create a new team |
 *DefaultApi* | [**postAPITeamsTeamIDUsersUserID**](Apis/DefaultApi.md#postapiteamsteamidusersuserid) | **POST** /api/teams/{teamID}/users/{userID} | Add a user to a team |
@@ -29,6 +30,9 @@ All URIs are relative to *http://localhost*
 <a name="documentation-for-models"></a>
 ## Documentation for Models
 
+ - [AlgoBody](./Models/AlgoBody.md)
+ - [AlgoResponse_inner](./Models/AlgoResponse_inner.md)
+ - [AlgoResponse_inner_ratingDistribution_inner](./Models/AlgoResponse_inner_ratingDistribution_inner.md)
  - [CalendarEvent](./Models/CalendarEvent.md)
  - [Team](./Models/Team.md)
  - [TeamCreate](./Models/TeamCreate.md)

@@ -16,6 +16,7 @@ All URIs are relative to *http://localhost*
 | [**getAPIUsers**](DefaultApi.md#getAPIUsers) | **GET** /api/users | Get a user by query params |
 | [**getAPIUsersMe**](DefaultApi.md#getAPIUsersMe) | **GET** /api/users/me | Get the user by id passed by JWT |
 | [**getAPIUsersUserID**](DefaultApi.md#getAPIUsersUserID) | **GET** /api/users/{userID} | Get a user by id |
+| [**postAPIAlgo**](DefaultApi.md#postAPIAlgo) | **POST** /api/algo |  |
 | [**postAPIRefresh**](DefaultApi.md#postAPIRefresh) | **POST** /api/refresh | Refresh Slotify access token and refresh token |
 | [**postAPITeams**](DefaultApi.md#postAPITeams) | **POST** /api/teams | Create a new team |
 | [**postAPITeamsTeamIDUsersUserID**](DefaultApi.md#postAPITeamsTeamIDUsersUserID) | **POST** /api/teams/{teamID}/users/{userID} | Add a user to a team |
@@ -312,6 +313,31 @@ No authorization required
 ### HTTP request headers
 
 - **Content-Type**: Not defined
+- **Accept**: application/json
+
+<a name="postAPIAlgo"></a>
+# **postAPIAlgo**
+> List postAPIAlgo(AlgoBody)
+
+
+
+### Parameters
+
+|Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **AlgoBody** | [**AlgoBody**](../Models/AlgoBody.md)|  | |
+
+### Return type
+
+[**List**](../Models/AlgoResponse_inner.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: application/json
 - **Accept**: application/json
 
 <a name="postAPIRefresh"></a>

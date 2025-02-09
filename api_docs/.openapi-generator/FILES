@@ -1,4 +1,7 @@
 Apis/DefaultApi.md
+Models/AlgoBody.md
+Models/AlgoResponse_inner.md
+Models/AlgoResponse_inner_ratingDistribution_inner.md
 Models/CalendarEvent.md
 Models/Team.md
 Models/TeamCreate.md
