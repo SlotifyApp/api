@@ -101,6 +101,7 @@ func (s Server) GetAPICalendarMe(w http.ResponseWriter, r *http.Request, params 
 }
 
 // (POST /calendar/event).
+// nolint: funlen // TODO: reduce length
 func (s Server) PostAPICalendarMe(w http.ResponseWriter, r *http.Request) {
 	userID, err := jwt.GetUserIDFromReq(r)
 	if err != nil {
@@ -110,7 +111,7 @@ func (s Server) PostAPICalendarMe(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var eventRequest CalendarEvent
-	if err := json.NewDecoder(r.Body).Decode(&eventRequest); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&eventRequest); err != nil {
 		s.Logger.Error("failed to parse event body", zap.Error(err))
 		sendError(w, http.StatusBadRequest, "Invalid request body.")
 		return
@@ -166,11 +167,11 @@ func (s Server) PostAPICalendarMe(w http.ResponseWriter, r *http.Request) {
 		var attendeeType graphmodels.AttendeeType
 		if att.Type != nil {
 			switch *att.Type {
-			case "required":
+			case Required:
 				attendeeType = graphmodels.REQUIRED_ATTENDEETYPE
-			case "optional":
+			case Optional:
 				attendeeType = graphmodels.OPTIONAL_ATTENDEETYPE
-			case "resource":
+			case Resource:
 				attendeeType = graphmodels.RESOURCE_ATTENDEETYPE
 			default:
 				attendeeType = graphmodels.REQUIRED_ATTENDEETYPE
@@ -187,8 +188,8 @@ func (s Server) PostAPICalendarMe(w http.ResponseWriter, r *http.Request) {
 
 	event.SetAttendees(attendees)
 
-	transactionId := uuid.New().String()
-	event.SetTransactionId(&transactionId)
+	transactionID := uuid.New().String()
+	event.SetTransactionId(&transactionID)
 
 	events, err := graphClient.Me().Events().Post(context.Background(), event, nil)
 	if err != nil {
@@ -198,10 +199,9 @@ func (s Server) PostAPICalendarMe(w http.ResponseWriter, r *http.Request) {
 	}
 
 	SetHeaderAndWriteResponse(w, http.StatusCreated, events)
-
 }
 
-func (s Server) OptionsAPICalendarMe(w http.ResponseWriter, r *http.Request) {
+func (s Server) OptionsAPICalendarMe(w http.ResponseWriter, _ *http.Request) {
 	// Set CORS headers
 	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")        // Your frontend's origin
 	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")          // Allowed methods

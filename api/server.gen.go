@@ -165,10 +165,10 @@ type PostAPIUsersJSONRequestBody = UserCreate
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
-	// Auth route for authorisation code flow
+	// Auth route for authorisation code flow.
 	// (GET /api/auth/callback)
 	GetAPIAuthCallback(w http.ResponseWriter, r *http.Request, params GetAPIAuthCallbackParams)
-	// get a user's calendar events
+	// Get a user's calendar events for a given time range.
 	// (GET /api/calendar/me)
 	GetAPICalendarMe(w http.ResponseWriter, r *http.Request, params GetAPICalendarMeParams)
 	// CORS preflight for creating an event
@@ -177,70 +177,70 @@ type ServerInterface interface {
 	// create a new calendar event
 	// (POST /api/calendar/me)
 	PostAPICalendarMe(w http.ResponseWriter, r *http.Request)
-	// Subscribe to notifications
+	// Subscribe to notifications eventstream.
 	// (GET /api/events)
 	RenderEvent(w http.ResponseWriter, r *http.Request)
-	// Healthcheck route
+	// Healthcheck route.
 	// (GET /api/healthcheck)
 	GetAPIHealthcheck(w http.ResponseWriter, r *http.Request)
-	// CORS preflight for marking a notification as read
+	// Satisfy CORS preflight for marking a notification as read.
 	// (OPTIONS /api/notifications/{notificationID}/read)
 	OptionsAPINotificationsNotificationIDRead(w http.ResponseWriter, r *http.Request, notificationID uint32)
-	// mark a notification as being read
+	// Mark a notification as being read.
 	// (PATCH /api/notifications/{notificationID}/read)
 	PatchAPINotificationsNotificationIDRead(w http.ResponseWriter, r *http.Request, notificationID uint32)
-	// Refresh Slotify access token and refresh token
+	// Refresh Slotify access token and refresh token.
 	// (POST /api/refresh)
 	PostAPIRefresh(w http.ResponseWriter, r *http.Request)
-	// Get a team by query params
+	// Get a team by query params.
 	// (GET /api/teams)
 	GetAPITeams(w http.ResponseWriter, r *http.Request, params GetAPITeamsParams)
-	// CORS preflight for teams
+	// Satisfy CORS preflight for creatingteams.
 	// (OPTIONS /api/teams)
 	OptionsAPITeams(w http.ResponseWriter, r *http.Request)
-	// Create a new team
+	// Create a new team.
 	// (POST /api/teams)
 	PostAPITeams(w http.ResponseWriter, r *http.Request)
-	// Get all joinable teams for a user excluding teams they are already a part of
+	// Get all joinable teams for a user excluding teams they are already a part of.
 	// (GET /api/teams/joinable/me)
 	GetAPITeamsJoinableMe(w http.ResponseWriter, r *http.Request)
-	// Get all teams for user by id passed by JWT
+	// Get all teams for current user.
 	// (GET /api/teams/me)
 	GetAPITeamsMe(w http.ResponseWriter, r *http.Request)
-	// Delete a team by id
+	// Delete a team by id.
 	// (DELETE /api/teams/{teamID})
 	DeleteAPITeamsTeamID(w http.ResponseWriter, r *http.Request, teamID uint32)
-	// Get a team by id
+	// Get a team by id.
 	// (GET /api/teams/{teamID})
 	GetAPITeamsTeamID(w http.ResponseWriter, r *http.Request, teamID uint32)
-	// Get all members of a team
+	// Get all members of a team.
 	// (GET /api/teams/{teamID}/users)
 	GetAPITeamsTeamIDUsers(w http.ResponseWriter, r *http.Request, teamID uint32)
-	// Add current user to a team
+	// Add current user to a team.
 	// (POST /api/teams/{teamID}/users/me)
 	PostAPITeamsTeamIDUsersMe(w http.ResponseWriter, r *http.Request, teamID uint32)
-	// Add a user to a team
+	// Add a user to a team.
 	// (POST /api/teams/{teamID}/users/{userID})
 	PostAPITeamsTeamIDUsersUserID(w http.ResponseWriter, r *http.Request, teamID uint32, userID uint32)
-	// Get a user by query params
+	// Get users by query params.
 	// (GET /api/users)
 	GetAPIUsers(w http.ResponseWriter, r *http.Request, params GetAPIUsersParams)
-	// Create a new user
+	// Create a new user.
 	// (POST /api/users)
 	PostAPIUsers(w http.ResponseWriter, r *http.Request)
-	// Get the user by id passed by JWT
+	// Get current user's details.
 	// (GET /api/users/me)
 	GetAPIUsersMe(w http.ResponseWriter, r *http.Request)
-	// Logout user
+	// Logout user.
 	// (POST /api/users/me/logout)
 	PostAPIUsersMeLogout(w http.ResponseWriter, r *http.Request)
-	// get user's unread notifications
+	// Get user's unread notifications.
 	// (GET /api/users/me/notifications)
 	GetAPIUsersMeNotifications(w http.ResponseWriter, r *http.Request)
-	// Delete a user by id
+	// Delete a user by id.
 	// (DELETE /api/users/{userID})
 	DeleteAPIUsersUserID(w http.ResponseWriter, r *http.Request, userID uint32)
-	// Get a user by id
+	// Get a user by id.
 	// (GET /api/users/{userID})
 	GetAPIUsersUserID(w http.ResponseWriter, r *http.Request, userID uint32)
 }
@@ -1009,49 +1009,50 @@ func HandlerWithOptions(si ServerInterface, options GorillaServerOptions) http.H
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"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",
+	"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",
+	"AA==",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file
