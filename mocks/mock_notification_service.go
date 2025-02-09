@@ -70,15 +70,15 @@ func (mr *MockServiceMockRecorder) RegisterUserClient(l, userID, w any) *gomock.
 }
 
 // SendNotification mocks base method.
-func (m *MockService) SendNotification(ctx context.Context, l *logger.Logger, db database.NotificationDatabase, userID uint32, notif database.CreateNotificationParams) error {
+func (m *MockService) SendNotification(ctx context.Context, l *logger.Logger, db database.NotificationDatabase, userIDs []uint32, notif database.CreateNotificationParams) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SendNotification", ctx, l, db, userID, notif)
+	ret := m.ctrl.Call(m, "SendNotification", ctx, l, db, userIDs, notif)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // SendNotification indicates an expected call of SendNotification.
-func (mr *MockServiceMockRecorder) SendNotification(ctx, l, db, userID, notif any) *gomock.Call {
+func (mr *MockServiceMockRecorder) SendNotification(ctx, l, db, userIDs, notif any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendNotification", reflect.TypeOf((*MockService)(nil).SendNotification), ctx, l, db, userID, notif)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendNotification", reflect.TypeOf((*MockService)(nil).SendNotification), ctx, l, db, userIDs, notif)
 }

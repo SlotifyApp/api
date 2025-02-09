@@ -16,6 +16,7 @@ generate:
 	# Generate sqlc files
 	docker run --rm -v $(shell pwd):/src -w /src sqlc/sqlc generate
 	# Generate server Go code based on openapi spec
+	# Generate mocks
 	go generate ./... 
 	go mod tidy
 
