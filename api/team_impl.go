@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/SlotifyApp/slotify-backend/database"
-	"github.com/SlotifyApp/slotify-backend/jwt"
 	"go.uber.org/zap"
 )
 
@@ -51,16 +50,16 @@ func (s Server) GetAPITeamsJoinableMe(w http.ResponseWriter, r *http.Request) {
 
 // (GET /api/teams/me).
 func (s Server) GetAPITeamsMe(w http.ResponseWriter, r *http.Request) {
-	// TODO: get user id from request context
-	userID, err := jwt.GetUserIDFromReq(r)
-	if err != nil {
+	userID, ok := r.Context().Value(UserCtxKey{}).(uint32)
+	if !ok {
 		s.Logger.Error("failed to get userid from request context")
 		sendError(w, http.StatusUnauthorized, "Try again later.")
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), database.DatabaseTimeout)
+	ctx, cancel := context.WithTimeout(r.Context(), 2*database.DatabaseTimeout)
 	defer cancel()
+
 	teams, err := s.DB.GetUsersTeams(ctx, userID)
 	if err != nil {
 		switch {
@@ -84,8 +83,8 @@ func (s Server) GetAPITeamsMe(w http.ResponseWriter, r *http.Request) {
 }
 
 // (GET /teams) Get a team by query params.
-func (s Server) GetAPITeams(w http.ResponseWriter, _ *http.Request, params GetAPITeamsParams) {
-	ctx, cancel := context.WithTimeout(context.Background(), database.DatabaseTimeout)
+func (s Server) GetAPITeams(w http.ResponseWriter, r *http.Request, params GetAPITeamsParams) {
+	ctx, cancel := context.WithTimeout(r.Context(), database.DatabaseTimeout)
 	defer cancel()
 
 	teams, err := s.DB.ListTeams(ctx, params.Name)
@@ -100,6 +99,9 @@ func (s Server) GetAPITeams(w http.ResponseWriter, _ *http.Request, params GetAP
 
 // (POST /teams) Create a new team and add the user who created the team.
 func (s Server) PostAPITeams(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), 4*database.DatabaseTimeout)
+	defer cancel()
+
 	userID, ok := r.Context().Value(UserCtxKey{}).(uint32)
 	if !ok {
 		s.Logger.Error("failed to get userid from request context")
@@ -115,8 +117,6 @@ func (s Server) PostAPITeams(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), database.DatabaseTimeout)
-	defer cancel()
 	var teamID int64
 	teamID, err = s.DB.AddTeam(ctx, teamBody.Name)
 	if err != nil {
@@ -154,7 +154,7 @@ func (s Server) PostAPITeams(w http.ResponseWriter, r *http.Request) {
 		Created: time.Now(),
 	}
 
-	if err = s.NotificationService.SendNotification(s.Logger, s.DB, userID, notifParams); err != nil {
+	if err = s.NotificationService.SendNotification(ctx, s.Logger, s.DB, userID, notifParams); err != nil {
 		s.Logger.Errorf("team api: failed to send notification",
 			zap.Error(err))
 	}
@@ -166,8 +166,8 @@ func (s Server) PostAPITeams(w http.ResponseWriter, r *http.Request) {
 }
 
 // (DELETE /teams/{teamID}) Delete a team by id.
-func (s Server) DeleteAPITeamsTeamID(w http.ResponseWriter, _ *http.Request, teamID uint32) {
-	ctx, cancel := context.WithTimeout(context.Background(), database.DatabaseTimeout)
+func (s Server) DeleteAPITeamsTeamID(w http.ResponseWriter, r *http.Request, teamID uint32) {
+	ctx, cancel := context.WithTimeout(r.Context(), database.DatabaseTimeout)
 	defer cancel()
 
 	rowsDeleted, err := s.DB.DeleteTeamByID(ctx, teamID)
@@ -202,8 +202,8 @@ func (s Server) DeleteAPITeamsTeamID(w http.ResponseWriter, _ *http.Request, tea
 }
 
 // (GET /teams/{teamID}) Get a team by id.
-func (s Server) GetAPITeamsTeamID(w http.ResponseWriter, _ *http.Request, teamID uint32) {
-	ctx, cancel := context.WithTimeout(context.Background(), database.DatabaseTimeout)
+func (s Server) GetAPITeamsTeamID(w http.ResponseWriter, r *http.Request, teamID uint32) {
+	ctx, cancel := context.WithTimeout(r.Context(), database.DatabaseTimeout)
 	defer cancel()
 
 	team, err := s.DB.GetTeamByID(ctx, teamID)
@@ -231,8 +231,8 @@ func (s Server) GetAPITeamsTeamID(w http.ResponseWriter, _ *http.Request, teamID
 }
 
 // (GET /teams/{teamID}/users) Get all members of a team.
-func (s Server) GetAPITeamsTeamIDUsers(w http.ResponseWriter, _ *http.Request, teamID uint32) {
-	ctx, cancel := context.WithTimeout(context.Background(), 2*database.DatabaseTimeout)
+func (s Server) GetAPITeamsTeamIDUsers(w http.ResponseWriter, r *http.Request, teamID uint32) {
+	ctx, cancel := context.WithTimeout(r.Context(), 5*database.DatabaseTimeout)
 	defer cancel()
 
 	count, err := s.DB.CountTeamByID(ctx, teamID)
@@ -390,13 +390,13 @@ func (s Server) PostAPITeamsTeamIDUsersUserID(w http.ResponseWriter, r *http.Req
 				Message: fmt.Sprintf("You were added to Team %s!", t.Name),
 				Created: time.Now(),
 			}
-			if err = s.NotificationService.SendNotification(s.Logger, s.DB, userID, notifParams); err != nil {
+			if err = s.NotificationService.SendNotification(ctx, s.Logger, s.DB, userID, notifParams); err != nil {
 				s.Logger.Errorf("team api: failed to send notification PostAPITeamsTeamIDUsersUserID to user that just joined team",
 					zap.Error(err))
 			}
 		} else {
 			// TODO: Batch insert for notifications
-			if err = s.NotificationService.SendNotification(s.Logger, s.DB, m.ID, allMemberNotif); err != nil {
+			if err = s.NotificationService.SendNotification(ctx, s.Logger, s.DB, m.ID, allMemberNotif); err != nil {
 				s.Logger.Errorf(
 					"team api: failed to send notification to all exisiting users of team, adding team member",
 					zap.Error(err))

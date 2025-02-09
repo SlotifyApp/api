@@ -12,9 +12,11 @@ import (
 	"testing"
 
 	"github.com/SlotifyApp/slotify-backend/api"
+	"github.com/SlotifyApp/slotify-backend/mocks"
 	"github.com/SlotifyApp/slotify-backend/testutil"
 	"github.com/brianvoe/gofakeit/v7"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 )
 
 func TestTeam_GetTeams(t *testing.T) {
@@ -81,7 +83,19 @@ func TestTeam_GetTeams(t *testing.T) {
 func TestTeam_PostTeams(t *testing.T) {
 	t.Parallel()
 
-	database, server := testutil.NewServerAndDB(t, context.Background())
+	ctrl := gomock.NewController(t)
+	mockNotifService := mocks.NewMockService(ctrl)
+
+	mockNotifService.
+		EXPECT().
+		SendNotification(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(nil).
+		AnyTimes()
+
+	database, server := testutil.NewServerAndDB(t,
+		context.Background(),
+		testutil.WithNotificationService(mockNotifService))
+
 	db := database.DB
 	t.Cleanup(func() {
 		testutil.CloseDB(db)
@@ -265,8 +279,20 @@ func TestTeam_GetTeamsTeamID(t *testing.T) {
 func TestTeam_PostTeamsTeamIDUsersUserID(t *testing.T) {
 	t.Parallel()
 
+	ctrl := gomock.NewController(t)
+	mockNotifService := mocks.NewMockService(ctrl)
+
+	mockNotifService.
+		EXPECT().
+		SendNotification(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(nil).
+		AnyTimes()
+
 	var err error
-	database, server := testutil.NewServerAndDB(t, context.Background())
+	database, server := testutil.NewServerAndDB(t,
+		context.Background(),
+		testutil.WithNotificationService(mockNotifService))
+
 	db := database.DB
 	t.Cleanup(func() {
 		testutil.CloseDB(db)
@@ -424,32 +450,30 @@ func TestTeam_GetAPITeamsMe(t *testing.T) {
 	})
 
 	user1 := testutil.InsertUser(t, db, testutil.WithEmail("blah@example.com"))
-	jwt1 := testutil.CreateJWT(t, user1.Id, user1.Email)
 
 	insertedTeam1 := testutil.InsertTeam(t, db)
 	insertedTeam2 := testutil.InsertTeam(t, db)
 	user2 := testutil.InsertUser(t, db)
 	testutil.AddUserToTeam(t, db, user2.Id, insertedTeam1.Id)
 	testutil.AddUserToTeam(t, db, user2.Id, insertedTeam2.Id)
-	jwt2 := testutil.CreateJWT(t, user2.Id, user2.Email)
 
 	tests := map[string]struct {
 		expectedRespBody any
 		httpStatus       int
-		jwt              string
 		testMsg          string
+		userID           uint32
 	}{
 		"get teams of user who has no teams": {
 			expectedRespBody: api.Teams{},
 			httpStatus:       http.StatusOK,
-			jwt:              jwt1,
 			testMsg:          "user who has no teams returns empty list",
+			userID:           user1.Id,
 		},
 		"get teams of user who has many teams": {
 			expectedRespBody: api.Teams{insertedTeam1, insertedTeam2},
 			httpStatus:       http.StatusOK,
-			jwt:              jwt2,
 			testMsg:          "correctly get all of a user's teams",
+			userID:           user2.Id,
 		},
 	}
 
@@ -459,7 +483,9 @@ func TestTeam_GetAPITeamsMe(t *testing.T) {
 
 			rr := httptest.NewRecorder()
 			req := httptest.NewRequest(http.MethodGet, "/api/teams/me", nil)
-			req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", tt.jwt))
+
+			ctx := context.WithValue(req.Context(), api.UserCtxKey{}, tt.userID)
+			req = req.WithContext(ctx)
 
 			server.GetAPITeamsMe(rr, req)
 

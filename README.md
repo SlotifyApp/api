@@ -17,7 +17,7 @@ git clone --recurse-submodules
     pre-commit install --hook-type pre-push
 ```
 
-4. Install the hooks:
+4. Install the other hooks:
 
 ```bash
     pre-commit install
