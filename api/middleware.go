@@ -47,9 +47,8 @@ type UserIDCtxKey struct{}
 func AuthMiddleware(next http.Handler) http.Handler {
 	// Paths to ignore this
 	excludedPaths := map[string]bool{
-		"/api/auth/callback": true, //http cookie is not set before logging in ie. during OAuth flow
+		"/api/auth/callback": true, // http cookie is not set before logging in ie. during OAuth flow
 		"/api/healthcheck":   true, // http cookie doesn't need to present for a healthcheck
-		"/api/swagger":       true, //swagger docs
 	}
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -103,7 +102,6 @@ func JWTMiddleware(next http.Handler) http.Handler {
 		"/api/healthcheck":   true,
 		"/api/users/logout":  true,
 		"/api/refresh":       true,
-		"/api/swagger":       true, //swagger docs
 	}
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -134,7 +132,7 @@ func ApplyMiddlewares(r *mux.Router, swagger *openapi3.T) {
 		CORSMiddleware,
 		AuthMiddleware,
 
-		//makes sure that requests and responses follow openapischema
+		// makes sure that requests and responses follow openapischema
 		oapi_middleware.OapiRequestValidator(swagger),
 
 		JWTMiddleware,
@@ -144,10 +142,10 @@ func ApplyMiddlewares(r *mux.Router, swagger *openapi3.T) {
 
 		chi_middleware.AllowContentType("application/json", "text/event-stream"),
 
-		//rate limitter
+		// rate limitter
 		httprate.LimitByIP(requestLimit, 1*time.Minute),
 
-		//returns 500 in case of panics instead of stopping API.
+		// returns 500 in case of panics instead of stopping API.
 		chi_middleware.Recoverer,
 	}
 

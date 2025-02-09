@@ -19,13 +19,13 @@ import (
 )
 
 const (
-	//AccessTokenJWTSecretEnv stores the env key for access token.
+	// AccessTokenJWTSecretEnv stores the env key for access token.
 	AccessTokenJWTSecretEnv = "ACCESS_TOKEN_JWT_SECRET"
-	//RefreshTokenJWTSecretEnv stores the env key for refresh token.
+	// RefreshTokenJWTSecretEnv stores the env key for refresh token.
 	//nolint: gosec //This doesn't leak anything, it's just the env var name
 	RefreshTokenJWTSecretEnv = "REFRESH_TOKEN_JWT_SECRET"
 
-	//OneWeek is a constant for representing 1 week as time.
+	// OneWeek is a constant for representing 1 week as time.
 	OneWeek = 7 * 24 * time.Hour
 )
 

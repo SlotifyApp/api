@@ -14,10 +14,10 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 	"github.com/AzureAD/microsoft-authentication-library-for-go/apps/confidential"
 	"github.com/SlotifyApp/slotify-backend/database"
-	"github.com/SlotifyApp/slotify-backend/logger"
 	"github.com/coreos/go-oidc/v3/oidc"
+	"github.com/google/uuid"
 	msgraphsdk "github.com/microsoftgraph/msgraph-sdk-go"
-	"github.com/microsoftgraph/msgraph-sdk-go/models"
+	graphmodels "github.com/microsoftgraph/msgraph-sdk-go/models"
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
@@ -177,15 +177,14 @@ func splitName(name string) (string, string) {
 // The home account id is stored so access token for a user can be gained when the user is logged out.
 func msftAuthoriseByCode(ctx context.Context,
 	msalClient *confidential.Client,
-	authCode string) (MSFTTokenResult, error) {
-
-	//exchange authorisation code for access token
+	authCode string,
+) (MSFTTokenResult, error) {
+	// exchange authorisation code for access token
 	res, err := msalClient.AcquireTokenByAuthCode(ctx,
 		authCode,
 		"http://localhost:8080/api/auth/callback",
 		getMSFTScopes(),
 	)
-
 	if err != nil {
 		return MSFTTokenResult{}, fmt.Errorf("failed to get token by auth code: %w", err)
 	}
@@ -238,9 +237,9 @@ func createMSFTGraphClientWithAccessToken(accessToken azcore.AccessToken) (*msgr
 }
 
 // CreateMSFTGraphClient gets a MSFT access token for a user and creates a graph client with it.
-func CreateMSFTGraphClient(ctx context.Context, l *logger.Logger, msalClient *confidential.Client,
-	db *database.Database, userID uint32) (*msgraphsdk.GraphServiceClient, error) {
-
+func CreateMSFTGraphClient(ctx context.Context, msalClient *confidential.Client,
+	db *database.Database, userID uint32,
+) (*msgraphsdk.GraphServiceClient, error) {
 	at, err := getMSFTAccessToken(ctx, msalClient, db, userID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get msft access token: %w", err)
@@ -255,7 +254,7 @@ func CreateMSFTGraphClient(ctx context.Context, l *logger.Logger, msalClient *co
 
 // parseMSFTAttendees filters out attributes of MSFT attendees.
 // see openapi spec to find docs about this.
-func parseMSFTAttendees(e models.Eventable) []Attendee {
+func parseMSFTAttendees(e graphmodels.Eventable) []Attendee {
 	msftAttendees := e.GetAttendees()
 	var attendees []Attendee
 	// Go through MSFT attendees and parse information we need
@@ -288,7 +287,7 @@ func parseMSFTAttendees(e models.Eventable) []Attendee {
 
 // parseMSFTLocations filters out attributes of MSFT locations.
 // see openapi spec to find docs about this.
-func parseMSFTLocations(e models.Eventable) []Location {
+func parseMSFTLocations(e graphmodels.Eventable) []Location {
 	msftLocations := e.GetLocations()
 	var locations []Location
 	for _, l := range msftLocations {
@@ -316,7 +315,9 @@ func parseMSFTLocations(e models.Eventable) []Location {
 
 // getOrInsertUserByClaimEmail will get a user by the claim email,
 // or if first time log in, it will create a new user.
-func getOrInsertUserByClaimEmail(ctx context.Context, qtx *database.Queries, msftTokenRes MSFTTokenResult) (database.User, error) {
+func getOrInsertUserByClaimEmail(ctx context.Context,
+	qtx *database.Queries, msftTokenRes MSFTTokenResult,
+) (database.User, error) {
 	email := msftTokenRes.Email
 	// Double the timeout due to more db operations
 	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
@@ -369,4 +370,76 @@ func getOrInsertUserByClaimEmail(ctx context.Context, qtx *database.Queries, msf
 	}
 
 	return u, nil
+}
+
+// parseCalendarEventToMSFTEvent parses CalendarEvent to create a MSFT Event.
+func parseCalendarEventToMSFTEvent(eventRequest CalendarEvent) *graphmodels.Event {
+	event := graphmodels.NewEvent()
+	event.SetSubject(eventRequest.Subject)
+
+	contentType := graphmodels.HTML_BODYTYPE
+	body := graphmodels.NewItemBody()
+	body.SetContentType(&contentType)
+	body.SetContent(eventRequest.Body)
+	event.SetBody(body)
+
+	timeZone := "UTC"
+
+	start := graphmodels.NewDateTimeTimeZone()
+	start.SetDateTime(eventRequest.StartTime)
+	start.SetTimeZone(&timeZone)
+	event.SetStart(start)
+
+	end := graphmodels.NewDateTimeTimeZone()
+	end.SetDateTime(eventRequest.EndTime)
+	end.SetTimeZone(&timeZone)
+	event.SetEnd(end)
+
+	// is location required and roomtype is not a property of location in graph
+	var location *graphmodels.Location
+	if eventRequest.Locations != nil && len(*eventRequest.Locations) > 0 {
+		location.SetDisplayName((*eventRequest.Locations)[0].Name)
+	}
+
+	var attendees []graphmodels.Attendeeable
+	if eventRequest.Attendees != nil {
+		for _, inviteAttendee := range *eventRequest.Attendees {
+			var email *graphmodels.EmailAddress
+			if inviteAttendee.Email != nil {
+				email = graphmodels.NewEmailAddress()
+				email.SetAddress((*string)(inviteAttendee.Email))
+			}
+
+			attendee := graphmodels.NewAttendee()
+			attendee.SetEmailAddress(email)
+
+			var attendeeType graphmodels.AttendeeType
+			if inviteAttendee.Type != nil {
+				switch *inviteAttendee.Type {
+				case Required:
+					attendeeType = graphmodels.REQUIRED_ATTENDEETYPE
+				case Optional:
+					attendeeType = graphmodels.OPTIONAL_ATTENDEETYPE
+				case Resource:
+					attendeeType = graphmodels.RESOURCE_ATTENDEETYPE
+				default:
+					attendeeType = graphmodels.REQUIRED_ATTENDEETYPE
+				}
+			}
+			attendee.SetTypeEscaped(&attendeeType)
+
+			// response status?
+			responseStatus := graphmodels.NewResponseStatus()
+			response := graphmodels.NOTRESPONDED_RESPONSETYPE
+			responseStatus.SetResponse(&response)
+			attendees = append(attendees, attendee)
+		}
+	}
+
+	event.SetAttendees(attendees)
+
+	transactionID := uuid.New().String()
+	event.SetTransactionId(&transactionID)
+
+	return event
 }

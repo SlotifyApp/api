@@ -35,7 +35,7 @@ func GetCount(t *testing.T, db *sql.DB, table string) int {
 	return count
 }
 
-// GetTeamRows
+// GetTeamRows.
 func GetTeamRows(t *testing.T, db *sql.DB) api.Teams {
 	rows, err := db.Query("SELECT * FROM Team")
 	require.NoError(t, err, "unable to form query")

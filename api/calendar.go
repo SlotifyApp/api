@@ -16,7 +16,7 @@ import (
 // See [MSFT Event Properties] for all of the MSFT event properties.
 //
 // [MSFT Event Properties]: https://learn.microsoft.com/en-us/graph/api/resources/event?view=graph-rest-1.0#properties
-func parseEventableResp(events []models.Eventable) ([]CalendarEvent, error) {
+func parseEventableResp(events []models.Eventable) []CalendarEvent {
 	calendarEvents := []CalendarEvent{}
 	for _, e := range events {
 		// Returned interfaces can be nil
@@ -57,14 +57,17 @@ func parseEventableResp(events []models.Eventable) ([]CalendarEvent, error) {
 		}
 		calendarEvents = append(calendarEvents, ce)
 	}
-	return calendarEvents, nil
+	return calendarEvents
 }
 
 // makeCalendarMeAPICall lists a user's events within a certain time range.
 // See [MSFT Calendar Me API Call] for docs on the API call made.
 //
-// [MSFT Calendar Me API Call]: https://learn.microsoft.com/en-us/graph/api/calendar-list-calendarview?view=graph-rest-1.0&tabs=http
-func makeCalendarMeAPICall(graph *msgraphsdkgo.GraphServiceClient, startTime, endTime time.Time) ([]CalendarEvent, error) {
+// [MSFT Calendar Me API Call]:
+// https://learn.microsoft.com/en-us/graph/api/calendar-list-calendarview?view=graph-rest-1.0&tabs=http
+func makeCalendarMeAPICall(graph *msgraphsdkgo.GraphServiceClient, startTime,
+	endTime time.Time,
+) ([]CalendarEvent, error) {
 	// Prepare request by formatting request parameters correctly.
 	start := startTime.Format(time.RFC3339)
 	end := endTime.Format(time.RFC3339)
@@ -89,11 +92,6 @@ func makeCalendarMeAPICall(graph *msgraphsdkgo.GraphServiceClient, startTime, en
 	}
 
 	// Filter out attributes that we want.
-	parsedEvents := []CalendarEvent{}
-	parsedEvents, err = parseEventableResp(events.GetValue())
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse msft events: %w", err)
-	}
 
-	return parsedEvents, nil
+	return parseEventableResp(events.GetValue()), nil
 }

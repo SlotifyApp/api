@@ -9,7 +9,7 @@ import (
 	"go.uber.org/zap"
 )
 
-// (POST /api/refresh)
+// (POST /api/refresh).
 func (s Server) PostAPIRefresh(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 5*database.DatabaseTimeout)
 	defer cancel()
@@ -66,7 +66,7 @@ func (s Server) PostAPIRefresh(w http.ResponseWriter, r *http.Request) {
 	SetHeaderAndWriteResponse(w, http.StatusCreated, "Successfully refreshed tokens")
 }
 
-// (GET /api/auth/callback)
+// (GET /api/auth/callback).
 func (s Server) GetAPIAuthCallback(w http.ResponseWriter, r *http.Request, params GetAPIAuthCallbackParams) {
 	msftTokenRes, err := msftAuthoriseByCode(r.Context(), s.MSALClient, params.Code)
 	if err != nil {
