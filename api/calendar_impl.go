@@ -101,7 +101,7 @@ func (s Server) GetAPICalendarMe(w http.ResponseWriter, r *http.Request, params 
 }
 
 // (POST /calendar/event).
-func (s Server) PostAPICalendarCreate(w http.ResponseWriter, r *http.Request) {
+func (s Server) PostAPICalendarMe(w http.ResponseWriter, r *http.Request) {
 	userID, err := jwt.GetUserIDFromReq(r)
 	if err != nil {
 		s.Logger.Error("failed to get userid from request access token", zap.Error(err))
@@ -198,4 +198,16 @@ func (s Server) PostAPICalendarCreate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	SetHeaderAndWriteResponse(w, http.StatusCreated, events)
+
+}
+
+func (s Server) OptionsAPICalendarMe(w http.ResponseWriter, r *http.Request) {
+	// Set CORS headers
+	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")        // Your frontend's origin
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")          // Allowed methods
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization") // Allowed headers
+	w.Header().Set("Access-Control-Allow-Credentials", "true")                    // Allow credentials (cookies, etc.)
+
+	// Send a 204 No Content response to indicate that the preflight request was successful
+	w.WriteHeader(http.StatusNoContent)
 }
