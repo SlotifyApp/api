@@ -20,12 +20,76 @@ import (
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
+// Defines values for AttendeeResponseStatus.
+const (
+	Accepted           AttendeeResponseStatus = "accepted"
+	Declined           AttendeeResponseStatus = "declined"
+	EntativelyAccepted AttendeeResponseStatus = "entativelyAccepted"
+	None               AttendeeResponseStatus = "none"
+	NotResponded       AttendeeResponseStatus = "notResponded"
+	Organizer          AttendeeResponseStatus = "organizer"
+)
+
+// Defines values for AttendeeType.
+const (
+	Optional AttendeeType = "optional"
+	Required AttendeeType = "required"
+	Resource AttendeeType = "resource"
+)
+
+// Defines values for LocationRoomType.
+const (
+	BusinessAddress LocationRoomType = "businessAddress"
+	ConferenceRoom  LocationRoomType = "conferenceRoom"
+	Default         LocationRoomType = "default"
+	GeoCoordinates  LocationRoomType = "geoCoordinates"
+	HomeAddress     LocationRoomType = "homeAddress"
+	Hotel           LocationRoomType = "hotel"
+	LocalBusiness   LocationRoomType = "localBusiness"
+	PostalAddress   LocationRoomType = "postalAddress"
+	Restaurant      LocationRoomType = "restaurant"
+	StreetAddress   LocationRoomType = "streetAddress"
+)
+
+// Attendee defines model for Attendee.
+type Attendee struct {
+	Email          *openapi_types.Email    `json:"email,omitempty"`
+	ResponseStatus *AttendeeResponseStatus `json:"responseStatus,omitempty"`
+	Type           *AttendeeType           `json:"type,omitempty"`
+}
+
+// AttendeeResponseStatus defines model for Attendee.ResponseStatus.
+type AttendeeResponseStatus string
+
+// AttendeeType defines model for Attendee.Type.
+type AttendeeType string
+
 // CalendarEvent defines model for CalendarEvent.
 type CalendarEvent struct {
-	EndTime   *string `json:"endTime,omitempty"`
-	StartTime *string `json:"startTime,omitempty"`
-	Subject   *string `json:"subject,omitempty"`
+	Attendees   *[]Attendee          `json:"attendees,omitempty"`
+	Body        *string              `json:"body,omitempty"`
+	Created     *time.Time           `json:"created,omitempty"`
+	EndTime     *string              `json:"endTime,omitempty"`
+	Id          *string              `json:"id,omitempty"`
+	IsCancelled *bool                `json:"isCancelled,omitempty"`
+	JoinURL     *string              `json:"joinURL,omitempty"`
+	Locations   *[]Location          `json:"locations,omitempty"`
+	Organizer   *openapi_types.Email `json:"organizer,omitempty"`
+	StartTime   *string              `json:"startTime,omitempty"`
+	Subject     *string              `json:"subject,omitempty"`
+	WebLink     *string              `json:"webLink,omitempty"`
 }
+
+// Location defines model for Location.
+type Location struct {
+	Id       *string           `json:"id,omitempty"`
+	Name     *string           `json:"name,omitempty"`
+	RoomType *LocationRoomType `json:"roomType,omitempty"`
+	Street   *string           `json:"street,omitempty"`
+}
+
+// LocationRoomType defines model for Location.RoomType.
+type LocationRoomType string
 
 // Notification defines model for Notification.
 type Notification struct {
@@ -66,6 +130,12 @@ type GetAPIAuthCallbackParams struct {
 	State string `form:"state" json:"state"`
 }
 
+// GetAPICalendarMeParams defines parameters for GetAPICalendarMe.
+type GetAPICalendarMeParams struct {
+	Start time.Time `form:"start" json:"start"`
+	End   time.Time `form:"end" json:"end"`
+}
+
 // GetAPITeamsParams defines parameters for GetAPITeams.
 type GetAPITeamsParams struct {
 	// Name Team name
@@ -84,6 +154,9 @@ type GetAPIUsersParams struct {
 	LastName *string `form:"lastName,omitempty" json:"lastName,omitempty"`
 }
 
+// PostAPICalendarEventJSONRequestBody defines body for PostAPICalendarEvent for application/json ContentType.
+type PostAPICalendarEventJSONRequestBody = CalendarEvent
+
 // PostAPITeamsJSONRequestBody defines body for PostAPITeams for application/json ContentType.
 type PostAPITeamsJSONRequestBody = TeamCreate
 
@@ -95,9 +168,12 @@ type ServerInterface interface {
 	// Auth route for authorisation code flow
 	// (GET /api/auth/callback)
 	GetAPIAuthCallback(w http.ResponseWriter, r *http.Request, params GetAPIAuthCallbackParams)
+	// create a new calendar event
+	// (POST /api/calendar/event)
+	PostAPICalendarEvent(w http.ResponseWriter, r *http.Request)
 	// get a user's calendar events
 	// (GET /api/calendar/me)
-	GetAPICalendarMe(w http.ResponseWriter, r *http.Request)
+	GetAPICalendarMe(w http.ResponseWriter, r *http.Request, params GetAPICalendarMeParams)
 	// Subscribe to notifications
 	// (GET /api/events)
 	RenderEvent(w http.ResponseWriter, r *http.Request)
@@ -224,11 +300,60 @@ func (siw *ServerInterfaceWrapper) GetAPIAuthCallback(w http.ResponseWriter, r *
 	handler.ServeHTTP(w, r)
 }
 
+// PostAPICalendarEvent operation middleware
+func (siw *ServerInterfaceWrapper) PostAPICalendarEvent(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PostAPICalendarEvent(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetAPICalendarMe operation middleware
 func (siw *ServerInterfaceWrapper) GetAPICalendarMe(w http.ResponseWriter, r *http.Request) {
 
+	var err error
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetAPICalendarMeParams
+
+	// ------------- Required query parameter "start" -------------
+
+	if paramValue := r.URL.Query().Get("start"); paramValue != "" {
+
+	} else {
+		siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "start"})
+		return
+	}
+
+	err = runtime.BindQueryParameter("form", true, true, "start", r.URL.Query(), &params.Start)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "start", Err: err})
+		return
+	}
+
+	// ------------- Required query parameter "end" -------------
+
+	if paramValue := r.URL.Query().Get("end"); paramValue != "" {
+
+	} else {
+		siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "end"})
+		return
+	}
+
+	err = runtime.BindQueryParameter("form", true, true, "end", r.URL.Query(), &params.End)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "end", Err: err})
+		return
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetAPICalendarMe(w, r)
+		siw.Handler.GetAPICalendarMe(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -811,6 +936,8 @@ func HandlerWithOptions(si ServerInterface, options GorillaServerOptions) http.H
 
 	r.HandleFunc(options.BaseURL+"/api/auth/callback", wrapper.GetAPIAuthCallback).Methods("GET")
 
+	r.HandleFunc(options.BaseURL+"/api/calendar/event", wrapper.PostAPICalendarEvent).Methods("POST")
+
 	r.HandleFunc(options.BaseURL+"/api/calendar/me", wrapper.GetAPICalendarMe).Methods("GET")
 
 	r.HandleFunc(options.BaseURL+"/api/events", wrapper.RenderEvent).Methods("GET")
@@ -863,43 +990,49 @@ func HandlerWithOptions(si ServerInterface, options GorillaServerOptions) http.H
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"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",
+	"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",
+	"l8vlvwMAAP//a65MUtE7AAA=",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file
