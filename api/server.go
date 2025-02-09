@@ -67,6 +67,7 @@ type Server struct {
 	NotificationService notification.Service
 }
 
+// NewServerWithContext creates a new server and accepts options.
 func NewServerWithContext(_ context.Context, db *database.Database, serverOpts ...ServerOption) (*Server, error) {
 	var opts options
 	for _, opt := range serverOpts {

@@ -15,10 +15,10 @@ import (
 )
 
 const (
-	requestLimit       = 100
-	refreshTokenHeader = "Refreshtoken"
+	requestLimit = 100
 )
 
+// CORSMiddleware sets access control headers.
 func CORSMiddleware(next http.Handler) http.Handler {
 	log.Printf("In CorsMiddleware")
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -36,11 +36,20 @@ func CORSMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-// set it under the Authorization header.
+// RefreshTokenCtxKey is the key in context value for the refresh token value.
+type RefreshTokenCtxKey struct{}
+
+// UserIDCtxKey is the key in context value for the user id value.
+type UserIDCtxKey struct{}
+
+// AuthMiddleware takes the http-only cookies and sets the access token under the Authorization header.
+// The refresh token is set in the request context.
 func AuthMiddleware(next http.Handler) http.Handler {
+	// Paths to ignore this
 	excludedPaths := map[string]bool{
-		"/api/auth/callback": true,
-		"/api/healthcheck":   true,
+		"/api/auth/callback": true, //http cookie is not set before logging in ie. during OAuth flow
+		"/api/healthcheck":   true, // http cookie doesn't need to present for a healthcheck
+		"/api/swagger":       true, //swagger docs
 	}
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -51,6 +60,7 @@ func AuthMiddleware(next http.Handler) http.Handler {
 
 		log.Print("AuthMiddleware executed")
 
+		// Get access_token cookie.
 		accessTokenCookie, err := r.Cookie("access_token")
 		if err != nil {
 			log.Printf("failed to get access_token cookie: %s", err.Error())
@@ -67,6 +77,7 @@ func AuthMiddleware(next http.Handler) http.Handler {
 
 		// Some methods require refresh token and it is sent automatically
 		// anyway in any request from the frontend
+		// set refresh token in request context
 		refreshTokenCookie, err := r.Cookie("refresh_token")
 		if err != nil {
 			log.Printf("failed to get refresh_token cookie: %s", err.Error())
@@ -79,20 +90,20 @@ func AuthMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		r.Header.Set(refreshTokenHeader, refreshTokenCookie.Value)
+		ctx := context.WithValue(r.Context(), RefreshTokenCtxKey{}, refreshTokenCookie)
 
-		next.ServeHTTP(w, r)
+		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
 
-type UserCtxKey struct{}
-
+// JWTMiddleware parses and validates the access token, and stores the userID in the request context.
 func JWTMiddleware(next http.Handler) http.Handler {
 	excludedPaths := map[string]bool{
 		"/api/auth/callback": true,
 		"/api/healthcheck":   true,
 		"/api/users/logout":  true,
 		"/api/refresh":       true,
+		"/api/swagger":       true, //swagger docs
 	}
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -111,21 +122,32 @@ func JWTMiddleware(next http.Handler) http.Handler {
 
 		// set userID in context so it's available in our requests
 		// and the access token doesn't need to be parsed again
-		ctx := context.WithValue(r.Context(), UserCtxKey{}, userID)
+		ctx := context.WithValue(r.Context(), UserIDCtxKey{}, userID)
 
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
 
+// ApplyMiddlewares applies all the middleware functions for the server.
 func ApplyMiddlewares(r *mux.Router, swagger *openapi3.T) {
 	middlewares := []mux.MiddlewareFunc{
 		CORSMiddleware,
 		AuthMiddleware,
+
+		//makes sure that requests and responses follow openapischema
 		oapi_middleware.OapiRequestValidator(swagger),
+
 		JWTMiddleware,
+
+		// logs requests and statuses.
 		chi_middleware.Logger,
+
 		chi_middleware.AllowContentType("application/json", "text/event-stream"),
+
+		//rate limitter
 		httprate.LimitByIP(requestLimit, 1*time.Minute),
+
+		//returns 500 in case of panics instead of stopping API.
 		chi_middleware.Recoverer,
 	}
 

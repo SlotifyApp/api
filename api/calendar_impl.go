@@ -6,9 +6,6 @@ import (
 	"time"
 
 	"go.uber.org/zap"
-
-	graphusers "github.com/microsoftgraph/msgraph-sdk-go/users"
-	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
 // (GET /calendar/me).
@@ -16,81 +13,28 @@ func (s Server) GetAPICalendarMe(w http.ResponseWriter, r *http.Request, params 
 	ctx, cancel := context.WithTimeout(r.Context(), time.Second*30)
 	defer cancel()
 
-	userID, ok := r.Context().Value(UserCtxKey{}).(uint32)
+	//Get userID from request
+	userID, ok := r.Context().Value(UserIDCtxKey{}).(uint32)
 	if !ok {
 		s.Logger.Error("failed to get userid from request context")
 		sendError(w, http.StatusUnauthorized, "Try again later.")
 		return
 	}
 
-	at, err := getMSFTAccessToken(ctx, s.MSALClient, s.DB, userID)
+	//Create msgraph client
+	graph, err := CreateMSFTGraphClient(ctx, s.Logger, s.MSALClient, s.DB, userID)
 	if err != nil {
-		s.Logger.Error("failed to get microsoft access token", zap.Error(err))
-		sendError(w, http.StatusUnauthorized, "Try again later.")
+		s.Logger.Error("failed to create msgraph client", zap.Error(err))
+		sendError(w, http.StatusBadGateway, "Failed to connect to microsoft graph API")
 		return
 	}
 
-	graph, err := createMSFTGraphClient(at)
-	if err != nil || graph == nil {
-		s.Logger.Error("failed to create msft graph client", zap.Error(err))
-		sendError(w, http.StatusInternalServerError, "msft graph could not be created")
-		return
-	}
-
-	start := params.Start.Format(time.RFC3339)
-	end := params.End.Format(time.RFC3339)
-
-	requestParameters := &graphusers.ItemCalendarCalendarViewRequestBuilderGetQueryParameters{
-		StartDateTime: &start,
-		EndDateTime:   &end,
-	}
-
-	configuration := &graphusers.ItemCalendarCalendarViewRequestBuilderGetRequestConfiguration{
-		QueryParameters: requestParameters,
-	}
-
-	events, err := graph.Me().Calendar().CalendarView().Get(context.Background(), configuration)
+	//Make call to API route and parse events
+	calendarEvents, err := makeCalendarMeAPICall(graph, params.Start, params.End)
 	if err != nil {
-		s.Logger.Error("failed to call graph client route", zap.Error(err))
-		sendError(w, http.StatusInternalServerError, "failed to call graph client route")
+		s.Logger.Error("failed to make calendar me msgraph api call", zap.Error(err))
+		sendError(w, http.StatusBadGateway, "Failed to make calendar me msgraph api call")
 		return
-	}
-
-	calendarEvents := []CalendarEvent{}
-	for _, e := range events.GetValue() {
-		attendees := parseMSFTAttendees(e)
-		locations := parseMSFTLocations(e)
-
-		var joinURL *string
-		if e.GetOnlineMeeting() != nil {
-			joinURL = e.GetOnlineMeeting().GetJoinUrl()
-		}
-
-		var endTime *string
-		if e.GetEnd() != nil {
-			endTime = e.GetEnd().GetDateTime()
-		}
-
-		var startTime *string
-		if e.GetStart() != nil {
-			startTime = e.GetStart().GetDateTime()
-		}
-
-		ce := CalendarEvent{
-			Attendees:   &attendees,
-			Body:        e.GetBodyPreview(),
-			Created:     e.GetCreatedDateTime(),
-			EndTime:     endTime,
-			Id:          e.GetId(),
-			IsCancelled: e.GetIsCancelled(),
-			JoinURL:     joinURL,
-			Locations:   &locations,
-			Organizer:   (*openapi_types.Email)(e.GetOrganizer().GetEmailAddress().GetAddress()),
-			StartTime:   startTime,
-			Subject:     e.GetSubject(),
-			WebLink:     e.GetWebLink(),
-		}
-		calendarEvents = append(calendarEvents, ce)
 	}
 
 	SetHeaderAndWriteResponse(w, http.StatusOK, calendarEvents)

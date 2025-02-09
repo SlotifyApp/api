@@ -175,7 +175,7 @@ func (s Server) GetAPIUsersUserID(w http.ResponseWriter, r *http.Request, userID
 
 // (GET /users/me).
 func (s Server) GetAPIUsersMe(w http.ResponseWriter, r *http.Request) {
-	userID, ok := r.Context().Value(UserCtxKey{}).(uint32)
+	userID, ok := r.Context().Value(UserIDCtxKey{}).(uint32)
 	if !ok {
 		s.Logger.Error("failed to get userid from request context")
 		sendError(w, http.StatusUnauthorized, "Try again later.")
@@ -190,7 +190,7 @@ func (s Server) PostAPIUsersMeLogout(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), database.DatabaseTimeout)
 	defer cancel()
 
-	userID, ok := r.Context().Value(UserCtxKey{}).(uint32)
+	userID, ok := r.Context().Value(UserIDCtxKey{}).(uint32)
 	if !ok {
 		s.Logger.Error("failed to get userid from request context")
 		RemoveCookies(w)

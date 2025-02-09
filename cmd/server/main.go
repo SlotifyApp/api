@@ -20,6 +20,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("error getting swagger/openapi spec: %s", err.Error())
 	}
+
 	ctx := context.Background()
 
 	db, err := database.NewDatabaseWithContext(ctx)
@@ -30,6 +31,9 @@ func main() {
 	server, err := api.NewServerWithContext(ctx, db)
 	if err != nil {
 		log.Fatalf("error creating server: %s", err.Error())
+	}
+	if err != nil {
+		log.Fatal(err)
 	}
 
 	r := mux.NewRouter()

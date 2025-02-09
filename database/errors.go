@@ -10,6 +10,7 @@ import (
 
 var ErrTeamIDInvalid = errors.New("team id does not exist")
 
+// WrongNumberSQLRowsError returns when the expected #rows affected != actual #rows affected.
 type WrongNumberSQLRowsError struct {
 	ActualRows   int64
 	ExpectedRows []int64
@@ -36,7 +37,7 @@ func IsRowDoesNotExistSQLError(err error) bool {
 	return isSpecificMySQLError(err, mysqlerr.ER_NO_REFERENCED_ROW_2)
 }
 
-// code is equal to target error code.
+// isSpecificMySQLError will check if a given error matches the mysql error described code.
 func isSpecificMySQLError(err error, errorCode uint16) bool {
 	var mysqlErr *mysql.MySQLError
 	// Check if err is instance of MySQLError

@@ -2,15 +2,19 @@ package api
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"log"
 	"os"
+	"strings"
+	"time"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 	"github.com/AzureAD/microsoft-authentication-library-for-go/apps/confidential"
 	"github.com/SlotifyApp/slotify-backend/database"
+	"github.com/SlotifyApp/slotify-backend/logger"
 	"github.com/coreos/go-oidc/v3/oidc"
 	msgraphsdk "github.com/microsoftgraph/msgraph-sdk-go"
 	"github.com/microsoftgraph/msgraph-sdk-go/models"
@@ -24,6 +28,22 @@ const (
 // ErrMSALCache is raised when MSAL could not find something in its cache.
 var ErrMSALCache = errors.New("MSAL could not find resource could not be found in MSAL cache")
 
+// MSFTEntraValues stores details specific to our MSFT tenant.
+type MSFTEntraValues struct {
+	ClientID     string
+	ClientSecret string
+	TenantID     string
+}
+
+// MSFTTokenResult contains filtered fields from the MSAL client exchanging an auth code for an access token,
+// got through the OpenID flow.
+type MSFTTokenResult struct {
+	Email         string
+	FirstName     string
+	LastName      string
+	HomeAccountID string
+}
+
 // getMSFTScopes will return the requested scopes for a MSFT access token.
 func getMSFTScopes() []string {
 	return []string{
@@ -33,7 +53,7 @@ func getMSFTScopes() []string {
 	}
 }
 
-// getMSFTEntraValues returns the MSFT Entra tenantID, clientID and clientSecret.
+// getMSFTEntraValues reads and returns the MSFT Entra tenantID, clientID and clientSecret.
 func getMSFTEntraValues() (MSFTEntraValues, error) {
 	var tenantID string
 	var clientID string
@@ -57,13 +77,6 @@ func getMSFTEntraValues() (MSFTEntraValues, error) {
 		ClientSecret: clientSecret,
 		TenantID:     tenantID,
 	}, nil
-}
-
-type MSFTTokenResult struct {
-	Email         string
-	FirstName     string
-	LastName      string
-	HomeAccountID string
 }
 
 // createMSALClient creates a new confiential MSAL Client.
@@ -139,11 +152,40 @@ func getMSFTAccessToken(ctx context.Context, c *confidential.Client,
 	return tk, nil
 }
 
-// msftAuthoriseByCode will exchange a authorisation code for a MSFT access token.
-// The home account id is stored, using this an access token can be gained.
-func msftAuthoriseByCode(ctx context.Context, c *confidential.Client, authCode string) (MSFTTokenResult, error) {
-	// MSAL fn to exchange auth code for token
-	res, err := c.AcquireTokenByAuthCode(ctx, authCode, "http://localhost:8080/api/auth/callback", getMSFTScopes())
+// splitName splits a name into first name and last name.
+// if there are fewer than 2 individual names, return the name.
+// if there are more than 2 names, join the last names to form our own last name.
+func splitName(name string) (string, string) {
+	names := strings.Fields(name)
+	var firstName string
+	var lastName string
+
+	if len(names) > 0 {
+		firstName = names[0]
+	}
+
+	if len(names) > 1 {
+		// Join the rest of the fields together to form the
+		// last name
+		lastName = strings.Join(names[1:], " ")
+	}
+	return firstName, lastName
+}
+
+// msftAuthoriseByCode will exchange a authorisation code for a MSFT access token, following OAuth2.
+// Due to the OpenID protocol, we get user information as well eg. first name.
+// The home account id is stored so access token for a user can be gained when the user is logged out.
+func msftAuthoriseByCode(ctx context.Context,
+	msalClient *confidential.Client,
+	authCode string) (MSFTTokenResult, error) {
+
+	//exchange authorisation code for access token
+	res, err := msalClient.AcquireTokenByAuthCode(ctx,
+		authCode,
+		"http://localhost:8080/api/auth/callback",
+		getMSFTScopes(),
+	)
+
 	if err != nil {
 		return MSFTTokenResult{}, fmt.Errorf("failed to get token by auth code: %w", err)
 	}
@@ -183,8 +225,8 @@ func (atp AccessTokenProvider) GetToken(_ context.Context,
 	return atp.accessToken, nil
 }
 
-// createMSFTGraphClient creates a MSGraph SDK Client using the AccessTokenProvider.
-func createMSFTGraphClient(accessToken azcore.AccessToken) (*msgraphsdk.GraphServiceClient, error) {
+// createMSFTGraphClientWithAccessToken creates a MSGraph SDK Client given an access token.
+func createMSFTGraphClientWithAccessToken(accessToken azcore.AccessToken) (*msgraphsdk.GraphServiceClient, error) {
 	atp := AccessTokenProvider{
 		accessToken: accessToken,
 	}
@@ -195,7 +237,24 @@ func createMSFTGraphClient(accessToken azcore.AccessToken) (*msgraphsdk.GraphSer
 	return client, nil
 }
 
+// CreateMSFTGraphClient gets a MSFT access token for a user and creates a graph client with it.
+func CreateMSFTGraphClient(ctx context.Context, l *logger.Logger, msalClient *confidential.Client,
+	db *database.Database, userID uint32) (*msgraphsdk.GraphServiceClient, error) {
+
+	at, err := getMSFTAccessToken(ctx, msalClient, db, userID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get msft access token: %w", err)
+	}
+
+	graph, err := createMSFTGraphClientWithAccessToken(at)
+	if err != nil || graph == nil {
+		return nil, fmt.Errorf("failed to create msft graph client: %w", err)
+	}
+	return graph, nil
+}
+
 // parseMSFTAttendees filters out attributes of MSFT attendees.
+// see openapi spec to find docs about this.
 func parseMSFTAttendees(e models.Eventable) []Attendee {
 	msftAttendees := e.GetAttendees()
 	var attendees []Attendee
@@ -228,6 +287,7 @@ func parseMSFTAttendees(e models.Eventable) []Attendee {
 }
 
 // parseMSFTLocations filters out attributes of MSFT locations.
+// see openapi spec to find docs about this.
 func parseMSFTLocations(e models.Eventable) []Location {
 	msftLocations := e.GetLocations()
 	var locations []Location
@@ -252,4 +312,61 @@ func parseMSFTLocations(e models.Eventable) []Location {
 		locations = append(locations, parsedLoc)
 	}
 	return locations
+}
+
+// getOrInsertUserByClaimEmail will get a user by the claim email,
+// or if first time log in, it will create a new user.
+func getOrInsertUserByClaimEmail(ctx context.Context, qtx *database.Queries, msftTokenRes MSFTTokenResult) (database.User, error) {
+	email := msftTokenRes.Email
+	// Double the timeout due to more db operations
+	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
+	defer cancel()
+
+	count, err := qtx.CountUserByEmail(ctx, email)
+	if err != nil {
+		return database.User{}, fmt.Errorf("failed to get user count by claim email: %w", err)
+	}
+
+	// User doesn't exist, first time signing so sign up
+	if count == 0 {
+		dbParams := database.CreateUserParams{
+			Email:     email,
+			FirstName: msftTokenRes.FirstName,
+			LastName:  msftTokenRes.LastName,
+		}
+		_, err = qtx.CreateUser(ctx, dbParams)
+		if err != nil {
+			return database.User{}, fmt.Errorf("failed to create user for claim email: %w", err)
+		}
+	}
+
+	var u database.User
+
+	u, err = qtx.GetUserByEmail(ctx, email)
+	if err != nil {
+		return database.User{}, fmt.Errorf("failed to get user with claim email: %w", err)
+	}
+
+	// Update user's home account id so it can be used when asking for a MSFT access token
+	dbParams := database.UpdateUserHomeAccountIDParams{
+		ID:                u.ID,
+		MsftHomeAccountID: sql.NullString{String: msftTokenRes.HomeAccountID, Valid: true},
+	}
+
+	var rowsAffected int64
+	rowsAffected, err = qtx.UpdateUserHomeAccountID(ctx, dbParams)
+	if err != nil {
+		return database.User{}, fmt.Errorf("failed to update user home account id: %w", err)
+	}
+
+	// UpdateUserHomeAccountID should only either update 1 or 0 rows.
+	if rowsAffected > 1 {
+		err = database.WrongNumberSQLRowsError{
+			ActualRows:   rowsAffected,
+			ExpectedRows: []int64{0, 1},
+		}
+		return database.User{}, fmt.Errorf("failed to update home account id: %w", err)
+	}
+
+	return u, nil
 }

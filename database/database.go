@@ -63,6 +63,7 @@ func WithPassword(password string) Option {
 	}
 }
 
+// openAndPingDBContext will open a sql db connection and ping the db to check if a connection is established.
 func openAndPingDBContext(ctx context.Context, dsn string) (*sql.DB, error) {
 	db, err := sql.Open("mysql", dsn)
 	if err != nil {

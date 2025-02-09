@@ -24,3 +24,4 @@ repos:
         entry: make test
         language: system
         pass_filenames: false
+        stages: [push]

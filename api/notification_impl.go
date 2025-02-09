@@ -8,8 +8,9 @@ import (
 	"go.uber.org/zap"
 )
 
+// (GET /api/events), HTTP SSE route.
 func (s Server) RenderEvent(w http.ResponseWriter, r *http.Request) {
-	userID, ok := r.Context().Value(UserCtxKey{}).(uint32)
+	userID, ok := r.Context().Value(UserIDCtxKey{}).(uint32)
 	if !ok {
 		s.Logger.Error("failed to get userid from request context")
 		sendError(w, http.StatusUnauthorized, "Try again later.")
@@ -43,7 +44,7 @@ func (s Server) RenderEvent(w http.ResponseWriter, r *http.Request) {
 	// Block until the request is 'done', eg. client navigates away
 	<-r.Context().Done()
 
-	s.Logger.Info("client disconnected")
+	s.Logger.Infof("userID %d disconnected", userID)
 	s.NotificationService.DeleteUserConn(s.Logger, userID, w)
 }
 
@@ -59,12 +60,12 @@ func (s Server) OptionsAPINotificationsNotificationIDRead(w http.ResponseWriter,
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// (PATCH /api/notifications/{notificationID}/read).
+// (PATCH /api/notifications/{notificationID}/read). Mark notifications as being read.
 func (s Server) PatchAPINotificationsNotificationIDRead(w http.ResponseWriter, r *http.Request, notificationID uint32) {
 	ctx, cancel := context.WithTimeout(r.Context(), database.DatabaseTimeout)
 	defer cancel()
 
-	userID, ok := r.Context().Value(UserCtxKey{}).(uint32)
+	userID, ok := r.Context().Value(UserIDCtxKey{}).(uint32)
 	if !ok {
 		s.Logger.Error("failed to get userid from request context")
 		sendError(w, http.StatusUnauthorized, "Try again later.")
@@ -101,7 +102,7 @@ func (s Server) GetAPIUsersMeNotifications(w http.ResponseWriter, r *http.Reques
 	ctx, cancel := context.WithTimeout(r.Context(), database.DatabaseTimeout)
 	defer cancel()
 
-	userID, ok := r.Context().Value(UserCtxKey{}).(uint32)
+	userID, ok := r.Context().Value(UserIDCtxKey{}).(uint32)
 	if !ok {
 		s.Logger.Error("failed to get userid from request context")
 		sendError(w, http.StatusUnauthorized, "Try again later.")

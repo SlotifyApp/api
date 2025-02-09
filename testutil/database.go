@@ -1,3 +1,7 @@
+// Package testutil implements common testing functionality.
+//
+// testutil functions take in a testing.T and this is used to fail the test if there is
+// any error.
 package testutil
 
 import (
@@ -31,6 +35,7 @@ func GetCount(t *testing.T, db *sql.DB, table string) int {
 	return count
 }
 
+// GetTeamRows
 func GetTeamRows(t *testing.T, db *sql.DB) api.Teams {
 	rows, err := db.Query("SELECT * FROM Team")
 	require.NoError(t, err, "unable to form query")

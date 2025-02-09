@@ -82,6 +82,8 @@ make generate
 
 This will generate API code based on our spec into a file named `api/server.gen.go`
 
+To view the SwaggerUI, look at the `website` repo and follow the instructions.
+
 ## OpenID Microsoft Flow and Slotify API protection
 
 ![OpenID Flow](./docs/openid_flow_diagram.png)

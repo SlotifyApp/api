@@ -14,7 +14,7 @@ import (
 )
 
 func (s Server) GetAPITeamsJoinableMe(w http.ResponseWriter, r *http.Request) {
-	userID, ok := r.Context().Value(UserCtxKey{}).(uint32)
+	userID, ok := r.Context().Value(UserIDCtxKey{}).(uint32)
 	if !ok {
 		s.Logger.Error("failed to get userid from request context")
 		sendError(w, http.StatusUnauthorized, "Try again later.")
@@ -50,7 +50,7 @@ func (s Server) GetAPITeamsJoinableMe(w http.ResponseWriter, r *http.Request) {
 
 // (GET /api/teams/me).
 func (s Server) GetAPITeamsMe(w http.ResponseWriter, r *http.Request) {
-	userID, ok := r.Context().Value(UserCtxKey{}).(uint32)
+	userID, ok := r.Context().Value(UserIDCtxKey{}).(uint32)
 	if !ok {
 		s.Logger.Error("failed to get userid from request context")
 		sendError(w, http.StatusUnauthorized, "Try again later.")
@@ -102,7 +102,7 @@ func (s Server) PostAPITeams(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 4*database.DatabaseTimeout)
 	defer cancel()
 
-	userID, ok := r.Context().Value(UserCtxKey{}).(uint32)
+	userID, ok := r.Context().Value(UserIDCtxKey{}).(uint32)
 	if !ok {
 		s.Logger.Error("failed to get userid from request context")
 		sendError(w, http.StatusUnauthorized, "Try again later.")
@@ -283,7 +283,7 @@ func (s Server) GetAPITeamsTeamIDUsers(w http.ResponseWriter, r *http.Request, t
 
 // (POST /api/teams/{teamID}/users/me).
 func (s Server) PostAPITeamsTeamIDUsersMe(w http.ResponseWriter, r *http.Request, teamID uint32) {
-	userID, ok := r.Context().Value(UserCtxKey{}).(uint32)
+	userID, ok := r.Context().Value(UserIDCtxKey{}).(uint32)
 	if !ok {
 		s.Logger.Error("failed to get userid from request context")
 		sendError(w, http.StatusUnauthorized, "Try again later.")
