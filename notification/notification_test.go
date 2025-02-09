@@ -297,7 +297,8 @@ func Test_SSESendNotification(t *testing.T) {
 			present := sseNotificationService.GetUserClients()[tt.userID][client]
 			require.Equal(t, struct{}{}, present, "client was correctly registered for user")
 
-			err := sseNotificationService.SendNotification(context.Background(), l, mockNotificationDB, tt.userID, notifParams)
+			err := sseNotificationService.
+				SendNotification(context.Background(), l, mockNotificationDB, []uint32{tt.userID}, notifParams)
 			require.NoError(t, err,
 				"send notification should execute successfully and produce no error")
 
@@ -366,13 +367,13 @@ func Test_SSESendNotification(t *testing.T) {
 
 		// send both notifications
 		err := sseNotificationService.
-			SendNotification(context.Background(), l, mockNotificationDB, userID, notifParams1)
+			SendNotification(context.Background(), l, mockNotificationDB, []uint32{userID}, notifParams1)
 
 		require.NoError(t, err,
 			"send notification should execute successfully and produce no error")
 
 		err = sseNotificationService.
-			SendNotification(context.Background(), l, mockNotificationDB, userID, notifParams2)
+			SendNotification(context.Background(), l, mockNotificationDB, []uint32{userID}, notifParams2)
 
 		require.NoError(t, err,
 			"send notification should execute successfully and produce no error")

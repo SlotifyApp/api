@@ -63,6 +63,9 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.getAllTeamMembersStmt, err = db.PrepareContext(ctx, getAllTeamMembers); err != nil {
 		return nil, fmt.Errorf("error preparing query GetAllTeamMembers: %w", err)
 	}
+	if q.getAllTeamMembersExceptStmt, err = db.PrepareContext(ctx, getAllTeamMembersExcept); err != nil {
+		return nil, fmt.Errorf("error preparing query GetAllTeamMembersExcept: %w", err)
+	}
 	if q.getJoinableTeamsStmt, err = db.PrepareContext(ctx, getJoinableTeams); err != nil {
 		return nil, fmt.Errorf("error preparing query GetJoinableTeams: %w", err)
 	}
@@ -164,6 +167,11 @@ func (q *Queries) Close() error {
 	if q.getAllTeamMembersStmt != nil {
 		if cerr := q.getAllTeamMembersStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing getAllTeamMembersStmt: %w", cerr)
+		}
+	}
+	if q.getAllTeamMembersExceptStmt != nil {
+		if cerr := q.getAllTeamMembersExceptStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getAllTeamMembersExceptStmt: %w", cerr)
 		}
 	}
 	if q.getJoinableTeamsStmt != nil {
@@ -273,6 +281,7 @@ type Queries struct {
 	deleteTeamByIDStmt             *sql.Stmt
 	deleteUserByIDStmt             *sql.Stmt
 	getAllTeamMembersStmt          *sql.Stmt
+	getAllTeamMembersExceptStmt    *sql.Stmt
 	getJoinableTeamsStmt           *sql.Stmt
 	getRefreshTokenByUserIDStmt    *sql.Stmt
 	getTeamByIDStmt                *sql.Stmt
@@ -303,6 +312,7 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		deleteTeamByIDStmt:             q.deleteTeamByIDStmt,
 		deleteUserByIDStmt:             q.deleteUserByIDStmt,
 		getAllTeamMembersStmt:          q.getAllTeamMembersStmt,
+		getAllTeamMembersExceptStmt:    q.getAllTeamMembersExceptStmt,
 		getJoinableTeamsStmt:           q.getJoinableTeamsStmt,
 		getRefreshTokenByUserIDStmt:    q.getRefreshTokenByUserIDStmt,
 		getTeamByIDStmt:                q.getTeamByIDStmt,

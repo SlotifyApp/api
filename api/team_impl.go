@@ -14,7 +14,7 @@ import (
 )
 
 func (s Server) GetAPITeamsJoinableMe(w http.ResponseWriter, r *http.Request) {
-	userID, ok := r.Context().Value(UserCtxKey{}).(uint32)
+	userID, ok := r.Context().Value(UserIDCtxKey{}).(uint32)
 	if !ok {
 		s.Logger.Error("failed to get userid from request context")
 		sendError(w, http.StatusUnauthorized, "Try again later.")
@@ -50,7 +50,7 @@ func (s Server) GetAPITeamsJoinableMe(w http.ResponseWriter, r *http.Request) {
 
 // (GET /api/teams/me).
 func (s Server) GetAPITeamsMe(w http.ResponseWriter, r *http.Request) {
-	userID, ok := r.Context().Value(UserCtxKey{}).(uint32)
+	userID, ok := r.Context().Value(UserIDCtxKey{}).(uint32)
 	if !ok {
 		s.Logger.Error("failed to get userid from request context")
 		sendError(w, http.StatusUnauthorized, "Try again later.")
@@ -102,7 +102,7 @@ func (s Server) PostAPITeams(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 4*database.DatabaseTimeout)
 	defer cancel()
 
-	userID, ok := r.Context().Value(UserCtxKey{}).(uint32)
+	userID, ok := r.Context().Value(UserIDCtxKey{}).(uint32)
 	if !ok {
 		s.Logger.Error("failed to get userid from request context")
 		sendError(w, http.StatusUnauthorized, "Try again later.")
@@ -154,7 +154,7 @@ func (s Server) PostAPITeams(w http.ResponseWriter, r *http.Request) {
 		Created: time.Now(),
 	}
 
-	if err = s.NotificationService.SendNotification(ctx, s.Logger, s.DB, userID, notifParams); err != nil {
+	if err = s.NotificationService.SendNotification(ctx, s.Logger, s.DB, []uint32{userID}, notifParams); err != nil {
 		s.Logger.Errorf("team api: failed to send notification",
 			zap.Error(err))
 	}
@@ -283,7 +283,7 @@ func (s Server) GetAPITeamsTeamIDUsers(w http.ResponseWriter, r *http.Request, t
 
 // (POST /api/teams/{teamID}/users/me).
 func (s Server) PostAPITeamsTeamIDUsersMe(w http.ResponseWriter, r *http.Request, teamID uint32) {
-	userID, ok := r.Context().Value(UserCtxKey{}).(uint32)
+	userID, ok := r.Context().Value(UserIDCtxKey{}).(uint32)
 	if !ok {
 		s.Logger.Error("failed to get userid from request context")
 		sendError(w, http.StatusUnauthorized, "Try again later.")
@@ -359,9 +359,14 @@ func (s Server) PostAPITeamsTeamIDUsersUserID(w http.ResponseWriter, r *http.Req
 		}
 	}
 
-	members, err := s.DB.GetAllTeamMembers(ctx, teamID)
+	dbParams := database.GetAllTeamMembersExceptParams{
+		TeamID: teamID,
+		UserID: userID,
+	}
+	members, err := s.DB.GetAllTeamMembersExcept(ctx, dbParams)
 	if err != nil {
-		s.Logger.Errorf("team api: failed to get all team members for PostAPITeamsTeamIDUsersUserID",
+		s.Logger.Errorf("team api: failed to get team members except new for PostAPITeamsTeamIDUsersUserID",
+			zap.Uint32("exceptUserID", userID),
 			zap.Error(err))
 		// Still return ok because the actual endpoint worked, its just notifications that didnt
 		SetHeaderAndWriteResponse(w, http.StatusOK, t)
@@ -373,35 +378,31 @@ func (s Server) PostAPITeamsTeamIDUsersUserID(w http.ResponseWriter, r *http.Req
 		s.Logger.Errorf("team api: failed to get user details for PostAPITeamsTeamIDUsersUserID",
 			zap.Error(err))
 		// Still return ok because the actual endpoint worked, its just notifications that didnt
-		SetHeaderAndWriteResponse(w, http.StatusOK, t)
+		SetHeaderAndWriteResponse(w, http.StatusCreated, t)
 		return
 	}
-
-	// TODO: Share notification between users, currently we have a 1-to-1 mapping
 	allMemberNotif := database.CreateNotificationParams{
 		Message: fmt.Sprintf("Say hi to %s, he just joined Team %s", u.FirstName+" "+u.LastName, t.Name),
 		Created: time.Now(),
 	}
 
-	for _, m := range members {
-		// This is the user that just joined
-		if m.ID == userID {
-			notifParams := database.CreateNotificationParams{
-				Message: fmt.Sprintf("You were added to Team %s!", t.Name),
-				Created: time.Now(),
-			}
-			if err = s.NotificationService.SendNotification(ctx, s.Logger, s.DB, userID, notifParams); err != nil {
-				s.Logger.Errorf("team api: failed to send notification PostAPITeamsTeamIDUsersUserID to user that just joined team",
-					zap.Error(err))
-			}
-		} else {
-			// TODO: Batch insert for notifications
-			if err = s.NotificationService.SendNotification(ctx, s.Logger, s.DB, m.ID, allMemberNotif); err != nil {
-				s.Logger.Errorf(
-					"team api: failed to send notification to all exisiting users of team, adding team member",
-					zap.Error(err))
-			}
-		}
+	newMemberNotif := database.CreateNotificationParams{
+		Message: fmt.Sprintf("You were added to Team %s!", t.Name),
+		Created: time.Now(),
+	}
+
+	err = s.NotificationService.SendNotification(ctx, s.Logger, s.DB, members, allMemberNotif)
+	if err != nil {
+		// Don't return error, attempt to send individual notification too
+		s.Logger.Errorf(
+			"team api: failed to send notification to all existing users of team, adding team member",
+			zap.Error(err))
+	}
+
+	err = s.NotificationService.SendNotification(ctx, s.Logger, s.DB, []uint32{userID}, newMemberNotif)
+	if err != nil {
+		s.Logger.Errorf("team api: failed to send notification PostAPITeamsTeamIDUsersUserID to user that just joined team",
+			zap.Error(err))
 	}
 
 	SetHeaderAndWriteResponse(w, http.StatusCreated, t)

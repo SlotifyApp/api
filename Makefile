@@ -7,15 +7,12 @@ db_shell:
 	# After 'make run', this will give you a shell to the mariadb
 	docker exec -it mariadb-container mariadb -u root -prootpassword slotify
 
-generate_api_docs:
-	# Generate API markdown documentation using openapi spec
-	docker run --rm  -v $(shell pwd):/local openapitools/openapi-generator-cli generate -i /local/shared/openapi/openapi.yaml -g markdown     -o /local/api_docs
-
 .PHONY: generate
 generate:
 	# Generate sqlc files
 	docker run --rm -v $(shell pwd):/src -w /src sqlc/sqlc generate
 	# Generate server Go code based on openapi spec
+	# Generate mocks
 	go generate ./... 
 	go mod tidy
 

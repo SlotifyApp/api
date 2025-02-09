@@ -1,3 +1,5 @@
+// Package jwt implements common jwt functions such as parsing for claims, generating
+// and storing jwt tokens.
 package jwt
 
 import (
@@ -17,10 +19,14 @@ import (
 )
 
 const (
+	// AccessTokenJWTSecretEnv stores the env key for access token.
 	AccessTokenJWTSecretEnv = "ACCESS_TOKEN_JWT_SECRET"
+	// RefreshTokenJWTSecretEnv stores the env key for refresh token.
 	//nolint: gosec //This doesn't leak anything, it's just the env var name
 	RefreshTokenJWTSecretEnv = "REFRESH_TOKEN_JWT_SECRET"
-	OneWeek                  = 7 * 24 * time.Hour
+
+	// OneWeek is a constant for representing 1 week as time.
+	OneWeek = 7 * 24 * time.Hour
 )
 
 var (
@@ -28,6 +34,7 @@ var (
 	ErrInvalidAuthHeader = errors.New("header Authorization is malformed")
 )
 
+// AccessAndRefreshTokens stores Slotify's granted access and refresh tokens.
 type AccessAndRefreshTokens struct {
 	AccessToken  string
 	RefreshToken string
@@ -108,8 +115,8 @@ func ParseJWT(tk string, keyEnv string) (CustomClaims, error) {
 	return CustomClaims{}, fmt.Errorf("failed to parse jwt, token valid: %t", token.Valid)
 }
 
-// getJWTFromRequest extracts a JWT string from an Authorization: Bearer <jwt> header.
-func getJWTFromRequest(req *http.Request) (string, error) {
+// getAccessTokenFromReq extracts the JWT access token from the request Authorization: Bearer <jwt> header.
+func getAccessTokenFromReq(req *http.Request) (string, error) {
 	authHdr := req.Header.Get("Authorization")
 	// Check for the Authorization header.
 	if authHdr == "" {
@@ -128,7 +135,7 @@ func getJWTFromRequest(req *http.Request) (string, error) {
 func GetUserIDFromReq(r *http.Request) (uint32, error) {
 	var err error
 	var accessToken string
-	if accessToken, err = getJWTFromRequest(r); err != nil {
+	if accessToken, err = getAccessTokenFromReq(r); err != nil {
 		return 0, fmt.Errorf("failed to getuserid from req: %w", err)
 	}
 	var claims CustomClaims

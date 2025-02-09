@@ -21,7 +21,7 @@ type Service interface {
 	DeleteUserConn(l *logger.Logger, userID uint32, w http.ResponseWriter)
 	RegisterUserClient(l *logger.Logger, userID uint32, w http.ResponseWriter) error
 	SendNotification(ctx context.Context, l *logger.Logger, db database.NotificationDatabase,
-		userID uint32, notif database.CreateNotificationParams) error
+		userIDs []uint32, notif database.CreateNotificationParams) error
 }
 
 // SSENotificationService is a Server-Side Events notification service impl.
@@ -87,53 +87,56 @@ func (sse *SSENotificationService) DeleteUserConn(logger *logger.Logger, userID 
 	delete(sse.conns[userID], w)
 }
 
-// SendNotification sends a notification to ALL clients of a user.
+// SendNotification sends a notification to ALL clients of some users.
 // The notification is also stored in the database regardless of whether the user has a client or not.
 func (sse *SSENotificationService) SendNotification(ctx context.Context, logger *logger.Logger,
-	db database.NotificationDatabase, userID uint32, notif database.CreateNotificationParams,
+	db database.NotificationDatabase, userIDs []uint32, notif database.CreateNotificationParams,
 ) error {
-	sse.mu.Lock()
-	clients := sse.conns[userID]
-
-	sse.mu.Unlock()
-
 	ctx, cancel := context.WithTimeout(ctx, time.Minute)
 	defer cancel()
 
-	storedNotif, err := database.StoreNotification(ctx, db, userID, notif)
+	// For all users, store this notification.
+	storedNotif, err := database.StoreNotification(ctx, db, userIDs, notif)
 	if err != nil {
 		return fmt.Errorf("failed to store notification for user: %w", err)
 	}
 
-	if clients == nil {
-		// No clients available for user so store the notification
-		logger.Infof("user id(%d) does not have a client", userID)
-		return nil
+	var notifJSON []byte
+	if notifJSON, err = json.Marshal(*storedNotif); err != nil {
+		return fmt.Errorf("failed to encode notification as json: %w", err)
 	}
 
-	logger.Infof("Sending notification: clients: %+v, len(clients): %d", clients, len(clients))
+	// for each user, get their clients and flush notification.
+	for _, userID := range userIDs {
+		sse.mu.Lock()
+		clients := sse.conns[userID]
 
-	for c := range clients {
-		logger.Info("attempting to flush to client")
-		if c == nil {
-			logger.Info("client was nil, attempting to delete")
-			sse.DeleteUserConn(logger, userID, c)
+		sse.mu.Unlock()
+
+		if clients == nil {
+			logger.Infof("user id(%d) does not have a client", userID)
+			// No clients available for user so go to next user
 			continue
 		}
-		var notifJSON []byte
-		if notifJSON, err = json.Marshal(*storedNotif); err != nil {
-			return fmt.Errorf("failed to encode notification as json: %w", err)
+
+		for c := range clients {
+			logger.Info("attempting to flush to client")
+			if c == nil {
+				logger.Warn("client was nil, attempting to delete")
+				sse.DeleteUserConn(logger, userID, c)
+				continue
+			}
+
+			fmt.Fprintf(c, "event: calendar_notification\n")
+			fmt.Fprintf(c, "data: %s\n\n", notifJSON)
+
+			f, ok := c.(http.Flusher)
+
+			if !ok {
+				return errors.New("client doesn't implement flusher interface")
+			}
+			f.Flush()
 		}
-
-		fmt.Fprintf(c, "event: calendar_notification\n")
-		fmt.Fprintf(c, "data: %s\n\n", notifJSON)
-
-		f, ok := c.(http.Flusher)
-
-		if !ok {
-			return errors.New("client doesn't implement flusher interface")
-		}
-		f.Flush()
 	}
 	return nil
 }

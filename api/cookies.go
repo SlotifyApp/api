@@ -10,7 +10,7 @@ const (
 	RefreshTokenCookieExpiryHours = 24 * 7 // 7 days
 )
 
-// and refresh_token HTTP-only cookies on the frontend.
+// RemoveCookies will expire and remove the access_token and refresh_token HTTP-only cookies on the frontend.
 func RemoveCookies(w http.ResponseWriter) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     "access_token",
@@ -31,6 +31,7 @@ func RemoveCookies(w http.ResponseWriter) {
 	})
 }
 
+// CreateCookies will set the access_token and refresh_token HTTP-only cookies on the frontend.
 func CreateCookies(w http.ResponseWriter, accessToken, refreshToken string) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     "access_token",

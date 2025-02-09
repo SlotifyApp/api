@@ -68,19 +68,13 @@ registering handlers among other things are automated.
 
 `/generate/oapi_codegen_cfg.yaml` defines our oapi-codegen config (eg. what Go server to use), to see everything that can be stated in this file see the oapi_codegen_cfg_schema.json
 
-Using OpenAPI means API documentation (routes, parameters, etc.) is generated for us, which can be done by doing:
-
-```bash
-make generate_api_docs
-```
-
-This will regenerate the API docs which can be found under api_docs/
-
 ```bash
 make generate
 ```
 
 This will generate API code based on our spec into a file named `api/server.gen.go`
+
+To view the SwaggerUI, look at the `website` repo and follow the instructions.
 
 ## OpenID Microsoft Flow and Slotify API protection
 

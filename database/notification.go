@@ -17,7 +17,7 @@ type NotificationDatabase interface {
 // StoreNotification creates a notification in the 'Notification' table, and
 // links it to a user via the 'UserToNotification' table.
 func StoreNotification(ctx context.Context, db NotificationDatabase,
-	userID uint32, notif CreateNotificationParams,
+	userIDs []uint32, notif CreateNotificationParams,
 ) (*Notification, error) {
 	notifID, err := db.CreateNotification(ctx, notif)
 	if err != nil {
@@ -31,27 +31,30 @@ func StoreNotification(ctx context.Context, db NotificationDatabase,
 		}
 	}
 
-	// Add to user table
-	dbParams := CreateUserNotificationParams{
-		UserID: userID,
-		//nolint: gosec // id is unsigned 32 bit int
-		NotificationID: uint32(notifID),
-	}
+	for _, userID := range userIDs {
+		// Add to user notification table
+		dbParams := CreateUserNotificationParams{
+			UserID: userID,
+			//nolint: gosec // id is unsigned 32 bit int
+			NotificationID: uint32(notifID),
+		}
 
-	rows, err := db.CreateUserNotification(ctx, dbParams)
+		var rows int64
+		rows, err = db.CreateUserNotification(ctx, dbParams)
 
-	if rows != 1 {
-		return nil, WrongNumberSQLRowsError{ActualRows: rows, ExpectedRows: []int64{1}}
-	}
+		if rows != 1 {
+			return nil, WrongNumberSQLRowsError{ActualRows: rows, ExpectedRows: []int64{1}}
+		}
 
-	if err != nil {
-		switch {
-		case errors.Is(err, context.Canceled):
-			return nil, fmt.Errorf("context cancelled during creating notif in UserToNotification table: %w", err)
-		case errors.Is(err, context.DeadlineExceeded):
-			return nil, fmt.Errorf("deadline exceeded during creating notif in UserToNotification table: %w", err)
-		default:
-			return nil, fmt.Errorf("failed to add notification to UserToNotification table: %w", err)
+		if err != nil {
+			switch {
+			case errors.Is(err, context.Canceled):
+				return nil, fmt.Errorf("context cancelled during creating notif in UserToNotification table: %w", err)
+			case errors.Is(err, context.DeadlineExceeded):
+				return nil, fmt.Errorf("deadline exceeded during creating notif in UserToNotification table: %w", err)
+			default:
+				return nil, fmt.Errorf("failed to add notification to UserToNotification table: %w", err)
+			}
 		}
 	}
 

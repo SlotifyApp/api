@@ -220,6 +220,41 @@ func (q *Queries) GetAllTeamMembers(ctx context.Context, id uint32) ([]GetAllTea
 	return items, nil
 }
 
+const getAllTeamMembersExcept = `-- name: GetAllTeamMembersExcept :many
+SELECT u.id FROM Team t
+JOIN UserToTeam utt ON t.id=utt.team_id
+JOIN User u ON u.id=utt.user_id 
+WHERE t.id=? AND u.id!=?
+`
+
+type GetAllTeamMembersExceptParams struct {
+	TeamID uint32 `json:"teamID"`
+	UserID uint32 `json:"userID"`
+}
+
+func (q *Queries) GetAllTeamMembersExcept(ctx context.Context, arg GetAllTeamMembersExceptParams) ([]uint32, error) {
+	rows, err := q.query(ctx, q.getAllTeamMembersExceptStmt, getAllTeamMembersExcept, arg.TeamID, arg.UserID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []uint32{}
+	for rows.Next() {
+		var id uint32
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getJoinableTeams = `-- name: GetJoinableTeams :many
 SELECT t.id, t.name FROM Team t
 LEFT JOIN UserToTeam utt ON

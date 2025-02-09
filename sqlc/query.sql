@@ -45,6 +45,12 @@ JOIN UserToTeam utt ON t.id=utt.team_id
 JOIN User u ON u.id=utt.user_id 
 WHERE t.id=?;
 
+-- name: GetAllTeamMembersExcept :many
+SELECT u.id FROM Team t
+JOIN UserToTeam utt ON t.id=utt.team_id
+JOIN User u ON u.id=utt.user_id 
+WHERE t.id=sqlc.arg('teamID') AND u.id!=sqlc.arg('userID');
+
 -- name: GetJoinableTeams :many
 SELECT t.* FROM Team t
 LEFT JOIN UserToTeam utt ON
