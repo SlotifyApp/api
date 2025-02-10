@@ -80,6 +80,12 @@ type CalendarEvent struct {
 	WebLink     *string              `json:"webLink,omitempty"`
 }
 
+// Group defines model for Group.
+type Group struct {
+	Id   uint32 `json:"id"`
+	Name string `json:"name"`
+}
+
 // Location defines model for Location.
 type Location struct {
 	Id       *string           `json:"id,omitempty"`
@@ -96,17 +102,6 @@ type Notification struct {
 	Created time.Time `json:"created"`
 	Id      uint32    `json:"id"`
 	Message string    `json:"message"`
-}
-
-// Team defines model for Team.
-type Team struct {
-	Id   uint32 `json:"id"`
-	Name string `json:"name"`
-}
-
-// TeamCreate defines model for TeamCreate.
-type TeamCreate struct {
-	Name string `json:"name"`
 }
 
 // User defines model for User.
@@ -136,9 +131,9 @@ type GetAPICalendarMeParams struct {
 	End   time.Time `form:"end" json:"end"`
 }
 
-// GetAPITeamsParams defines parameters for GetAPITeams.
-type GetAPITeamsParams struct {
-	// Name Team name
+// GetAPIGroupsParams defines parameters for GetAPIGroups.
+type GetAPIGroupsParams struct {
+	// Name Group name
 	Name *string `form:"name,omitempty" json:"name,omitempty"`
 }
 
@@ -156,9 +151,6 @@ type GetAPIUsersParams struct {
 
 // PostAPICalendarMeJSONRequestBody defines body for PostAPICalendarMe for application/json ContentType.
 type PostAPICalendarMeJSONRequestBody = CalendarEvent
-
-// PostAPITeamsJSONRequestBody defines body for PostAPITeams for application/json ContentType.
-type PostAPITeamsJSONRequestBody = TeamCreate
 
 // PostAPIUsersJSONRequestBody defines body for PostAPIUsers for application/json ContentType.
 type PostAPIUsersJSONRequestBody = UserCreate
@@ -180,6 +172,21 @@ type ServerInterface interface {
 	// Subscribe to notifications eventstream.
 	// (GET /api/events)
 	RenderEvent(w http.ResponseWriter, r *http.Request)
+	// Get a group by query params.
+	// (GET /api/groups)
+	GetAPIGroups(w http.ResponseWriter, r *http.Request, params GetAPIGroupsParams)
+	// Satisfy CORS preflight for creatinggroups.
+	// (OPTIONS /api/groups)
+	OptionsAPIGroups(w http.ResponseWriter, r *http.Request)
+	// Get all groups for current user.
+	// (GET /api/groups/me)
+	GetAPIgroupsMe(w http.ResponseWriter, r *http.Request)
+	// Get a group by id.
+	// (GET /api/groups/{groupID})
+	GetAPIGroupsGroupID(w http.ResponseWriter, r *http.Request, groupID uint32)
+	// Get all members of a group.
+	// (GET /api/groups/{groupID}/users)
+	GetAPIGroupsGroupIDUsers(w http.ResponseWriter, r *http.Request, groupID uint32)
 	// Healthcheck route.
 	// (GET /api/healthcheck)
 	GetAPIHealthcheck(w http.ResponseWriter, r *http.Request)
@@ -192,36 +199,6 @@ type ServerInterface interface {
 	// Refresh Slotify access token and refresh token.
 	// (POST /api/refresh)
 	PostAPIRefresh(w http.ResponseWriter, r *http.Request)
-	// Get a team by query params.
-	// (GET /api/teams)
-	GetAPITeams(w http.ResponseWriter, r *http.Request, params GetAPITeamsParams)
-	// Satisfy CORS preflight for creatingteams.
-	// (OPTIONS /api/teams)
-	OptionsAPITeams(w http.ResponseWriter, r *http.Request)
-	// Create a new team.
-	// (POST /api/teams)
-	PostAPITeams(w http.ResponseWriter, r *http.Request)
-	// Get all joinable teams for a user excluding teams they are already a part of.
-	// (GET /api/teams/joinable/me)
-	GetAPITeamsJoinableMe(w http.ResponseWriter, r *http.Request)
-	// Get all teams for current user.
-	// (GET /api/teams/me)
-	GetAPITeamsMe(w http.ResponseWriter, r *http.Request)
-	// Delete a team by id.
-	// (DELETE /api/teams/{teamID})
-	DeleteAPITeamsTeamID(w http.ResponseWriter, r *http.Request, teamID uint32)
-	// Get a team by id.
-	// (GET /api/teams/{teamID})
-	GetAPITeamsTeamID(w http.ResponseWriter, r *http.Request, teamID uint32)
-	// Get all members of a team.
-	// (GET /api/teams/{teamID}/users)
-	GetAPITeamsTeamIDUsers(w http.ResponseWriter, r *http.Request, teamID uint32)
-	// Add current user to a team.
-	// (POST /api/teams/{teamID}/users/me)
-	PostAPITeamsTeamIDUsersMe(w http.ResponseWriter, r *http.Request, teamID uint32)
-	// Add a user to a team.
-	// (POST /api/teams/{teamID}/users/{userID})
-	PostAPITeamsTeamIDUsersUserID(w http.ResponseWriter, r *http.Request, teamID uint32, userID uint32)
 	// Get users by query params.
 	// (GET /api/users)
 	GetAPIUsers(w http.ResponseWriter, r *http.Request, params GetAPIUsersParams)
@@ -394,6 +371,111 @@ func (siw *ServerInterfaceWrapper) RenderEvent(w http.ResponseWriter, r *http.Re
 	handler.ServeHTTP(w, r)
 }
 
+// GetAPIGroups operation middleware
+func (siw *ServerInterfaceWrapper) GetAPIGroups(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetAPIGroupsParams
+
+	// ------------- Optional query parameter "name" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "name", r.URL.Query(), &params.Name)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "name", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAPIGroups(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// OptionsAPIGroups operation middleware
+func (siw *ServerInterfaceWrapper) OptionsAPIGroups(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.OptionsAPIGroups(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAPIgroupsMe operation middleware
+func (siw *ServerInterfaceWrapper) GetAPIgroupsMe(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAPIgroupsMe(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAPIGroupsGroupID operation middleware
+func (siw *ServerInterfaceWrapper) GetAPIGroupsGroupID(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "groupID" -------------
+	var groupID uint32
+
+	err = runtime.BindStyledParameterWithOptions("simple", "groupID", mux.Vars(r)["groupID"], &groupID, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "groupID", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAPIGroupsGroupID(w, r, groupID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAPIGroupsGroupIDUsers operation middleware
+func (siw *ServerInterfaceWrapper) GetAPIGroupsGroupIDUsers(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "groupID" -------------
+	var groupID uint32
+
+	err = runtime.BindStyledParameterWithOptions("simple", "groupID", mux.Vars(r)["groupID"], &groupID, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "groupID", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAPIGroupsGroupIDUsers(w, r, groupID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetAPIHealthcheck operation middleware
 func (siw *ServerInterfaceWrapper) GetAPIHealthcheck(w http.ResponseWriter, r *http.Request) {
 
@@ -463,223 +545,6 @@ func (siw *ServerInterfaceWrapper) PostAPIRefresh(w http.ResponseWriter, r *http
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.PostAPIRefresh(w, r)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// GetAPITeams operation middleware
-func (siw *ServerInterfaceWrapper) GetAPITeams(w http.ResponseWriter, r *http.Request) {
-
-	var err error
-
-	// Parameter object where we will unmarshal all parameters from the context
-	var params GetAPITeamsParams
-
-	// ------------- Optional query parameter "name" -------------
-
-	err = runtime.BindQueryParameter("form", true, false, "name", r.URL.Query(), &params.Name)
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "name", Err: err})
-		return
-	}
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetAPITeams(w, r, params)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// OptionsAPITeams operation middleware
-func (siw *ServerInterfaceWrapper) OptionsAPITeams(w http.ResponseWriter, r *http.Request) {
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.OptionsAPITeams(w, r)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// PostAPITeams operation middleware
-func (siw *ServerInterfaceWrapper) PostAPITeams(w http.ResponseWriter, r *http.Request) {
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.PostAPITeams(w, r)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// GetAPITeamsJoinableMe operation middleware
-func (siw *ServerInterfaceWrapper) GetAPITeamsJoinableMe(w http.ResponseWriter, r *http.Request) {
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetAPITeamsJoinableMe(w, r)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// GetAPITeamsMe operation middleware
-func (siw *ServerInterfaceWrapper) GetAPITeamsMe(w http.ResponseWriter, r *http.Request) {
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetAPITeamsMe(w, r)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// DeleteAPITeamsTeamID operation middleware
-func (siw *ServerInterfaceWrapper) DeleteAPITeamsTeamID(w http.ResponseWriter, r *http.Request) {
-
-	var err error
-
-	// ------------- Path parameter "teamID" -------------
-	var teamID uint32
-
-	err = runtime.BindStyledParameterWithOptions("simple", "teamID", mux.Vars(r)["teamID"], &teamID, runtime.BindStyledParameterOptions{Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "teamID", Err: err})
-		return
-	}
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.DeleteAPITeamsTeamID(w, r, teamID)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// GetAPITeamsTeamID operation middleware
-func (siw *ServerInterfaceWrapper) GetAPITeamsTeamID(w http.ResponseWriter, r *http.Request) {
-
-	var err error
-
-	// ------------- Path parameter "teamID" -------------
-	var teamID uint32
-
-	err = runtime.BindStyledParameterWithOptions("simple", "teamID", mux.Vars(r)["teamID"], &teamID, runtime.BindStyledParameterOptions{Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "teamID", Err: err})
-		return
-	}
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetAPITeamsTeamID(w, r, teamID)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// GetAPITeamsTeamIDUsers operation middleware
-func (siw *ServerInterfaceWrapper) GetAPITeamsTeamIDUsers(w http.ResponseWriter, r *http.Request) {
-
-	var err error
-
-	// ------------- Path parameter "teamID" -------------
-	var teamID uint32
-
-	err = runtime.BindStyledParameterWithOptions("simple", "teamID", mux.Vars(r)["teamID"], &teamID, runtime.BindStyledParameterOptions{Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "teamID", Err: err})
-		return
-	}
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetAPITeamsTeamIDUsers(w, r, teamID)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// PostAPITeamsTeamIDUsersMe operation middleware
-func (siw *ServerInterfaceWrapper) PostAPITeamsTeamIDUsersMe(w http.ResponseWriter, r *http.Request) {
-
-	var err error
-
-	// ------------- Path parameter "teamID" -------------
-	var teamID uint32
-
-	err = runtime.BindStyledParameterWithOptions("simple", "teamID", mux.Vars(r)["teamID"], &teamID, runtime.BindStyledParameterOptions{Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "teamID", Err: err})
-		return
-	}
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.PostAPITeamsTeamIDUsersMe(w, r, teamID)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// PostAPITeamsTeamIDUsersUserID operation middleware
-func (siw *ServerInterfaceWrapper) PostAPITeamsTeamIDUsersUserID(w http.ResponseWriter, r *http.Request) {
-
-	var err error
-
-	// ------------- Path parameter "teamID" -------------
-	var teamID uint32
-
-	err = runtime.BindStyledParameterWithOptions("simple", "teamID", mux.Vars(r)["teamID"], &teamID, runtime.BindStyledParameterOptions{Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "teamID", Err: err})
-		return
-	}
-
-	// ------------- Path parameter "userID" -------------
-	var userID uint32
-
-	err = runtime.BindStyledParameterWithOptions("simple", "userID", mux.Vars(r)["userID"], &userID, runtime.BindStyledParameterOptions{Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "userID", Err: err})
-		return
-	}
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.PostAPITeamsTeamIDUsersUserID(w, r, teamID, userID)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -961,6 +826,16 @@ func HandlerWithOptions(si ServerInterface, options GorillaServerOptions) http.H
 
 	r.HandleFunc(options.BaseURL+"/api/events", wrapper.RenderEvent).Methods("GET")
 
+	r.HandleFunc(options.BaseURL+"/api/groups", wrapper.GetAPIGroups).Methods("GET")
+
+	r.HandleFunc(options.BaseURL+"/api/groups", wrapper.OptionsAPIGroups).Methods("OPTIONS")
+
+	r.HandleFunc(options.BaseURL+"/api/groups/me", wrapper.GetAPIgroupsMe).Methods("GET")
+
+	r.HandleFunc(options.BaseURL+"/api/groups/{groupID}", wrapper.GetAPIGroupsGroupID).Methods("GET")
+
+	r.HandleFunc(options.BaseURL+"/api/groups/{groupID}/users", wrapper.GetAPIGroupsGroupIDUsers).Methods("GET")
+
 	r.HandleFunc(options.BaseURL+"/api/healthcheck", wrapper.GetAPIHealthcheck).Methods("GET")
 
 	r.HandleFunc(options.BaseURL+"/api/notifications/{notificationID}/read", wrapper.OptionsAPINotificationsNotificationIDRead).Methods("OPTIONS")
@@ -968,26 +843,6 @@ func HandlerWithOptions(si ServerInterface, options GorillaServerOptions) http.H
 	r.HandleFunc(options.BaseURL+"/api/notifications/{notificationID}/read", wrapper.PatchAPINotificationsNotificationIDRead).Methods("PATCH")
 
 	r.HandleFunc(options.BaseURL+"/api/refresh", wrapper.PostAPIRefresh).Methods("POST")
-
-	r.HandleFunc(options.BaseURL+"/api/teams", wrapper.GetAPITeams).Methods("GET")
-
-	r.HandleFunc(options.BaseURL+"/api/teams", wrapper.OptionsAPITeams).Methods("OPTIONS")
-
-	r.HandleFunc(options.BaseURL+"/api/teams", wrapper.PostAPITeams).Methods("POST")
-
-	r.HandleFunc(options.BaseURL+"/api/teams/joinable/me", wrapper.GetAPITeamsJoinableMe).Methods("GET")
-
-	r.HandleFunc(options.BaseURL+"/api/teams/me", wrapper.GetAPITeamsMe).Methods("GET")
-
-	r.HandleFunc(options.BaseURL+"/api/teams/{teamID}", wrapper.DeleteAPITeamsTeamID).Methods("DELETE")
-
-	r.HandleFunc(options.BaseURL+"/api/teams/{teamID}", wrapper.GetAPITeamsTeamID).Methods("GET")
-
-	r.HandleFunc(options.BaseURL+"/api/teams/{teamID}/users", wrapper.GetAPITeamsTeamIDUsers).Methods("GET")
-
-	r.HandleFunc(options.BaseURL+"/api/teams/{teamID}/users/me", wrapper.PostAPITeamsTeamIDUsersMe).Methods("POST")
-
-	r.HandleFunc(options.BaseURL+"/api/teams/{teamID}/users/{userID}", wrapper.PostAPITeamsTeamIDUsersUserID).Methods("POST")
 
 	r.HandleFunc(options.BaseURL+"/api/users", wrapper.GetAPIUsers).Methods("GET")
 
@@ -1009,50 +864,47 @@ func HandlerWithOptions(si ServerInterface, options GorillaServerOptions) http.H
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"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",
-	"/H3391169+3ufwEAAP//JrB+yg1AAAA=",
+	"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",
+	"AA==",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file

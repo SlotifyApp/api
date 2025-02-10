@@ -35,29 +35,6 @@ func GetCount(t *testing.T, db *sql.DB, table string) int {
 	return count
 }
 
-// GetTeamRows.
-func GetTeamRows(t *testing.T, db *sql.DB) api.Teams {
-	rows, err := db.Query("SELECT * FROM Team")
-	require.NoError(t, err, "unable to form query")
-	defer func() {
-		err = rows.Close()
-		require.NoError(t, err, "unable to close rows")
-	}()
-
-	var teams api.Teams
-	for rows.Next() {
-		var team api.Team
-		err = rows.Scan(&team.Id, &team.Name)
-		require.NoError(t, err, "unable to scan rows")
-		teams = append(teams, team)
-	}
-
-	err = rows.Err()
-	require.NoError(t, err, "sql rows error")
-
-	return teams
-}
-
 // GetNextAutoIncrementValue gets the next auto increment value for a table,
 // this is different to just getting count.
 func GetNextAutoIncrementValue(t *testing.T, db *sql.DB, tableName string) int {
@@ -73,36 +50,6 @@ func GetNextAutoIncrementValue(t *testing.T, db *sql.DB, tableName string) int {
 	err := db.QueryRow(query, dbName, tableName).Scan(&nextAutoIncrement)
 	require.NoError(t, err, "scanning row fails")
 	return nextAutoIncrement
-}
-
-func AddUserToTeam(t *testing.T, db *sql.DB, userID uint32, teamID uint32) {
-	res, err := db.Exec("INSERT INTO UserToTeam (user_id, team_id) VALUES (?, ?)", userID, teamID)
-	require.NoError(t, err, "failed to execute sql query to add user to team")
-
-	rows, err := res.RowsAffected()
-	require.NoError(t, err, "failed to get the number of rows affected")
-
-	require.Equal(t, int64(1), rows, "rows returned is not correct")
-}
-
-func InsertTeam(t *testing.T, db *sql.DB) api.Team {
-	name := gofakeit.ProductName()
-
-	res, err := db.Exec("INSERT INTO Team (name) VALUES (?)", name)
-	require.NoError(t, err, "db insert team failed")
-
-	rows, err := res.RowsAffected()
-	require.Equal(t, int64(1), rows, "rows affected after insert is 1")
-	require.NoError(t, err, "failed to get rows affected")
-
-	id, err := res.LastInsertId()
-	require.NoError(t, err, "failed to get last insert id")
-
-	return api.Team{
-		//nolint: gosec // id is unsigned 32 bit int
-		Id:   uint32(id),
-		Name: name,
-	}
 }
 
 type options struct {
