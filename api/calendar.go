@@ -5,18 +5,155 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/avast/retry-go"
 	msgraphsdkgo "github.com/microsoftgraph/msgraph-sdk-go"
-	"github.com/microsoftgraph/msgraph-sdk-go/models"
 	graphusers "github.com/microsoftgraph/msgraph-sdk-go/users"
 
 	openapi_types "github.com/oapi-codegen/runtime/types"
+
+	"github.com/google/uuid"
+
+	graphmodels "github.com/microsoftgraph/msgraph-sdk-go/models"
 )
+
+// parseMSFTAttendees filters out attributes of MSFT attendees.
+// see openapi spec to find docs about this.
+func parseMSFTAttendees(e graphmodels.Eventable) []Attendee {
+	msftAttendees := e.GetAttendees()
+	var attendees []Attendee
+	// Go through MSFT attendees and parse information we need
+	for _, a := range msftAttendees {
+		var email openapi_types.Email
+		emailStr := a.GetEmailAddress().GetAddress()
+		if a.GetEmailAddress() != nil && a.GetEmailAddress().GetAddress() != nil {
+			email = openapi_types.Email(*emailStr)
+		}
+
+		var responseStatus AttendeeResponseStatus
+		if e.GetResponseStatus() != nil && e.GetResponseStatus().GetResponse() != nil {
+			responseStatus = AttendeeResponseStatus(e.GetResponseStatus().GetResponse().String())
+		}
+
+		var attendeeType AttendeeType
+		if e.GetTypeEscaped() != nil {
+			attendeeType = AttendeeType(e.GetTypeEscaped().String())
+		}
+
+		attendee := Attendee{
+			Email:          &email,
+			ResponseStatus: &responseStatus,
+			Type:           &attendeeType,
+		}
+		attendees = append(attendees, attendee)
+	}
+	return attendees
+}
+
+// parseMSFTLocations filters out attributes of MSFT locations.
+// see openapi spec to find docs about this.
+func parseMSFTLocations(e graphmodels.Eventable) []Location {
+	msftLocations := e.GetLocations()
+	var locations []Location
+	for _, l := range msftLocations {
+		var roomType LocationRoomType
+		if l.GetLocationType() != nil {
+			roomType = LocationRoomType(l.GetLocationType().String())
+		}
+
+		var street *string
+		if l.GetAddress() != nil {
+			street = l.GetAddress().GetStreet()
+		}
+
+		parsedLoc := Location{
+			Id:       l.GetUniqueId(),
+			Name:     l.GetDisplayName(),
+			Street:   street,
+			RoomType: &roomType,
+		}
+
+		locations = append(locations, parsedLoc)
+	}
+	return locations
+}
+
+// parseCalendarEventToMSFTEvent parses CalendarEvent to create a MSFT Event.
+func parseCalendarEventToMSFTEvent(eventRequest CalendarEvent) *graphmodels.Event {
+	event := graphmodels.NewEvent()
+	event.SetSubject(eventRequest.Subject)
+
+	contentType := graphmodels.HTML_BODYTYPE
+	body := graphmodels.NewItemBody()
+	body.SetContentType(&contentType)
+	body.SetContent(eventRequest.Body)
+	event.SetBody(body)
+
+	timeZone := "UTC"
+
+	start := graphmodels.NewDateTimeTimeZone()
+	start.SetDateTime(eventRequest.StartTime)
+	start.SetTimeZone(&timeZone)
+	event.SetStart(start)
+
+	end := graphmodels.NewDateTimeTimeZone()
+	end.SetDateTime(eventRequest.EndTime)
+	end.SetTimeZone(&timeZone)
+	event.SetEnd(end)
+
+	// is location required and roomtype is not a property of location in graph
+	var location *graphmodels.Location
+	if eventRequest.Locations != nil && len(*eventRequest.Locations) > 0 {
+		location.SetDisplayName((*eventRequest.Locations)[0].Name)
+	}
+
+	var attendees []graphmodels.Attendeeable
+	if eventRequest.Attendees != nil {
+		for _, inviteAttendee := range *eventRequest.Attendees {
+			var email *graphmodels.EmailAddress
+			if inviteAttendee.Email != nil {
+				email = graphmodels.NewEmailAddress()
+				email.SetAddress((*string)(inviteAttendee.Email))
+			}
+
+			attendee := graphmodels.NewAttendee()
+			attendee.SetEmailAddress(email)
+
+			var attendeeType graphmodels.AttendeeType
+			if inviteAttendee.Type != nil {
+				switch *inviteAttendee.Type {
+				case Required:
+					attendeeType = graphmodels.REQUIRED_ATTENDEETYPE
+				case Optional:
+					attendeeType = graphmodels.OPTIONAL_ATTENDEETYPE
+				case Resource:
+					attendeeType = graphmodels.RESOURCE_ATTENDEETYPE
+				default:
+					attendeeType = graphmodels.REQUIRED_ATTENDEETYPE
+				}
+			}
+			attendee.SetTypeEscaped(&attendeeType)
+
+			// response status?
+			responseStatus := graphmodels.NewResponseStatus()
+			response := graphmodels.NOTRESPONDED_RESPONSETYPE
+			responseStatus.SetResponse(&response)
+			attendees = append(attendees, attendee)
+		}
+	}
+
+	event.SetAttendees(attendees)
+
+	transactionID := uuid.New().String()
+	event.SetTransactionId(&transactionID)
+
+	return event
+}
 
 // parseEventableResp takes in MSFT's version of events and parses them to extract needed attributes.
 // See [MSFT Event Properties] for all of the MSFT event properties.
 //
 // [MSFT Event Properties]: https://learn.microsoft.com/en-us/graph/api/resources/event?view=graph-rest-1.0#properties
-func parseEventableResp(events []models.Eventable) []CalendarEvent {
+func parseEventableResp(events []graphmodels.Eventable) []CalendarEvent {
 	calendarEvents := []CalendarEvent{}
 	for _, e := range events {
 		// Returned interfaces can be nil
@@ -86,9 +223,18 @@ func makeCalendarMeAPICall(graph *msgraphsdkgo.GraphServiceClient, startTime,
 	}
 
 	// Make actual API request.
-	events, err := graph.Me().Calendar().CalendarView().Get(context.Background(), configuration)
-	if err != nil || events == nil {
-		return nil, fmt.Errorf("failed to make graph client call: %w", err)
+
+	var events graphmodels.EventCollectionResponseable
+	var err error
+	err = retry.Do(func() error {
+		events, err = graph.Me().Calendar().CalendarView().Get(context.Background(), configuration)
+		if err != nil || events == nil {
+			return fmt.Errorf("failed to make graph client call: %w", err)
+		}
+		return nil
+	}, retry.Attempts(3), retry.Delay(time.Millisecond*500))
+	if err != nil {
+		return nil, fmt.Errorf("failed msft create event after 3 retries: %w", err)
 	}
 
 	// Filter out attributes that we want.
