@@ -23,6 +23,10 @@ func main() {
 
 	ctx := context.Background()
 
+	// Clear out the servers array in the swagger spec, that skips validating
+	// that server names match.
+	swagger.Servers = nil
+
 	db, err := database.NewDatabaseWithContext(ctx)
 	if err != nil {
 		log.Fatalf("error creating db: %s", err.Error())
