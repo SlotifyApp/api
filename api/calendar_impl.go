@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/SlotifyApp/slotify-backend/database"
 	"go.uber.org/zap"
 )
 
@@ -73,6 +74,18 @@ func (s Server) PostAPICalendarMe(w http.ResponseWriter, r *http.Request) {
 		s.Logger.Error("failed to create calendar event", zap.Error(err))
 		sendError(w, http.StatusBadGateway, "Failed to create event")
 		return
+	}
+
+	// if success, send through notifications
+	// TODO: send separate notification for other participants, saying a meeting has been added
+	notif := database.CreateNotificationParams{
+		Message: "Created meeting!",
+		Created: time.Now(),
+	}
+	err = s.NotificationService.SendNotification(ctx, s.Logger, s.DB, []uint32{userID}, notif)
+	if err != nil {
+		// dont send http error because the actual op succeeded
+		s.Logger.Error("failed to send notification", zap.Error(err))
 	}
 
 	SetHeaderAndWriteResponse(w, http.StatusCreated, events)
