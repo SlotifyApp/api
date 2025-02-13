@@ -18,7 +18,7 @@ generate:
 
 lint:
 	# Run Golangci-lint for Go linting
-	docker run -t --rm -v $(shell pwd):/app -w /app golangci/golangci-lint:v1.63.4 golangci-lint run -v --fix ./...
+	docker run -t --rm -v $(shell pwd):/app -w /app golangci/golangci-lint:v1.64.5 golangci-lint run -v --fix ./...
 
 run:
 	# First docker compose down, some data can be persisted in the db

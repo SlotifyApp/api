@@ -2,7 +2,6 @@ package api_test
 
 import (
 	"bytes"
-	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -24,7 +23,7 @@ func TestUser_GetUsersUserID(t *testing.T) {
 	t.Parallel()
 
 	var err error
-	database, server := testutil.NewServerAndDB(t, context.Background())
+	database, server := testutil.NewServerAndDB(t, t.Context())
 	db := database.DB
 	t.Cleanup(func() {
 		testutil.CloseDB(db)
@@ -83,7 +82,7 @@ func TestUser_GetUsersUserID(t *testing.T) {
 func TestUser_PostUsers(t *testing.T) {
 	t.Parallel()
 
-	database, server := testutil.NewServerAndDB(t, context.Background())
+	database, server := testutil.NewServerAndDB(t, t.Context())
 	db := database.DB
 	t.Cleanup(func() {
 		testutil.CloseDB(db)
@@ -162,7 +161,7 @@ func TestUser_PostUsers(t *testing.T) {
 
 func TestUser_GetUsers(t *testing.T) {
 	var err error
-	database, server := testutil.NewServerAndDB(t, context.Background())
+	database, server := testutil.NewServerAndDB(t, t.Context())
 	db := database.DB
 	t.Cleanup(func() {
 		testutil.CloseDB(db)
@@ -278,7 +277,7 @@ func TestUser_DeleteUsersUserID(t *testing.T) {
 	t.Parallel()
 
 	var err error
-	database, server := testutil.NewServerAndDB(t, context.Background())
+	database, server := testutil.NewServerAndDB(t, t.Context())
 	db := database.DB
 	t.Cleanup(func() {
 		testutil.CloseDB(db)
