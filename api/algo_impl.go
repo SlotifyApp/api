@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/SlotifyApp/slotify-backend/jwt"
 	"github.com/SlotifyApp/slotify-backend/scheduling"
 	"github.com/microsoftgraph/msgraph-sdk-go/models"
 	"go.uber.org/zap"
@@ -15,6 +14,9 @@ import (
 // (POST /api/algo).
 // nolint: funlen, gocognit // Decrease function length
 func (s Server) PostAPIAlgo(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Minute)
+	defer cancel()
+
 	var teamBody PostAPIAlgoJSONRequestBody
 	var err error
 
@@ -25,22 +27,14 @@ func (s Server) PostAPIAlgo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Create Microsft Graph ClientS
-	userID, err := jwt.GetUserIDFromReq(r)
-	if err != nil {
-		s.Logger.Error("failed to get userid from request access token")
+	userID, ok := r.Context().Value(UserIDCtxKey{}).(uint32)
+	if !ok {
+		s.Logger.Error("failed to get userid from request context")
 		sendError(w, http.StatusUnauthorized, "Try again later.")
 		return
 	}
 
-	at, err := getMSFTAccessToken(context.Background(), s.MSALClient, s.DB, userID)
-	if err != nil {
-		s.Logger.Error("failed to get microsoft access token", zap.Error(err))
-		sendError(w, http.StatusUnauthorized, "Try again later.")
-		return
-	}
-
-	graph, err := createMSFTGraphClient(at)
+	graph, err := CreateMSFTGraphClient(ctx, s.MSALClient, s.DB, userID)
 
 	if err != nil || graph == nil {
 		s.Logger.Error("failed to create msft graph client", zap.Error(err))
