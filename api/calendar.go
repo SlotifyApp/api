@@ -24,19 +24,19 @@ func parseMSFTAttendees(e graphmodels.Eventable) []Attendee {
 	// Go through MSFT attendees and parse information we need
 	for _, a := range msftAttendees {
 		var email openapi_types.Email
-		emailStr := a.GetEmailAddress().GetAddress()
 		if a.GetEmailAddress() != nil && a.GetEmailAddress().GetAddress() != nil {
+			emailStr := a.GetEmailAddress().GetAddress()
 			email = openapi_types.Email(*emailStr)
 		}
 
 		var responseStatus AttendeeResponseStatus
-		if e.GetResponseStatus() != nil && e.GetResponseStatus().GetResponse() != nil {
-			responseStatus = AttendeeResponseStatus(e.GetResponseStatus().GetResponse().String())
+		if a.GetStatus() != nil && a.GetStatus().GetResponse() != nil {
+			responseStatus = AttendeeResponseStatus(a.GetStatus().GetResponse().String())
 		}
 
 		var attendeeType AttendeeType
-		if e.GetTypeEscaped() != nil {
-			attendeeType = AttendeeType(e.GetTypeEscaped().String())
+		if a.GetTypeEscaped() != nil {
+			attendeeType = AttendeeType(a.GetTypeEscaped().String())
 		}
 
 		attendee := Attendee{
