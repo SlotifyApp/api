@@ -11,17 +11,21 @@ import (
 	"go.uber.org/zap"
 )
 
-// (POST /api/algo).
+const (
+	startWorkingTime = 8
+	endWorkingTime   = 17
+	workingHours     = endWorkingTime - startWorkingTime
+)
+
+// (POST /api/scheduling/free)
 // nolint: funlen, gocognit // Decrease function length
-func (s Server) PostAPIAlgo(w http.ResponseWriter, r *http.Request) {
+func (s Server) PostAPISchedulingFree(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Minute)
 	defer cancel()
 
-	var teamBody PostAPIAlgoJSONRequestBody
-	var err error
+	var schedulingBody PostAPISchedulingFreeJSONRequestBody
 
-	// Parse request body for errors
-	if err = json.NewDecoder(r.Body).Decode(&teamBody); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&schedulingBody); err != nil {
 		s.Logger.Error(ErrUnmarshalBody, zap.Error(err))
 		sendError(w, http.StatusBadRequest, ErrUnmarshalBody.Error())
 		return
@@ -42,21 +46,20 @@ func (s Server) PostAPIAlgo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	//	Get all user's meeting data
+	// Get all user's meeting data
 	type UserEvents struct {
 		userID string
 		events map[string][]scheduling.Event
 	}
 
 	userEvents := []UserEvents{}
-	participants := *teamBody.Participants // array of emails
 
-	for _, participantEmail := range participants {
+	for _, participantEmail := range schedulingBody.Participants {
 		// Get Participant's calendar events, (sort by date in the future)
 		temp := string(participantEmail)
 
 		var events models.EventCollectionResponseable
-		events, err = graph.Users().ByUserId(temp).Calendar().Events().Get(context.Background(), nil)
+		events, err = graph.Users().ByUserId(temp).Calendar().Events().Get(ctx, nil)
 		if err != nil {
 			s.Logger.Error("failed to call graph client route", zap.Error(err))
 			sendError(w, http.StatusInternalServerError, "failed to call graph client route")
@@ -80,10 +83,6 @@ func (s Server) PostAPIAlgo(w http.ResponseWriter, r *http.Request) {
 
 	//	for each user, calculate free slots
 	currSlots := make(map[string][]scheduling.Slot)
-
-	const startWorkingTime = 8
-	const endWorkingTime = 17
-	const workingHours = endWorkingTime - startWorkingTime
 
 	for _, users := range userEvents {
 		// Assume that users.events is sorted by date
@@ -152,7 +151,7 @@ func (s Server) PostAPIAlgo(w http.ResponseWriter, r *http.Request) {
 
 		// For eachslot, check if it can fit the new event
 		for _, eachSlot := range slots {
-			if int(eachSlot.EndDateTime.Sub(eachSlot.StartDateTime)) >= *teamBody.EventDuration {
+			if eachSlot.EndDateTime.Sub(eachSlot.StartDateTime).Minutes() >= float64(schedulingBody.EventDuration) {
 				// Check if slot is in currSlotsWithConflicts
 				finalSlots = append(finalSlots, eachSlot)
 			}
