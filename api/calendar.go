@@ -21,6 +21,8 @@ import (
 func parseMSFTAttendees(e graphmodels.Eventable) []Attendee {
 	msftAttendees := e.GetAttendees()
 	var attendees []Attendee
+	attendees = make([]Attendee, 0)
+
 	// Go through MSFT attendees and parse information we need
 	for _, a := range msftAttendees {
 		var email openapi_types.Email
@@ -54,6 +56,8 @@ func parseMSFTAttendees(e graphmodels.Eventable) []Attendee {
 func parseMSFTLocations(e graphmodels.Eventable) []Location {
 	msftLocations := e.GetLocations()
 	var locations []Location
+	locations = make([]Location, 0)
+
 	for _, l := range msftLocations {
 		var roomType LocationRoomType
 		if l.GetLocationType() != nil {
@@ -102,13 +106,13 @@ func parseCalendarEventToMSFTEvent(eventRequest CalendarEvent) *graphmodels.Even
 
 	// is location required and roomtype is not a property of location in graph
 	var location *graphmodels.Location
-	if eventRequest.Locations != nil && len(*eventRequest.Locations) > 0 {
-		location.SetDisplayName((*eventRequest.Locations)[0].Name)
+	if len(eventRequest.Locations) > 0 {
+		location.SetDisplayName(eventRequest.Locations[0].Name)
 	}
 
 	var attendees []graphmodels.Attendeeable
 	if eventRequest.Attendees != nil {
-		for _, inviteAttendee := range *eventRequest.Attendees {
+		for _, inviteAttendee := range eventRequest.Attendees {
 			var email *graphmodels.EmailAddress
 			if inviteAttendee.Email != nil {
 				email = graphmodels.NewEmailAddress()
@@ -179,14 +183,14 @@ func parseEventableResp(events []graphmodels.Eventable) []CalendarEvent {
 		}
 
 		ce := CalendarEvent{
-			Attendees:   &attendees,
+			Attendees:   attendees,
 			Body:        e.GetBodyPreview(),
 			Created:     e.GetCreatedDateTime(),
 			EndTime:     endTime,
 			Id:          e.GetId(),
 			IsCancelled: e.GetIsCancelled(),
 			JoinURL:     joinURL,
-			Locations:   &locations,
+			Locations:   locations,
 			Organizer:   (*openapi_types.Email)(e.GetOrganizer().GetEmailAddress().GetAddress()),
 			StartTime:   startTime,
 			Subject:     e.GetSubject(),
