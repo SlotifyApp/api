@@ -12,10 +12,8 @@ import (
 	"go.uber.org/zap"
 )
 
-// Get a group by query params.
-// (GET /api/groups)
+// (GET /api/groups).
 func (s Server) GetAPIGroups(w http.ResponseWriter, r *http.Request, params GetAPIGroupsParams) {
-
 	ctx, cancel := context.WithTimeout(r.Context(), database.DatabaseTimeout)
 	defer cancel()
 
@@ -34,7 +32,7 @@ func (s Server) GetAPIGroups(w http.ResponseWriter, r *http.Request, params GetA
 		return
 	}
 
-	filter := fmt.Sprintf("displayName eq '%s'", params.Name)
+	filter := fmt.Sprintf("displayName eq '%s'", *params.Name)
 	configuration := &graphgroups.GroupsRequestBuilderGetRequestConfiguration{
 		QueryParameters: &graphgroups.GroupsRequestBuilderGetQueryParameters{
 			Filter: &filter,
@@ -54,14 +52,8 @@ func (s Server) GetAPIGroups(w http.ResponseWriter, r *http.Request, params GetA
 		return
 	}
 
-	groupable, ok := gets.GetValue()[0].(models.Groupable)
-	if !ok {
-		s.Logger.Error("failed to cast to groupable")
-		sendError(w, http.StatusInternalServerError, "Failed to cast to groupable")
-		return
-	}
-
-	group, err := GroupableToGroup(groupable)
+	// uses the first group
+	group, err := GroupableToGroup(gets.GetValue()[0])
 	if err != nil {
 		s.Logger.Error("error converting groupable")
 		sendError(w, http.StatusInternalServerError, "Failed to convert groupable")
@@ -71,10 +63,8 @@ func (s Server) GetAPIGroups(w http.ResponseWriter, r *http.Request, params GetA
 	SetHeaderAndWriteResponse(w, http.StatusOK, group)
 }
 
-// Get all groups for current user.
-// (GET /api/groups/me)
+// (GET /api/groups/me).
 func (s Server) GetAPIGroupsMe(w http.ResponseWriter, r *http.Request) {
-
 	ctx, cancel := context.WithTimeout(r.Context(), database.DatabaseTimeout)
 	defer cancel()
 
@@ -106,8 +96,10 @@ func (s Server) GetAPIGroupsMe(w http.ResponseWriter, r *http.Request) {
 
 	if gets.GetValue() != nil {
 		for _, dirs := range gets.GetValue() {
-			if grp, ok := dirs.(models.Groupable); ok {
-				group, err := GroupableToGroup(grp)
+			var grp models.Groupable
+			if grp, ok = dirs.(models.Groupable); ok {
+				var group Group
+				group, err = GroupableToGroup(grp)
 				if err != nil {
 					s.Logger.Error("failed to convert groupable to group")
 					sendError(w, http.StatusInternalServerError, "Failed to convert groupable to groups")
@@ -119,13 +111,10 @@ func (s Server) GetAPIGroupsMe(w http.ResponseWriter, r *http.Request) {
 	}
 
 	SetHeaderAndWriteResponse(w, http.StatusOK, groups)
-
 }
 
-// Get a group by id.
-// (GET /api/groups/{groupID})
+// (GET /api/groups/{groupID}).
 func (s Server) GetAPIGroupsGroupID(w http.ResponseWriter, r *http.Request, groupID uint32) {
-
 	ctx, cancel := context.WithTimeout(r.Context(), database.DatabaseTimeout)
 	defer cancel()
 
@@ -171,10 +160,8 @@ func (s Server) GetAPIGroupsGroupID(w http.ResponseWriter, r *http.Request, grou
 	SetHeaderAndWriteResponse(w, http.StatusOK, group)
 }
 
-// Get all members of a group.
-// (GET /api/groups/{groupID}/users)
+// (GET /api/groups/{groupID}/users).
 func (s Server) GetAPIGroupsGroupIDUsers(w http.ResponseWriter, r *http.Request, groupID uint32) {
-
 	ctx, cancel := context.WithTimeout(r.Context(), database.DatabaseTimeout)
 	defer cancel()
 
@@ -206,8 +193,10 @@ func (s Server) GetAPIGroupsGroupIDUsers(w http.ResponseWriter, r *http.Request,
 
 	if groupable.GetValue() != nil {
 		for _, dirs := range groupable.GetValue() {
-			if usr, ok := dirs.(models.Userable); ok {
-				user, err := UserableToUser(usr)
+			var usr models.Userable
+			if usr, ok = dirs.(models.Userable); ok {
+				var user User
+				user, err = UserableToUser(usr)
 				if err != nil {
 					s.Logger.Error("failed to convert userable to user")
 					sendError(w, http.StatusInternalServerError, "Failed to convert userable to user")
