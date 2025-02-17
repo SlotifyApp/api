@@ -2,10 +2,12 @@ package api
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"strconv"
 
 	"github.com/SlotifyApp/slotify-backend/database"
+	graphgroups "github.com/microsoftgraph/msgraph-sdk-go/groups"
 	"github.com/microsoftgraph/msgraph-sdk-go/models"
 	"go.uber.org/zap"
 )
@@ -13,8 +15,60 @@ import (
 // Get a group by query params.
 // (GET /api/groups)
 func (s Server) GetAPIGroups(w http.ResponseWriter, r *http.Request, params GetAPIGroupsParams) {
-	return
 
+	ctx, cancel := context.WithTimeout(r.Context(), database.DatabaseTimeout)
+	defer cancel()
+
+	// Get userID from request
+	userID, ok := r.Context().Value(UserIDCtxKey{}).(uint32)
+	if !ok {
+		s.Logger.Error("failed to get userid from request context")
+		sendError(w, http.StatusUnauthorized, "Try again later.")
+		return
+	}
+
+	graph, err := CreateMSFTGraphClient(ctx, s.MSALClient, s.DB, userID)
+	if err != nil {
+		s.Logger.Error("failed to create msgraph client", zap.Error(err))
+		sendError(w, http.StatusBadGateway, "Failed to connect to microsoft graph API")
+		return
+	}
+
+	filter := fmt.Sprintf("displayName eq '%s'", params.Name)
+	configuration := &graphgroups.GroupsRequestBuilderGetRequestConfiguration{
+		QueryParameters: &graphgroups.GroupsRequestBuilderGetQueryParameters{
+			Filter: &filter,
+		},
+	}
+
+	gets, err := graph.Groups().Get(ctx, configuration)
+	if err != nil {
+		s.Logger.Error("failed to get group")
+		sendError(w, http.StatusInternalServerError, "Failed to connect to get group")
+		return
+	}
+
+	if gets.GetValue() == nil || len(gets.GetValue()) == 0 {
+		s.Logger.Error("no group found")
+		sendError(w, http.StatusNotFound, "Failed to find a group with name")
+		return
+	}
+
+	groupable, ok := gets.GetValue()[0].(models.Groupable)
+	if !ok {
+		s.Logger.Error("failed to cast to groupable")
+		sendError(w, http.StatusInternalServerError, "Failed to cast to groupable")
+		return
+	}
+
+	group, err := GroupableToGroup(groupable)
+	if err != nil {
+		s.Logger.Error("error converting groupable")
+		sendError(w, http.StatusInternalServerError, "Failed to convert groupable")
+		return
+	}
+
+	SetHeaderAndWriteResponse(w, http.StatusOK, group)
 }
 
 // Get all groups for current user.
