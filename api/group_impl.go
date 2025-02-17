@@ -121,4 +121,48 @@ func (s Server) GetAPIGroupsGroupID(w http.ResponseWriter, r *http.Request, grou
 // (GET /api/groups/{groupID}/users)
 func (s Server) GetAPIGroupsGroupIDUsers(w http.ResponseWriter, r *http.Request, groupID uint32) {
 
+	ctx, cancel := context.WithTimeout(r.Context(), database.DatabaseTimeout)
+	defer cancel()
+
+	// Get userID from request
+	userID, ok := r.Context().Value(UserIDCtxKey{}).(uint32)
+	if !ok {
+		s.Logger.Error("failed to get userid from request context")
+		sendError(w, http.StatusUnauthorized, "Try again later.")
+		return
+	}
+
+	graph, err := CreateMSFTGraphClient(ctx, s.MSALClient, s.DB, userID)
+	if err != nil {
+		s.Logger.Error("failed to create msgraph client", zap.Error(err))
+		sendError(w, http.StatusBadGateway, "Failed to connect to microsoft graph API")
+		return
+	}
+
+	groupIDStr := strconv.FormatUint(uint64(groupID), 10)
+
+	groupable, err := graph.Groups().ByGroupId(groupIDStr).Members().Get(ctx, nil)
+	if err != nil {
+		s.Logger.Error("failed to get group from microsoft")
+		sendError(w, http.StatusNotFound, "Failed to find group")
+		return
+	}
+
+	var users []User
+
+	if groupable.GetValue() != nil {
+		for _, dirs := range groupable.GetValue() {
+			if usr, ok := dirs.(models.Userable); ok {
+				user, err := UserableToUser(usr)
+				if err != nil {
+					s.Logger.Error("failed to convert userable to user")
+					sendError(w, http.StatusInternalServerError, "Failed to convert userable to user")
+					return
+				}
+				users = append(users, user)
+			}
+		}
+	}
+
+	SetHeaderAndWriteResponse(w, http.StatusOK, users)
 }
