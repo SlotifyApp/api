@@ -78,3 +78,14 @@ func (tp GetAPITeamsParams) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 	enc.AddString("name", name)
 	return nil
 }
+
+func (g GetAPIGroupsParams) MarshalLogObject(enc zapcore.ObjectEncoder) error {
+	name := ""
+	if g.Name != nil {
+		name = *g.Name
+	} else {
+		name = "nil"
+	}
+	enc.AddString("name", name)
+	return nil
+}
