@@ -44,7 +44,7 @@ func parseMSFTAttendees(e graphmodels.Eventable) []Attendee {
 		attendee := Attendee{
 			Email:          &email,
 			ResponseStatus: &responseStatus,
-			Type:           &attendeeType,
+			AttendeeType:   &attendeeType,
 		}
 		attendees = append(attendees, attendee)
 	}
@@ -123,8 +123,8 @@ func parseCalendarEventToMSFTEvent(eventRequest CalendarEvent) *graphmodels.Even
 			attendee.SetEmailAddress(email)
 
 			var attendeeType graphmodels.AttendeeType
-			if inviteAttendee.Type != nil {
-				switch *inviteAttendee.Type {
+			if inviteAttendee.AttendeeType != nil {
+				switch *inviteAttendee.AttendeeType {
 				case Required:
 					attendeeType = graphmodels.REQUIRED_ATTENDEETYPE
 				case Optional:
