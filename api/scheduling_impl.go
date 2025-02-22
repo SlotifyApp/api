@@ -23,7 +23,7 @@ func (s Server) PostAPISchedulingFree(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var body SchedulingSlotsSuccessResponseBody
+	var body SchedulingSlotsBodySchema
 	var err error
 	if err = json.NewDecoder(r.Body).Decode(&body); err != nil {
 		// TODO: Add zap log for body
