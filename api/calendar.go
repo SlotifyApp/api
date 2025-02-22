@@ -11,147 +11,8 @@ import (
 
 	openapi_types "github.com/oapi-codegen/runtime/types"
 
-	"github.com/google/uuid"
-
 	graphmodels "github.com/microsoftgraph/msgraph-sdk-go/models"
 )
-
-// parseMSFTAttendees filters out attributes of MSFT attendees.
-// see openapi spec to find docs about this.
-func parseMSFTAttendees(e graphmodels.Eventable) []Attendee {
-	msftAttendees := e.GetAttendees()
-	var attendees []Attendee
-	attendees = make([]Attendee, 0)
-
-	// Go through MSFT attendees and parse information we need
-	for _, a := range msftAttendees {
-		var email openapi_types.Email
-		if a.GetEmailAddress() != nil && a.GetEmailAddress().GetAddress() != nil {
-			emailStr := a.GetEmailAddress().GetAddress()
-			email = openapi_types.Email(*emailStr)
-		}
-
-		var responseStatus AttendeeResponseStatus
-		if a.GetStatus() != nil && a.GetStatus().GetResponse() != nil {
-			responseStatus = AttendeeResponseStatus(a.GetStatus().GetResponse().String())
-		}
-
-		var attendeeType AttendeeType
-		if a.GetTypeEscaped() != nil {
-			attendeeType = AttendeeType(a.GetTypeEscaped().String())
-		}
-
-		attendee := Attendee{
-			Email:          &email,
-			ResponseStatus: &responseStatus,
-			AttendeeType:   &attendeeType,
-		}
-		attendees = append(attendees, attendee)
-	}
-	return attendees
-}
-
-// parseMSFTLocations filters out attributes of MSFT locations.
-// see openapi spec to find docs about this.
-func parseMSFTLocations(e graphmodels.Eventable) []Location {
-	msftLocations := e.GetLocations()
-	var locations []Location
-	locations = make([]Location, 0)
-
-	for _, l := range msftLocations {
-		var roomType LocationRoomType
-		if l.GetLocationType() != nil {
-			roomType = LocationRoomType(l.GetLocationType().String())
-		}
-
-		var street *string
-		if l.GetAddress() != nil {
-			street = l.GetAddress().GetStreet()
-		}
-
-		parsedLoc := Location{
-			Id:       l.GetUniqueId(),
-			Name:     l.GetDisplayName(),
-			Street:   street,
-			RoomType: &roomType,
-		}
-
-		locations = append(locations, parsedLoc)
-	}
-	return locations
-}
-
-// parseCalendarEventToMSFTEvent parses CalendarEvent to create a MSFT Event.
-func parseCalendarEventToMSFTEvent(eventRequest CalendarEvent) *graphmodels.Event {
-	event := graphmodels.NewEvent()
-	event.SetSubject(eventRequest.Subject)
-
-	contentType := graphmodels.HTML_BODYTYPE
-	body := graphmodels.NewItemBody()
-	body.SetContentType(&contentType)
-	body.SetContent(eventRequest.Body)
-	event.SetBody(body)
-
-	timeZone := "UTC"
-
-	start := graphmodels.NewDateTimeTimeZone()
-	start.SetDateTime(eventRequest.StartTime)
-	start.SetTimeZone(&timeZone)
-	event.SetStart(start)
-
-	end := graphmodels.NewDateTimeTimeZone()
-	end.SetDateTime(eventRequest.EndTime)
-	end.SetTimeZone(&timeZone)
-	event.SetEnd(end)
-
-	// is location required and roomtype is not a property of location in graph
-	var location *graphmodels.Location
-	if len(eventRequest.Locations) > 0 {
-		location.SetDisplayName(eventRequest.Locations[0].Name)
-	}
-
-	var attendees []graphmodels.Attendeeable
-	if eventRequest.Attendees != nil {
-		for _, inviteAttendee := range eventRequest.Attendees {
-			var email *graphmodels.EmailAddress
-			if inviteAttendee.Email != nil {
-				email = graphmodels.NewEmailAddress()
-				email.SetAddress((*string)(inviteAttendee.Email))
-			}
-
-			attendee := graphmodels.NewAttendee()
-			attendee.SetEmailAddress(email)
-
-			var attendeeType graphmodels.AttendeeType
-			if inviteAttendee.AttendeeType != nil {
-				switch *inviteAttendee.AttendeeType {
-				case Required:
-					attendeeType = graphmodels.REQUIRED_ATTENDEETYPE
-				case Optional:
-					attendeeType = graphmodels.OPTIONAL_ATTENDEETYPE
-				case Resource:
-					attendeeType = graphmodels.RESOURCE_ATTENDEETYPE
-				default:
-					attendeeType = graphmodels.REQUIRED_ATTENDEETYPE
-				}
-			}
-			attendee.SetTypeEscaped(&attendeeType)
-
-			// response status?
-			responseStatus := graphmodels.NewResponseStatus()
-			response := graphmodels.NOTRESPONDED_RESPONSETYPE
-			responseStatus.SetResponse(&response)
-			attendees = append(attendees, attendee)
-		}
-	}
-
-	event.SetAttendees(attendees)
-
-	transactionID := uuid.New().String()
-	event.SetTransactionId(&transactionID)
-
-	return event
-}
 
 // parseEventableResp takes in MSFT's version of events and parses them to extract needed attributes.
 // See [MSFT Event Properties] for all of the MSFT event properties.
@@ -165,7 +26,7 @@ func parseEventableResp(events []graphmodels.Eventable) []CalendarEvent {
 			continue
 		}
 		attendees := parseMSFTAttendees(e)
-		locations := parseMSFTLocations(e)
+		locations := parseMSFTLocations(e.GetLocations())
 
 		var joinURL *string
 		if e.GetOnlineMeeting() != nil {
