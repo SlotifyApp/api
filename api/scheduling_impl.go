@@ -3,7 +3,6 @@ package api
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"time"
 
@@ -13,7 +12,7 @@ import (
 // (POST /api/scheduling/free).
 func (s Server) PostAPISchedulingFree(w http.ResponseWriter, r *http.Request) {
 	// Get userid from access token
-	ctx, cancel := context.WithTimeout(r.Context(), time.Minute)
+	ctx, cancel := context.WithTimeout(r.Context(), time.Minute*3)
 	defer cancel()
 
 	userID, ok := r.Context().Value(UserIDCtxKey{}).(uint32)
@@ -39,17 +38,12 @@ func (s Server) PostAPISchedulingFree(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get custom graph request header and config
-	graphConfigAndBody, err := CreateSchedulingGraphReqBody()
+	respBody, err := makeFindMeetingTimesAPICall(ctx, graph, body)
 	if err != nil {
-		SetHeaderAndWriteResponse(w, http.StatusBadRequest, fmt.Sprintf("failed to make scheduling call: %s", err.Error()))
-		return
-	}
-	findMeetingTimes, err := graph.Me().FindMeetingTimes().Post(ctx, graphConfigAndBody.reqBody, graphConfigAndBody.config)
-	if err != nil {
-		SetHeaderAndWriteResponse(w, http.StatusBadRequest, fmt.Sprintf("failed to make scheduling call: %s", err.Error()))
+		s.Logger.Error("failed to make msgraph api call to findMeetings", zap.Error(err))
+		sendError(w, http.StatusBadGateway, "Failed to process/send microsoft graph API request for findMeeting")
 		return
 	}
 
-	SetHeaderAndWriteResponse(w, http.StatusOK, findMeetingTimes)
+	SetHeaderAndWriteResponse(w, http.StatusOK, respBody)
 }
