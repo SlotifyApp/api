@@ -6,8 +6,64 @@ package database
 
 import (
 	"database/sql"
+	"database/sql/driver"
+	"fmt"
 	"time"
 )
+
+type InviteStatus string
+
+const (
+	InviteStatusPending  InviteStatus = "pending"
+	InviteStatusAccepted InviteStatus = "accepted"
+	InviteStatusDeclined InviteStatus = "declined"
+	InviteStatusExpired  InviteStatus = "expired"
+)
+
+func (e *InviteStatus) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = InviteStatus(s)
+	case string:
+		*e = InviteStatus(s)
+	default:
+		return fmt.Errorf("unsupported scan type for InviteStatus: %T", src)
+	}
+	return nil
+}
+
+type NullInviteStatus struct {
+	InviteStatus InviteStatus `json:"inviteStatus"`
+	Valid        bool         `json:"valid"` // Valid is true if InviteStatus is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullInviteStatus) Scan(value interface{}) error {
+	if value == nil {
+		ns.InviteStatus, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.InviteStatus.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullInviteStatus) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.InviteStatus), nil
+}
+
+type Invite struct {
+	ID             uint32       `json:"id"`
+	SlotifyGroupID uint32       `json:"slotifyGroupId"`
+	FromUserID     uint32       `json:"fromUserId"`
+	ToUserID       uint32       `json:"toUserId"`
+	Message        string       `json:"message"`
+	Status         InviteStatus `json:"status"`
+	CreatedAt      time.Time    `json:"createdAt"`
+}
 
 type Notification struct {
 	ID      uint32    `json:"id"`
