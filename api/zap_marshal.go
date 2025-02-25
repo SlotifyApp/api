@@ -78,3 +78,16 @@ func (sgp GetAPISlotifyGroupsParams) MarshalLogObject(enc zapcore.ObjectEncoder)
 	enc.AddString("name", name)
 	return nil
 }
+
+func (pai PostAPIInvitesJSONRequestBody) MarshalLogObject(enc zapcore.ObjectEncoder) error {
+	enc.AddString("message", pai.Message)
+	enc.AddUint32("toUserID", pai.ToUserID)
+	enc.AddUint32("slotifyGroupID", pai.SlotifyGroupID)
+	enc.AddTime("createdAt", pai.CreatedAt)
+	return nil
+}
+
+func (paiBody PatchAPIInvitesInviteIDJSONRequestBody) MarshalLogObject(enc zapcore.ObjectEncoder) error {
+	enc.AddString("message", paiBody.Message)
+	return nil
+}

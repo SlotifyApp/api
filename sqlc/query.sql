@@ -97,3 +97,36 @@ ORDER BY n.created DESC;
 -- name: MarkNotificationAsRead :execrows
 UPDATE UserToNotification SET is_read=TRUE
 WHERE user_id=? AND notification_id=?;
+
+
+
+
+-- name: CreateInvite :execrows
+INSERT INTO Invite (slotify_group_id, from_user_id, to_user_id, message, created_at)
+VALUES(?, ?, ?, ?, ?);
+
+-- name: UpdateInviteStatus :execrows
+UPDATE Invite SET status=?
+WHERE id=?;
+
+-- name: DeleteInviteByID :execrows
+DELETE FROM Invite WHERE id=?;
+
+-- name: UpdateInviteMessage :execrows
+UPDATE Invite SET message=?
+WHERE id=? AND from_user_id=?;
+
+-- name: ListInvitesMe :many
+SELECT i.id AS invite_id, i.message, i.status,i.created_at, fu.email AS from_user_email, fu.first_name AS from_user_first_name, fu.last_name AS from_user_last_name, sg.name AS slotify_group_name FROM Invite i
+JOIN User fu ON fu.id=i.from_user_id
+JOIN SlotifyGroup sg ON sg.id=i.slotify_group_id
+WHERE i.status = ifnull(sqlc.arg('status'), i.status) 
+AND i.to_user_id=?;
+
+-- name: ListInvitesByGroup :many
+SELECT 
+   i.id AS invite_id, i.message, i.status, i.created_at, fu.email AS from_user_email, fu.first_name AS from_user_first_name, fu.last_name AS from_user_last_name, tu.email AS to_user_email, tu.first_name AS to_user_first_name, tu.last_name AS to_user_last_name FROM Invite i
+JOIN User fu ON fu.id=i.from_user_id
+JOIN User tu ON tu.id=i.to_user_id
+WHERE i.status = ifnull(sqlc.arg('status'), i.status) 
+AND i.slotify_group_id=?;

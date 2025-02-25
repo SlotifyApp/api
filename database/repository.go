@@ -39,6 +39,9 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.countUserByIDStmt, err = db.PrepareContext(ctx, countUserByID); err != nil {
 		return nil, fmt.Errorf("error preparing query CountUserByID: %w", err)
 	}
+	if q.createInviteStmt, err = db.PrepareContext(ctx, createInvite); err != nil {
+		return nil, fmt.Errorf("error preparing query CreateInvite: %w", err)
+	}
 	if q.createNotificationStmt, err = db.PrepareContext(ctx, createNotification); err != nil {
 		return nil, fmt.Errorf("error preparing query CreateNotification: %w", err)
 	}
@@ -50,6 +53,9 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	}
 	if q.createUserNotificationStmt, err = db.PrepareContext(ctx, createUserNotification); err != nil {
 		return nil, fmt.Errorf("error preparing query CreateUserNotification: %w", err)
+	}
+	if q.deleteInviteByIDStmt, err = db.PrepareContext(ctx, deleteInviteByID); err != nil {
+		return nil, fmt.Errorf("error preparing query DeleteInviteByID: %w", err)
 	}
 	if q.deleteRefreshTokenByUserIDStmt, err = db.PrepareContext(ctx, deleteRefreshTokenByUserID); err != nil {
 		return nil, fmt.Errorf("error preparing query DeleteRefreshTokenByUserID: %w", err)
@@ -87,6 +93,12 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.getUsersSlotifyGroupsStmt, err = db.PrepareContext(ctx, getUsersSlotifyGroups); err != nil {
 		return nil, fmt.Errorf("error preparing query GetUsersSlotifyGroups: %w", err)
 	}
+	if q.listInvitesByGroupStmt, err = db.PrepareContext(ctx, listInvitesByGroup); err != nil {
+		return nil, fmt.Errorf("error preparing query ListInvitesByGroup: %w", err)
+	}
+	if q.listInvitesMeStmt, err = db.PrepareContext(ctx, listInvitesMe); err != nil {
+		return nil, fmt.Errorf("error preparing query ListInvitesMe: %w", err)
+	}
 	if q.listSlotifyGroupsStmt, err = db.PrepareContext(ctx, listSlotifyGroups); err != nil {
 		return nil, fmt.Errorf("error preparing query ListSlotifyGroups: %w", err)
 	}
@@ -95,6 +107,12 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	}
 	if q.markNotificationAsReadStmt, err = db.PrepareContext(ctx, markNotificationAsRead); err != nil {
 		return nil, fmt.Errorf("error preparing query MarkNotificationAsRead: %w", err)
+	}
+	if q.updateInviteMessageStmt, err = db.PrepareContext(ctx, updateInviteMessage); err != nil {
+		return nil, fmt.Errorf("error preparing query UpdateInviteMessage: %w", err)
+	}
+	if q.updateInviteStatusStmt, err = db.PrepareContext(ctx, updateInviteStatus); err != nil {
+		return nil, fmt.Errorf("error preparing query UpdateInviteStatus: %w", err)
 	}
 	if q.updateUserHomeAccountIDStmt, err = db.PrepareContext(ctx, updateUserHomeAccountID); err != nil {
 		return nil, fmt.Errorf("error preparing query UpdateUserHomeAccountID: %w", err)
@@ -129,6 +147,11 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing countUserByIDStmt: %w", cerr)
 		}
 	}
+	if q.createInviteStmt != nil {
+		if cerr := q.createInviteStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing createInviteStmt: %w", cerr)
+		}
+	}
 	if q.createNotificationStmt != nil {
 		if cerr := q.createNotificationStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing createNotificationStmt: %w", cerr)
@@ -147,6 +170,11 @@ func (q *Queries) Close() error {
 	if q.createUserNotificationStmt != nil {
 		if cerr := q.createUserNotificationStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing createUserNotificationStmt: %w", cerr)
+		}
+	}
+	if q.deleteInviteByIDStmt != nil {
+		if cerr := q.deleteInviteByIDStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing deleteInviteByIDStmt: %w", cerr)
 		}
 	}
 	if q.deleteRefreshTokenByUserIDStmt != nil {
@@ -209,6 +237,16 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing getUsersSlotifyGroupsStmt: %w", cerr)
 		}
 	}
+	if q.listInvitesByGroupStmt != nil {
+		if cerr := q.listInvitesByGroupStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing listInvitesByGroupStmt: %w", cerr)
+		}
+	}
+	if q.listInvitesMeStmt != nil {
+		if cerr := q.listInvitesMeStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing listInvitesMeStmt: %w", cerr)
+		}
+	}
 	if q.listSlotifyGroupsStmt != nil {
 		if cerr := q.listSlotifyGroupsStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing listSlotifyGroupsStmt: %w", cerr)
@@ -222,6 +260,16 @@ func (q *Queries) Close() error {
 	if q.markNotificationAsReadStmt != nil {
 		if cerr := q.markNotificationAsReadStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing markNotificationAsReadStmt: %w", cerr)
+		}
+	}
+	if q.updateInviteMessageStmt != nil {
+		if cerr := q.updateInviteMessageStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing updateInviteMessageStmt: %w", cerr)
+		}
+	}
+	if q.updateInviteStatusStmt != nil {
+		if cerr := q.updateInviteStatusStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing updateInviteStatusStmt: %w", cerr)
 		}
 	}
 	if q.updateUserHomeAccountIDStmt != nil {
@@ -273,10 +321,12 @@ type Queries struct {
 	countSlotifyGroupByIDStmt           *sql.Stmt
 	countUserByEmailStmt                *sql.Stmt
 	countUserByIDStmt                   *sql.Stmt
+	createInviteStmt                    *sql.Stmt
 	createNotificationStmt              *sql.Stmt
 	createRefreshTokenStmt              *sql.Stmt
 	createUserStmt                      *sql.Stmt
 	createUserNotificationStmt          *sql.Stmt
+	deleteInviteByIDStmt                *sql.Stmt
 	deleteRefreshTokenByUserIDStmt      *sql.Stmt
 	deleteSlotifyGroupByIDStmt          *sql.Stmt
 	deleteUserByIDStmt                  *sql.Stmt
@@ -289,9 +339,13 @@ type Queries struct {
 	getUserByEmailStmt                  *sql.Stmt
 	getUserByIDStmt                     *sql.Stmt
 	getUsersSlotifyGroupsStmt           *sql.Stmt
+	listInvitesByGroupStmt              *sql.Stmt
+	listInvitesMeStmt                   *sql.Stmt
 	listSlotifyGroupsStmt               *sql.Stmt
 	listUsersStmt                       *sql.Stmt
 	markNotificationAsReadStmt          *sql.Stmt
+	updateInviteMessageStmt             *sql.Stmt
+	updateInviteStatusStmt              *sql.Stmt
 	updateUserHomeAccountIDStmt         *sql.Stmt
 }
 
@@ -304,10 +358,12 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		countSlotifyGroupByIDStmt:           q.countSlotifyGroupByIDStmt,
 		countUserByEmailStmt:                q.countUserByEmailStmt,
 		countUserByIDStmt:                   q.countUserByIDStmt,
+		createInviteStmt:                    q.createInviteStmt,
 		createNotificationStmt:              q.createNotificationStmt,
 		createRefreshTokenStmt:              q.createRefreshTokenStmt,
 		createUserStmt:                      q.createUserStmt,
 		createUserNotificationStmt:          q.createUserNotificationStmt,
+		deleteInviteByIDStmt:                q.deleteInviteByIDStmt,
 		deleteRefreshTokenByUserIDStmt:      q.deleteRefreshTokenByUserIDStmt,
 		deleteSlotifyGroupByIDStmt:          q.deleteSlotifyGroupByIDStmt,
 		deleteUserByIDStmt:                  q.deleteUserByIDStmt,
@@ -320,9 +376,13 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		getUserByEmailStmt:                  q.getUserByEmailStmt,
 		getUserByIDStmt:                     q.getUserByIDStmt,
 		getUsersSlotifyGroupsStmt:           q.getUsersSlotifyGroupsStmt,
+		listInvitesByGroupStmt:              q.listInvitesByGroupStmt,
+		listInvitesMeStmt:                   q.listInvitesMeStmt,
 		listSlotifyGroupsStmt:               q.listSlotifyGroupsStmt,
 		listUsersStmt:                       q.listUsersStmt,
 		markNotificationAsReadStmt:          q.markNotificationAsReadStmt,
+		updateInviteMessageStmt:             q.updateInviteMessageStmt,
+		updateInviteStatusStmt:              q.updateInviteStatusStmt,
 		updateUserHomeAccountIDStmt:         q.updateUserHomeAccountIDStmt,
 	}
 }
