@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/avast/retry-go"
 	abstractions "github.com/microsoft/kiota-abstractions-go"
 	msgraphsdkgo "github.com/microsoftgraph/msgraph-sdk-go"
 	graphusers "github.com/microsoftgraph/msgraph-sdk-go/users"
@@ -236,11 +237,19 @@ func makeFindMeetingTimesAPICall(ctx context.Context,
 			fmt.Errorf("failed to create graph req body for findMeetings: %w", err)
 	}
 
-	// Make actual API call
-	findMeetingTimes, err := graph.Me().FindMeetingTimes().Post(ctx, graphConfigAndBody.reqBody, graphConfigAndBody.config)
+	// Attempt to call FindMeetingTimes 3 times
+	var findMeetingTimes graphmodels.MeetingTimeSuggestionsResultable
+	err = retry.Do(func() error {
+		findMeetingTimes, err = graph.Me().FindMeetingTimes().Post(ctx, graphConfigAndBody.reqBody, graphConfigAndBody.config)
+		if err != nil {
+			return fmt.Errorf("failed to make msgraph findMeeting API call: %w", err)
+		}
+
+		return nil
+	}, retry.Attempts(3), retry.Delay(time.Millisecond*500))
 	if err != nil {
 		return SchedulingSlotsSuccessResponseBody{},
-			fmt.Errorf("failed to make msgraph findMeeting API call: %w", err)
+			fmt.Errorf("failed msft find meeting times after 3 retries: %w", err)
 	}
 
 	// Process MSFT resp into our own types
