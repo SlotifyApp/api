@@ -8,7 +8,7 @@ import (
 	"github.com/go-sql-driver/mysql"
 )
 
-var ErrTeamIDInvalid = errors.New("team id does not exist")
+var ErrSlotifyGroupIDInvalid = errors.New("slotifyGroup id does not exist")
 
 // WrongNumberSQLRowsError returns when the expected #rows affected != actual #rows affected.
 type WrongNumberSQLRowsError struct {

@@ -112,4 +112,4 @@ A map of clients is mapped to each user, a client is registered when a client us
 `/api/events` eventstream route. From there, notifications can be sent from server to client in real time.
 
 If a notification is meant for a user who doesn't have a client (ie. not currently using the website, imagine an offline user
-was added to a team), then on the next login these notifications are fetched from the database and displayed.
+was added to a slotifyGroup), then on the next login these notifications are fetched from the database and displayed.

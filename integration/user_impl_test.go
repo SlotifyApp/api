@@ -42,7 +42,7 @@ func TestUser_GetUsersUserID(t *testing.T) {
 			httpStatus:   http.StatusForbidden,
 			userID:       100000,
 			expectedBody: "user api: user with id(100000) doesn't exist",
-			testMsg:      "empty array is returned when team does not exist",
+			testMsg:      "empty array is returned when slotify group does not exist",
 		},
 		"user exists": {
 			httpStatus:   http.StatusOK,

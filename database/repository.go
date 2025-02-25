@@ -24,14 +24,14 @@ func New(db DBTX) *Queries {
 func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	q := Queries{db: db}
 	var err error
-	if q.addTeamStmt, err = db.PrepareContext(ctx, addTeam); err != nil {
-		return nil, fmt.Errorf("error preparing query AddTeam: %w", err)
+	if q.addSlotifyGroupStmt, err = db.PrepareContext(ctx, addSlotifyGroup); err != nil {
+		return nil, fmt.Errorf("error preparing query AddSlotifyGroup: %w", err)
 	}
-	if q.addUserToTeamStmt, err = db.PrepareContext(ctx, addUserToTeam); err != nil {
-		return nil, fmt.Errorf("error preparing query AddUserToTeam: %w", err)
+	if q.addUserToSlotifyGroupStmt, err = db.PrepareContext(ctx, addUserToSlotifyGroup); err != nil {
+		return nil, fmt.Errorf("error preparing query AddUserToSlotifyGroup: %w", err)
 	}
-	if q.countTeamByIDStmt, err = db.PrepareContext(ctx, countTeamByID); err != nil {
-		return nil, fmt.Errorf("error preparing query CountTeamByID: %w", err)
+	if q.countSlotifyGroupByIDStmt, err = db.PrepareContext(ctx, countSlotifyGroupByID); err != nil {
+		return nil, fmt.Errorf("error preparing query CountSlotifyGroupByID: %w", err)
 	}
 	if q.countUserByEmailStmt, err = db.PrepareContext(ctx, countUserByEmail); err != nil {
 		return nil, fmt.Errorf("error preparing query CountUserByEmail: %w", err)
@@ -54,26 +54,26 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.deleteRefreshTokenByUserIDStmt, err = db.PrepareContext(ctx, deleteRefreshTokenByUserID); err != nil {
 		return nil, fmt.Errorf("error preparing query DeleteRefreshTokenByUserID: %w", err)
 	}
-	if q.deleteTeamByIDStmt, err = db.PrepareContext(ctx, deleteTeamByID); err != nil {
-		return nil, fmt.Errorf("error preparing query DeleteTeamByID: %w", err)
+	if q.deleteSlotifyGroupByIDStmt, err = db.PrepareContext(ctx, deleteSlotifyGroupByID); err != nil {
+		return nil, fmt.Errorf("error preparing query DeleteSlotifyGroupByID: %w", err)
 	}
 	if q.deleteUserByIDStmt, err = db.PrepareContext(ctx, deleteUserByID); err != nil {
 		return nil, fmt.Errorf("error preparing query DeleteUserByID: %w", err)
 	}
-	if q.getAllTeamMembersStmt, err = db.PrepareContext(ctx, getAllTeamMembers); err != nil {
-		return nil, fmt.Errorf("error preparing query GetAllTeamMembers: %w", err)
+	if q.getAllSlotifyGroupMembersStmt, err = db.PrepareContext(ctx, getAllSlotifyGroupMembers); err != nil {
+		return nil, fmt.Errorf("error preparing query GetAllSlotifyGroupMembers: %w", err)
 	}
-	if q.getAllTeamMembersExceptStmt, err = db.PrepareContext(ctx, getAllTeamMembersExcept); err != nil {
-		return nil, fmt.Errorf("error preparing query GetAllTeamMembersExcept: %w", err)
+	if q.getAllSlotifyGroupMembersExceptStmt, err = db.PrepareContext(ctx, getAllSlotifyGroupMembersExcept); err != nil {
+		return nil, fmt.Errorf("error preparing query GetAllSlotifyGroupMembersExcept: %w", err)
 	}
-	if q.getJoinableTeamsStmt, err = db.PrepareContext(ctx, getJoinableTeams); err != nil {
-		return nil, fmt.Errorf("error preparing query GetJoinableTeams: %w", err)
+	if q.getJoinableSlotifyGroupsStmt, err = db.PrepareContext(ctx, getJoinableSlotifyGroups); err != nil {
+		return nil, fmt.Errorf("error preparing query GetJoinableSlotifyGroups: %w", err)
 	}
 	if q.getRefreshTokenByUserIDStmt, err = db.PrepareContext(ctx, getRefreshTokenByUserID); err != nil {
 		return nil, fmt.Errorf("error preparing query GetRefreshTokenByUserID: %w", err)
 	}
-	if q.getTeamByIDStmt, err = db.PrepareContext(ctx, getTeamByID); err != nil {
-		return nil, fmt.Errorf("error preparing query GetTeamByID: %w", err)
+	if q.getSlotifyGroupByIDStmt, err = db.PrepareContext(ctx, getSlotifyGroupByID); err != nil {
+		return nil, fmt.Errorf("error preparing query GetSlotifyGroupByID: %w", err)
 	}
 	if q.getUnreadUserNotificationsStmt, err = db.PrepareContext(ctx, getUnreadUserNotifications); err != nil {
 		return nil, fmt.Errorf("error preparing query GetUnreadUserNotifications: %w", err)
@@ -84,11 +84,11 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.getUserByIDStmt, err = db.PrepareContext(ctx, getUserByID); err != nil {
 		return nil, fmt.Errorf("error preparing query GetUserByID: %w", err)
 	}
-	if q.getUsersTeamsStmt, err = db.PrepareContext(ctx, getUsersTeams); err != nil {
-		return nil, fmt.Errorf("error preparing query GetUsersTeams: %w", err)
+	if q.getUsersSlotifyGroupsStmt, err = db.PrepareContext(ctx, getUsersSlotifyGroups); err != nil {
+		return nil, fmt.Errorf("error preparing query GetUsersSlotifyGroups: %w", err)
 	}
-	if q.listTeamsStmt, err = db.PrepareContext(ctx, listTeams); err != nil {
-		return nil, fmt.Errorf("error preparing query ListTeams: %w", err)
+	if q.listSlotifyGroupsStmt, err = db.PrepareContext(ctx, listSlotifyGroups); err != nil {
+		return nil, fmt.Errorf("error preparing query ListSlotifyGroups: %w", err)
 	}
 	if q.listUsersStmt, err = db.PrepareContext(ctx, listUsers); err != nil {
 		return nil, fmt.Errorf("error preparing query ListUsers: %w", err)
@@ -104,19 +104,19 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 
 func (q *Queries) Close() error {
 	var err error
-	if q.addTeamStmt != nil {
-		if cerr := q.addTeamStmt.Close(); cerr != nil {
-			err = fmt.Errorf("error closing addTeamStmt: %w", cerr)
+	if q.addSlotifyGroupStmt != nil {
+		if cerr := q.addSlotifyGroupStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing addSlotifyGroupStmt: %w", cerr)
 		}
 	}
-	if q.addUserToTeamStmt != nil {
-		if cerr := q.addUserToTeamStmt.Close(); cerr != nil {
-			err = fmt.Errorf("error closing addUserToTeamStmt: %w", cerr)
+	if q.addUserToSlotifyGroupStmt != nil {
+		if cerr := q.addUserToSlotifyGroupStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing addUserToSlotifyGroupStmt: %w", cerr)
 		}
 	}
-	if q.countTeamByIDStmt != nil {
-		if cerr := q.countTeamByIDStmt.Close(); cerr != nil {
-			err = fmt.Errorf("error closing countTeamByIDStmt: %w", cerr)
+	if q.countSlotifyGroupByIDStmt != nil {
+		if cerr := q.countSlotifyGroupByIDStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing countSlotifyGroupByIDStmt: %w", cerr)
 		}
 	}
 	if q.countUserByEmailStmt != nil {
@@ -154,9 +154,9 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing deleteRefreshTokenByUserIDStmt: %w", cerr)
 		}
 	}
-	if q.deleteTeamByIDStmt != nil {
-		if cerr := q.deleteTeamByIDStmt.Close(); cerr != nil {
-			err = fmt.Errorf("error closing deleteTeamByIDStmt: %w", cerr)
+	if q.deleteSlotifyGroupByIDStmt != nil {
+		if cerr := q.deleteSlotifyGroupByIDStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing deleteSlotifyGroupByIDStmt: %w", cerr)
 		}
 	}
 	if q.deleteUserByIDStmt != nil {
@@ -164,19 +164,19 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing deleteUserByIDStmt: %w", cerr)
 		}
 	}
-	if q.getAllTeamMembersStmt != nil {
-		if cerr := q.getAllTeamMembersStmt.Close(); cerr != nil {
-			err = fmt.Errorf("error closing getAllTeamMembersStmt: %w", cerr)
+	if q.getAllSlotifyGroupMembersStmt != nil {
+		if cerr := q.getAllSlotifyGroupMembersStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getAllSlotifyGroupMembersStmt: %w", cerr)
 		}
 	}
-	if q.getAllTeamMembersExceptStmt != nil {
-		if cerr := q.getAllTeamMembersExceptStmt.Close(); cerr != nil {
-			err = fmt.Errorf("error closing getAllTeamMembersExceptStmt: %w", cerr)
+	if q.getAllSlotifyGroupMembersExceptStmt != nil {
+		if cerr := q.getAllSlotifyGroupMembersExceptStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getAllSlotifyGroupMembersExceptStmt: %w", cerr)
 		}
 	}
-	if q.getJoinableTeamsStmt != nil {
-		if cerr := q.getJoinableTeamsStmt.Close(); cerr != nil {
-			err = fmt.Errorf("error closing getJoinableTeamsStmt: %w", cerr)
+	if q.getJoinableSlotifyGroupsStmt != nil {
+		if cerr := q.getJoinableSlotifyGroupsStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getJoinableSlotifyGroupsStmt: %w", cerr)
 		}
 	}
 	if q.getRefreshTokenByUserIDStmt != nil {
@@ -184,9 +184,9 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing getRefreshTokenByUserIDStmt: %w", cerr)
 		}
 	}
-	if q.getTeamByIDStmt != nil {
-		if cerr := q.getTeamByIDStmt.Close(); cerr != nil {
-			err = fmt.Errorf("error closing getTeamByIDStmt: %w", cerr)
+	if q.getSlotifyGroupByIDStmt != nil {
+		if cerr := q.getSlotifyGroupByIDStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getSlotifyGroupByIDStmt: %w", cerr)
 		}
 	}
 	if q.getUnreadUserNotificationsStmt != nil {
@@ -204,14 +204,14 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing getUserByIDStmt: %w", cerr)
 		}
 	}
-	if q.getUsersTeamsStmt != nil {
-		if cerr := q.getUsersTeamsStmt.Close(); cerr != nil {
-			err = fmt.Errorf("error closing getUsersTeamsStmt: %w", cerr)
+	if q.getUsersSlotifyGroupsStmt != nil {
+		if cerr := q.getUsersSlotifyGroupsStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getUsersSlotifyGroupsStmt: %w", cerr)
 		}
 	}
-	if q.listTeamsStmt != nil {
-		if cerr := q.listTeamsStmt.Close(); cerr != nil {
-			err = fmt.Errorf("error closing listTeamsStmt: %w", cerr)
+	if q.listSlotifyGroupsStmt != nil {
+		if cerr := q.listSlotifyGroupsStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing listSlotifyGroupsStmt: %w", cerr)
 		}
 	}
 	if q.listUsersStmt != nil {
@@ -266,63 +266,63 @@ func (q *Queries) queryRow(ctx context.Context, stmt *sql.Stmt, query string, ar
 }
 
 type Queries struct {
-	db                             DBTX
-	tx                             *sql.Tx
-	addTeamStmt                    *sql.Stmt
-	addUserToTeamStmt              *sql.Stmt
-	countTeamByIDStmt              *sql.Stmt
-	countUserByEmailStmt           *sql.Stmt
-	countUserByIDStmt              *sql.Stmt
-	createNotificationStmt         *sql.Stmt
-	createRefreshTokenStmt         *sql.Stmt
-	createUserStmt                 *sql.Stmt
-	createUserNotificationStmt     *sql.Stmt
-	deleteRefreshTokenByUserIDStmt *sql.Stmt
-	deleteTeamByIDStmt             *sql.Stmt
-	deleteUserByIDStmt             *sql.Stmt
-	getAllTeamMembersStmt          *sql.Stmt
-	getAllTeamMembersExceptStmt    *sql.Stmt
-	getJoinableTeamsStmt           *sql.Stmt
-	getRefreshTokenByUserIDStmt    *sql.Stmt
-	getTeamByIDStmt                *sql.Stmt
-	getUnreadUserNotificationsStmt *sql.Stmt
-	getUserByEmailStmt             *sql.Stmt
-	getUserByIDStmt                *sql.Stmt
-	getUsersTeamsStmt              *sql.Stmt
-	listTeamsStmt                  *sql.Stmt
-	listUsersStmt                  *sql.Stmt
-	markNotificationAsReadStmt     *sql.Stmt
-	updateUserHomeAccountIDStmt    *sql.Stmt
+	db                                  DBTX
+	tx                                  *sql.Tx
+	addSlotifyGroupStmt                 *sql.Stmt
+	addUserToSlotifyGroupStmt           *sql.Stmt
+	countSlotifyGroupByIDStmt           *sql.Stmt
+	countUserByEmailStmt                *sql.Stmt
+	countUserByIDStmt                   *sql.Stmt
+	createNotificationStmt              *sql.Stmt
+	createRefreshTokenStmt              *sql.Stmt
+	createUserStmt                      *sql.Stmt
+	createUserNotificationStmt          *sql.Stmt
+	deleteRefreshTokenByUserIDStmt      *sql.Stmt
+	deleteSlotifyGroupByIDStmt          *sql.Stmt
+	deleteUserByIDStmt                  *sql.Stmt
+	getAllSlotifyGroupMembersStmt       *sql.Stmt
+	getAllSlotifyGroupMembersExceptStmt *sql.Stmt
+	getJoinableSlotifyGroupsStmt        *sql.Stmt
+	getRefreshTokenByUserIDStmt         *sql.Stmt
+	getSlotifyGroupByIDStmt             *sql.Stmt
+	getUnreadUserNotificationsStmt      *sql.Stmt
+	getUserByEmailStmt                  *sql.Stmt
+	getUserByIDStmt                     *sql.Stmt
+	getUsersSlotifyGroupsStmt           *sql.Stmt
+	listSlotifyGroupsStmt               *sql.Stmt
+	listUsersStmt                       *sql.Stmt
+	markNotificationAsReadStmt          *sql.Stmt
+	updateUserHomeAccountIDStmt         *sql.Stmt
 }
 
 func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 	return &Queries{
-		db:                             tx,
-		tx:                             tx,
-		addTeamStmt:                    q.addTeamStmt,
-		addUserToTeamStmt:              q.addUserToTeamStmt,
-		countTeamByIDStmt:              q.countTeamByIDStmt,
-		countUserByEmailStmt:           q.countUserByEmailStmt,
-		countUserByIDStmt:              q.countUserByIDStmt,
-		createNotificationStmt:         q.createNotificationStmt,
-		createRefreshTokenStmt:         q.createRefreshTokenStmt,
-		createUserStmt:                 q.createUserStmt,
-		createUserNotificationStmt:     q.createUserNotificationStmt,
-		deleteRefreshTokenByUserIDStmt: q.deleteRefreshTokenByUserIDStmt,
-		deleteTeamByIDStmt:             q.deleteTeamByIDStmt,
-		deleteUserByIDStmt:             q.deleteUserByIDStmt,
-		getAllTeamMembersStmt:          q.getAllTeamMembersStmt,
-		getAllTeamMembersExceptStmt:    q.getAllTeamMembersExceptStmt,
-		getJoinableTeamsStmt:           q.getJoinableTeamsStmt,
-		getRefreshTokenByUserIDStmt:    q.getRefreshTokenByUserIDStmt,
-		getTeamByIDStmt:                q.getTeamByIDStmt,
-		getUnreadUserNotificationsStmt: q.getUnreadUserNotificationsStmt,
-		getUserByEmailStmt:             q.getUserByEmailStmt,
-		getUserByIDStmt:                q.getUserByIDStmt,
-		getUsersTeamsStmt:              q.getUsersTeamsStmt,
-		listTeamsStmt:                  q.listTeamsStmt,
-		listUsersStmt:                  q.listUsersStmt,
-		markNotificationAsReadStmt:     q.markNotificationAsReadStmt,
-		updateUserHomeAccountIDStmt:    q.updateUserHomeAccountIDStmt,
+		db:                                  tx,
+		tx:                                  tx,
+		addSlotifyGroupStmt:                 q.addSlotifyGroupStmt,
+		addUserToSlotifyGroupStmt:           q.addUserToSlotifyGroupStmt,
+		countSlotifyGroupByIDStmt:           q.countSlotifyGroupByIDStmt,
+		countUserByEmailStmt:                q.countUserByEmailStmt,
+		countUserByIDStmt:                   q.countUserByIDStmt,
+		createNotificationStmt:              q.createNotificationStmt,
+		createRefreshTokenStmt:              q.createRefreshTokenStmt,
+		createUserStmt:                      q.createUserStmt,
+		createUserNotificationStmt:          q.createUserNotificationStmt,
+		deleteRefreshTokenByUserIDStmt:      q.deleteRefreshTokenByUserIDStmt,
+		deleteSlotifyGroupByIDStmt:          q.deleteSlotifyGroupByIDStmt,
+		deleteUserByIDStmt:                  q.deleteUserByIDStmt,
+		getAllSlotifyGroupMembersStmt:       q.getAllSlotifyGroupMembersStmt,
+		getAllSlotifyGroupMembersExceptStmt: q.getAllSlotifyGroupMembersExceptStmt,
+		getJoinableSlotifyGroupsStmt:        q.getJoinableSlotifyGroupsStmt,
+		getRefreshTokenByUserIDStmt:         q.getRefreshTokenByUserIDStmt,
+		getSlotifyGroupByIDStmt:             q.getSlotifyGroupByIDStmt,
+		getUnreadUserNotificationsStmt:      q.getUnreadUserNotificationsStmt,
+		getUserByEmailStmt:                  q.getUserByEmailStmt,
+		getUserByIDStmt:                     q.getUserByIDStmt,
+		getUsersSlotifyGroupsStmt:           q.getUsersSlotifyGroupsStmt,
+		listSlotifyGroupsStmt:               q.listSlotifyGroupsStmt,
+		listUsersStmt:                       q.listUsersStmt,
+		markNotificationAsReadStmt:          q.markNotificationAsReadStmt,
+		updateUserHomeAccountIDStmt:         q.updateUserHomeAccountIDStmt,
 	}
 }
