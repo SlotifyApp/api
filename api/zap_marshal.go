@@ -80,7 +80,7 @@ func (tp GetAPITeamsParams) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 }
 
 func (g GetAPIGroupsParams) MarshalLogObject(enc zapcore.ObjectEncoder) error {
-	var name string
+	name := ""
 	if g.Name != nil {
 		name = *g.Name
 	} else {
