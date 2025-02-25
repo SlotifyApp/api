@@ -19,10 +19,10 @@ SELECT * FROM User WHERE email=?;
 -- name: UpdateUserHomeAccountID :execrows
 UPDATE User SET msft_home_account_id=? WHERE id=?;
 
--- name: GetUsersTeams :many
-SELECT t.* FROM UserToTeam utt
-JOIN Team t ON utt.team_id=t.id 
-WHERE utt.user_id=?;
+-- name: GetUsersSlotifyGroups :many
+SELECT sg.* FROM UserToSlotifyGroup utsg
+JOIN SlotifyGroup sg ON utsg.slotify_group_id=sg.id 
+WHERE utsg.user_id=?;
 
 -- name: ListUsers :many
 SELECT id, email, first_name, last_name FROM User
@@ -33,42 +33,42 @@ WHERE email = ifnull(sqlc.arg('email'), email)
 
 
 
--- name: AddUserToTeam :execrows
-INSERT INTO UserToTeam (user_id, team_id) VALUES (?, ?);
+-- name: AddUserToSlotifyGroup :execrows
+INSERT INTO UserToSlotifyGroup (user_id, slotify_group_id) VALUES (?, ?);
 
--- name: CountTeamByID :one
-SELECT COUNT(*) FROM Team WHERE id=?;
+-- name: CountSlotifyGroupByID :one
+SELECT COUNT(*) FROM SlotifyGroup WHERE id=?;
 
--- name: GetAllTeamMembers :many
-SELECT u.id, u.email, u.first_name, u.last_name FROM Team t
-JOIN UserToTeam utt ON t.id=utt.team_id
-JOIN User u ON u.id=utt.user_id 
-WHERE t.id=?;
+-- name: GetAllSlotifyGroupMembers :many
+SELECT u.id, u.email, u.first_name, u.last_name FROM SlotifyGroup sg
+JOIN UserToSlotifyGroup utsg ON sg.id=utsg.slotify_group_id
+JOIN User u ON u.id=utsg.user_id 
+WHERE sg.id=?;
 
--- name: GetAllTeamMembersExcept :many
-SELECT u.id FROM Team t
-JOIN UserToTeam utt ON t.id=utt.team_id
-JOIN User u ON u.id=utt.user_id 
-WHERE t.id=sqlc.arg('teamID') AND u.id!=sqlc.arg('userID');
+-- name: GetAllSlotifyGroupMembersExcept :many
+SELECT u.id FROM SlotifyGroup sg
+JOIN UserToSlotifyGroup utsg ON sg.id=utsg.slotify_group_id
+JOIN User u ON u.id=utsg.user_id 
+WHERE sg.id=sqlc.arg('slotifyGroupID') AND u.id!=sqlc.arg('userID');
 
--- name: GetJoinableTeams :many
-SELECT t.* FROM Team t
-LEFT JOIN UserToTeam utt ON
-     t.id = utt.team_id AND utt.user_id = ? 
-WHERE utt.user_id IS NULL;
+-- name: GetJoinableSlotifyGroups :many
+SELECT sg.* FROM SlotifyGroup sg
+LEFT JOIN UserToSlotifyGroup utsg ON
+     sg.id = utsg.slotify_group_id AND utsg.user_id = ? 
+WHERE utsg.user_id IS NULL;
 
--- name: GetTeamByID :one
-SELECT * FROM Team WHERE id=?;
+-- name: GetSlotifyGroupByID :one
+SELECT * FROM SlotifyGroup WHERE id=?;
 
--- name: DeleteTeamByID :execrows
-DELETE FROM Team WHERE id=?;
+-- name: DeleteSlotifyGroupByID :execrows
+DELETE FROM SlotifyGroup WHERE id=?;
 
--- name: ListTeams :many
-SELECT * FROM Team
+-- name: ListSlotifyGroups :many
+SELECT * FROM SlotifyGroup
 WHERE name = ifnull(sqlc.arg('name'), name);
 
--- name: AddTeam :execlastid
-INSERT INTO Team (name) VALUES (?);
+-- name: AddSlotifyGroup :execlastid
+INSERT INTO SlotifyGroup (name) VALUES (?);
 
 
 

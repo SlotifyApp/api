@@ -235,14 +235,14 @@ type SchedulingSlotsSuccessResponseBody struct {
 	MeetingTimeSuggestions *[]MeetingTimeSuggestion `json:"meetingTimeSuggestions,omitempty"`
 }
 
-// Team defines model for Team.
-type Team struct {
+// SlotifyGroup defines model for SlotifyGroup.
+type SlotifyGroup struct {
 	Id   uint32 `json:"id"`
 	Name string `json:"name"`
 }
 
-// TeamCreate defines model for TeamCreate.
-type TeamCreate struct {
+// SlotifyGroupCreate defines model for SlotifyGroupCreate.
+type SlotifyGroupCreate struct {
 	Name string `json:"name"`
 }
 
@@ -282,9 +282,9 @@ type GetAPICalendarMeParams struct {
 	End   time.Time `form:"end" json:"end"`
 }
 
-// GetAPITeamsParams defines parameters for GetAPITeams.
-type GetAPITeamsParams struct {
-	// Name Team name
+// GetAPISlotifyGroupsParams defines parameters for GetAPISlotifyGroups.
+type GetAPISlotifyGroupsParams struct {
+	// Name SlotifyGroup name
 	Name *string `form:"name,omitempty" json:"name,omitempty"`
 }
 
@@ -306,8 +306,8 @@ type PostAPICalendarMeJSONRequestBody = CalendarEvent
 // PostAPISchedulingFreeJSONRequestBody defines body for PostAPISchedulingFree for application/json ContentType.
 type PostAPISchedulingFreeJSONRequestBody = SchedulingSlotsBodySchema
 
-// PostAPITeamsJSONRequestBody defines body for PostAPITeams for application/json ContentType.
-type PostAPITeamsJSONRequestBody = TeamCreate
+// PostAPISlotifyGroupsJSONRequestBody defines body for PostAPISlotifyGroups for application/json ContentType.
+type PostAPISlotifyGroupsJSONRequestBody = SlotifyGroupCreate
 
 // PostAPIUsersJSONRequestBody defines body for PostAPIUsers for application/json ContentType.
 type PostAPIUsersJSONRequestBody = UserCreate
@@ -344,36 +344,36 @@ type ServerInterface interface {
 	// Idempotent route, just returns appropriate time slots along with their respective ratings.
 	// (POST /api/scheduling/slots)
 	PostAPISchedulingFree(w http.ResponseWriter, r *http.Request)
-	// Get a team by query params.
-	// (GET /api/teams)
-	GetAPITeams(w http.ResponseWriter, r *http.Request, params GetAPITeamsParams)
-	// Satisfy CORS preflight for creatingteams.
-	// (OPTIONS /api/teams)
-	OptionsAPITeams(w http.ResponseWriter, r *http.Request)
-	// Create a new team.
-	// (POST /api/teams)
-	PostAPITeams(w http.ResponseWriter, r *http.Request)
-	// Get all joinable teams for a user excluding teams they are already a part of.
-	// (GET /api/teams/joinable/me)
-	GetAPITeamsJoinableMe(w http.ResponseWriter, r *http.Request)
-	// Get all teams for current user.
-	// (GET /api/teams/me)
-	GetAPITeamsMe(w http.ResponseWriter, r *http.Request)
-	// Delete a team by id.
-	// (DELETE /api/teams/{teamID})
-	DeleteAPITeamsTeamID(w http.ResponseWriter, r *http.Request, teamID uint32)
-	// Get a team by id.
-	// (GET /api/teams/{teamID})
-	GetAPITeamsTeamID(w http.ResponseWriter, r *http.Request, teamID uint32)
-	// Get all members of a team.
-	// (GET /api/teams/{teamID}/users)
-	GetAPITeamsTeamIDUsers(w http.ResponseWriter, r *http.Request, teamID uint32)
-	// Add current user to a team.
-	// (POST /api/teams/{teamID}/users/me)
-	PostAPITeamsTeamIDUsersMe(w http.ResponseWriter, r *http.Request, teamID uint32)
-	// Add a user to a team.
-	// (POST /api/teams/{teamID}/users/{userID})
-	PostAPITeamsTeamIDUsersUserID(w http.ResponseWriter, r *http.Request, teamID uint32, userID uint32)
+	// Get a slotifyGroup by query params.
+	// (GET /api/slotify-groups)
+	GetAPISlotifyGroups(w http.ResponseWriter, r *http.Request, params GetAPISlotifyGroupsParams)
+	// Satisfy CORS preflight for creatingslotify-groups.
+	// (OPTIONS /api/slotify-groups)
+	OptionsAPISlotifyGroups(w http.ResponseWriter, r *http.Request)
+	// Create a new slotifyGroup.
+	// (POST /api/slotify-groups)
+	PostAPISlotifyGroups(w http.ResponseWriter, r *http.Request)
+	// Get all joinable slotify-groups for a user excluding slotify-groups they are already a part of.
+	// (GET /api/slotify-groups/joinable/me)
+	GetAPISlotifyGroupsJoinableMe(w http.ResponseWriter, r *http.Request)
+	// Get all slotify-groups for current user.
+	// (GET /api/slotify-groups/me)
+	GetAPISlotifyGroupsMe(w http.ResponseWriter, r *http.Request)
+	// Delete a slotifyGroup by id.
+	// (DELETE /api/slotify-groups/{slotifyGroupID})
+	DeleteAPISlotifyGroupsSlotifyGroupID(w http.ResponseWriter, r *http.Request, slotifyGroupID uint32)
+	// Get a slotifyGroup by id.
+	// (GET /api/slotify-groups/{slotifyGroupID})
+	GetAPISlotifyGroupsSlotifyGroupID(w http.ResponseWriter, r *http.Request, slotifyGroupID uint32)
+	// Get all members of a slotifyGroup.
+	// (GET /api/slotify-groups/{slotifyGroupID}/users)
+	GetAPISlotifyGroupsSlotifyGroupIDUsers(w http.ResponseWriter, r *http.Request, slotifyGroupID uint32)
+	// Add current user to a slotifyGroup.
+	// (POST /api/slotify-groups/{slotifyGroupID}/users/me)
+	PostAPISlotifyGroupsSlotifyGroupIDUsersMe(w http.ResponseWriter, r *http.Request, slotifyGroupID uint32)
+	// Add a user to a slotifyGroup.
+	// (POST /api/slotify-groups/{slotifyGroupID}/users/{userID})
+	PostAPISlotifyGroupsSlotifyGroupIDUsersUserID(w http.ResponseWriter, r *http.Request, slotifyGroupID uint32, userID uint32)
 	// Get users by query params.
 	// (GET /api/users)
 	GetAPIUsers(w http.ResponseWriter, r *http.Request, params GetAPIUsersParams)
@@ -638,13 +638,13 @@ func (siw *ServerInterfaceWrapper) PostAPISchedulingFree(w http.ResponseWriter, 
 	handler.ServeHTTP(w, r)
 }
 
-// GetAPITeams operation middleware
-func (siw *ServerInterfaceWrapper) GetAPITeams(w http.ResponseWriter, r *http.Request) {
+// GetAPISlotifyGroups operation middleware
+func (siw *ServerInterfaceWrapper) GetAPISlotifyGroups(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 
 	// Parameter object where we will unmarshal all parameters from the context
-	var params GetAPITeamsParams
+	var params GetAPISlotifyGroupsParams
 
 	// ------------- Optional query parameter "name" -------------
 
@@ -655,7 +655,7 @@ func (siw *ServerInterfaceWrapper) GetAPITeams(w http.ResponseWriter, r *http.Re
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetAPITeams(w, r, params)
+		siw.Handler.GetAPISlotifyGroups(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -665,11 +665,11 @@ func (siw *ServerInterfaceWrapper) GetAPITeams(w http.ResponseWriter, r *http.Re
 	handler.ServeHTTP(w, r)
 }
 
-// OptionsAPITeams operation middleware
-func (siw *ServerInterfaceWrapper) OptionsAPITeams(w http.ResponseWriter, r *http.Request) {
+// OptionsAPISlotifyGroups operation middleware
+func (siw *ServerInterfaceWrapper) OptionsAPISlotifyGroups(w http.ResponseWriter, r *http.Request) {
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.OptionsAPITeams(w, r)
+		siw.Handler.OptionsAPISlotifyGroups(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -679,11 +679,11 @@ func (siw *ServerInterfaceWrapper) OptionsAPITeams(w http.ResponseWriter, r *htt
 	handler.ServeHTTP(w, r)
 }
 
-// PostAPITeams operation middleware
-func (siw *ServerInterfaceWrapper) PostAPITeams(w http.ResponseWriter, r *http.Request) {
+// PostAPISlotifyGroups operation middleware
+func (siw *ServerInterfaceWrapper) PostAPISlotifyGroups(w http.ResponseWriter, r *http.Request) {
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.PostAPITeams(w, r)
+		siw.Handler.PostAPISlotifyGroups(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -693,11 +693,11 @@ func (siw *ServerInterfaceWrapper) PostAPITeams(w http.ResponseWriter, r *http.R
 	handler.ServeHTTP(w, r)
 }
 
-// GetAPITeamsJoinableMe operation middleware
-func (siw *ServerInterfaceWrapper) GetAPITeamsJoinableMe(w http.ResponseWriter, r *http.Request) {
+// GetAPISlotifyGroupsJoinableMe operation middleware
+func (siw *ServerInterfaceWrapper) GetAPISlotifyGroupsJoinableMe(w http.ResponseWriter, r *http.Request) {
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetAPITeamsJoinableMe(w, r)
+		siw.Handler.GetAPISlotifyGroupsJoinableMe(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -707,11 +707,11 @@ func (siw *ServerInterfaceWrapper) GetAPITeamsJoinableMe(w http.ResponseWriter, 
 	handler.ServeHTTP(w, r)
 }
 
-// GetAPITeamsMe operation middleware
-func (siw *ServerInterfaceWrapper) GetAPITeamsMe(w http.ResponseWriter, r *http.Request) {
+// GetAPISlotifyGroupsMe operation middleware
+func (siw *ServerInterfaceWrapper) GetAPISlotifyGroupsMe(w http.ResponseWriter, r *http.Request) {
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetAPITeamsMe(w, r)
+		siw.Handler.GetAPISlotifyGroupsMe(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -721,22 +721,22 @@ func (siw *ServerInterfaceWrapper) GetAPITeamsMe(w http.ResponseWriter, r *http.
 	handler.ServeHTTP(w, r)
 }
 
-// DeleteAPITeamsTeamID operation middleware
-func (siw *ServerInterfaceWrapper) DeleteAPITeamsTeamID(w http.ResponseWriter, r *http.Request) {
+// DeleteAPISlotifyGroupsSlotifyGroupID operation middleware
+func (siw *ServerInterfaceWrapper) DeleteAPISlotifyGroupsSlotifyGroupID(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 
-	// ------------- Path parameter "teamID" -------------
-	var teamID uint32
+	// ------------- Path parameter "slotifyGroupID" -------------
+	var slotifyGroupID uint32
 
-	err = runtime.BindStyledParameterWithOptions("simple", "teamID", mux.Vars(r)["teamID"], &teamID, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	err = runtime.BindStyledParameterWithOptions("simple", "slotifyGroupID", mux.Vars(r)["slotifyGroupID"], &slotifyGroupID, runtime.BindStyledParameterOptions{Explode: false, Required: true})
 	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "teamID", Err: err})
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "slotifyGroupID", Err: err})
 		return
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.DeleteAPITeamsTeamID(w, r, teamID)
+		siw.Handler.DeleteAPISlotifyGroupsSlotifyGroupID(w, r, slotifyGroupID)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -746,22 +746,22 @@ func (siw *ServerInterfaceWrapper) DeleteAPITeamsTeamID(w http.ResponseWriter, r
 	handler.ServeHTTP(w, r)
 }
 
-// GetAPITeamsTeamID operation middleware
-func (siw *ServerInterfaceWrapper) GetAPITeamsTeamID(w http.ResponseWriter, r *http.Request) {
+// GetAPISlotifyGroupsSlotifyGroupID operation middleware
+func (siw *ServerInterfaceWrapper) GetAPISlotifyGroupsSlotifyGroupID(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 
-	// ------------- Path parameter "teamID" -------------
-	var teamID uint32
+	// ------------- Path parameter "slotifyGroupID" -------------
+	var slotifyGroupID uint32
 
-	err = runtime.BindStyledParameterWithOptions("simple", "teamID", mux.Vars(r)["teamID"], &teamID, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	err = runtime.BindStyledParameterWithOptions("simple", "slotifyGroupID", mux.Vars(r)["slotifyGroupID"], &slotifyGroupID, runtime.BindStyledParameterOptions{Explode: false, Required: true})
 	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "teamID", Err: err})
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "slotifyGroupID", Err: err})
 		return
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetAPITeamsTeamID(w, r, teamID)
+		siw.Handler.GetAPISlotifyGroupsSlotifyGroupID(w, r, slotifyGroupID)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -771,22 +771,22 @@ func (siw *ServerInterfaceWrapper) GetAPITeamsTeamID(w http.ResponseWriter, r *h
 	handler.ServeHTTP(w, r)
 }
 
-// GetAPITeamsTeamIDUsers operation middleware
-func (siw *ServerInterfaceWrapper) GetAPITeamsTeamIDUsers(w http.ResponseWriter, r *http.Request) {
+// GetAPISlotifyGroupsSlotifyGroupIDUsers operation middleware
+func (siw *ServerInterfaceWrapper) GetAPISlotifyGroupsSlotifyGroupIDUsers(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 
-	// ------------- Path parameter "teamID" -------------
-	var teamID uint32
+	// ------------- Path parameter "slotifyGroupID" -------------
+	var slotifyGroupID uint32
 
-	err = runtime.BindStyledParameterWithOptions("simple", "teamID", mux.Vars(r)["teamID"], &teamID, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	err = runtime.BindStyledParameterWithOptions("simple", "slotifyGroupID", mux.Vars(r)["slotifyGroupID"], &slotifyGroupID, runtime.BindStyledParameterOptions{Explode: false, Required: true})
 	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "teamID", Err: err})
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "slotifyGroupID", Err: err})
 		return
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetAPITeamsTeamIDUsers(w, r, teamID)
+		siw.Handler.GetAPISlotifyGroupsSlotifyGroupIDUsers(w, r, slotifyGroupID)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -796,22 +796,22 @@ func (siw *ServerInterfaceWrapper) GetAPITeamsTeamIDUsers(w http.ResponseWriter,
 	handler.ServeHTTP(w, r)
 }
 
-// PostAPITeamsTeamIDUsersMe operation middleware
-func (siw *ServerInterfaceWrapper) PostAPITeamsTeamIDUsersMe(w http.ResponseWriter, r *http.Request) {
+// PostAPISlotifyGroupsSlotifyGroupIDUsersMe operation middleware
+func (siw *ServerInterfaceWrapper) PostAPISlotifyGroupsSlotifyGroupIDUsersMe(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 
-	// ------------- Path parameter "teamID" -------------
-	var teamID uint32
+	// ------------- Path parameter "slotifyGroupID" -------------
+	var slotifyGroupID uint32
 
-	err = runtime.BindStyledParameterWithOptions("simple", "teamID", mux.Vars(r)["teamID"], &teamID, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	err = runtime.BindStyledParameterWithOptions("simple", "slotifyGroupID", mux.Vars(r)["slotifyGroupID"], &slotifyGroupID, runtime.BindStyledParameterOptions{Explode: false, Required: true})
 	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "teamID", Err: err})
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "slotifyGroupID", Err: err})
 		return
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.PostAPITeamsTeamIDUsersMe(w, r, teamID)
+		siw.Handler.PostAPISlotifyGroupsSlotifyGroupIDUsersMe(w, r, slotifyGroupID)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -821,17 +821,17 @@ func (siw *ServerInterfaceWrapper) PostAPITeamsTeamIDUsersMe(w http.ResponseWrit
 	handler.ServeHTTP(w, r)
 }
 
-// PostAPITeamsTeamIDUsersUserID operation middleware
-func (siw *ServerInterfaceWrapper) PostAPITeamsTeamIDUsersUserID(w http.ResponseWriter, r *http.Request) {
+// PostAPISlotifyGroupsSlotifyGroupIDUsersUserID operation middleware
+func (siw *ServerInterfaceWrapper) PostAPISlotifyGroupsSlotifyGroupIDUsersUserID(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 
-	// ------------- Path parameter "teamID" -------------
-	var teamID uint32
+	// ------------- Path parameter "slotifyGroupID" -------------
+	var slotifyGroupID uint32
 
-	err = runtime.BindStyledParameterWithOptions("simple", "teamID", mux.Vars(r)["teamID"], &teamID, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	err = runtime.BindStyledParameterWithOptions("simple", "slotifyGroupID", mux.Vars(r)["slotifyGroupID"], &slotifyGroupID, runtime.BindStyledParameterOptions{Explode: false, Required: true})
 	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "teamID", Err: err})
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "slotifyGroupID", Err: err})
 		return
 	}
 
@@ -845,7 +845,7 @@ func (siw *ServerInterfaceWrapper) PostAPITeamsTeamIDUsersUserID(w http.Response
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.PostAPITeamsTeamIDUsersUserID(w, r, teamID, userID)
+		siw.Handler.PostAPISlotifyGroupsSlotifyGroupIDUsersUserID(w, r, slotifyGroupID, userID)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1137,25 +1137,25 @@ func HandlerWithOptions(si ServerInterface, options GorillaServerOptions) http.H
 
 	r.HandleFunc(options.BaseURL+"/api/scheduling/slots", wrapper.PostAPISchedulingFree).Methods("POST")
 
-	r.HandleFunc(options.BaseURL+"/api/teams", wrapper.GetAPITeams).Methods("GET")
+	r.HandleFunc(options.BaseURL+"/api/slotify-groups", wrapper.GetAPISlotifyGroups).Methods("GET")
 
-	r.HandleFunc(options.BaseURL+"/api/teams", wrapper.OptionsAPITeams).Methods("OPTIONS")
+	r.HandleFunc(options.BaseURL+"/api/slotify-groups", wrapper.OptionsAPISlotifyGroups).Methods("OPTIONS")
 
-	r.HandleFunc(options.BaseURL+"/api/teams", wrapper.PostAPITeams).Methods("POST")
+	r.HandleFunc(options.BaseURL+"/api/slotify-groups", wrapper.PostAPISlotifyGroups).Methods("POST")
 
-	r.HandleFunc(options.BaseURL+"/api/teams/joinable/me", wrapper.GetAPITeamsJoinableMe).Methods("GET")
+	r.HandleFunc(options.BaseURL+"/api/slotify-groups/joinable/me", wrapper.GetAPISlotifyGroupsJoinableMe).Methods("GET")
 
-	r.HandleFunc(options.BaseURL+"/api/teams/me", wrapper.GetAPITeamsMe).Methods("GET")
+	r.HandleFunc(options.BaseURL+"/api/slotify-groups/me", wrapper.GetAPISlotifyGroupsMe).Methods("GET")
 
-	r.HandleFunc(options.BaseURL+"/api/teams/{teamID}", wrapper.DeleteAPITeamsTeamID).Methods("DELETE")
+	r.HandleFunc(options.BaseURL+"/api/slotify-groups/{slotifyGroupID}", wrapper.DeleteAPISlotifyGroupsSlotifyGroupID).Methods("DELETE")
 
-	r.HandleFunc(options.BaseURL+"/api/teams/{teamID}", wrapper.GetAPITeamsTeamID).Methods("GET")
+	r.HandleFunc(options.BaseURL+"/api/slotify-groups/{slotifyGroupID}", wrapper.GetAPISlotifyGroupsSlotifyGroupID).Methods("GET")
 
-	r.HandleFunc(options.BaseURL+"/api/teams/{teamID}/users", wrapper.GetAPITeamsTeamIDUsers).Methods("GET")
+	r.HandleFunc(options.BaseURL+"/api/slotify-groups/{slotifyGroupID}/users", wrapper.GetAPISlotifyGroupsSlotifyGroupIDUsers).Methods("GET")
 
-	r.HandleFunc(options.BaseURL+"/api/teams/{teamID}/users/me", wrapper.PostAPITeamsTeamIDUsersMe).Methods("POST")
+	r.HandleFunc(options.BaseURL+"/api/slotify-groups/{slotifyGroupID}/users/me", wrapper.PostAPISlotifyGroupsSlotifyGroupIDUsersMe).Methods("POST")
 
-	r.HandleFunc(options.BaseURL+"/api/teams/{teamID}/users/{userID}", wrapper.PostAPITeamsTeamIDUsersUserID).Methods("POST")
+	r.HandleFunc(options.BaseURL+"/api/slotify-groups/{slotifyGroupID}/users/{userID}", wrapper.PostAPISlotifyGroupsSlotifyGroupIDUsersUserID).Methods("POST")
 
 	r.HandleFunc(options.BaseURL+"/api/users", wrapper.GetAPIUsers).Methods("GET")
 
@@ -1177,75 +1177,75 @@ func HandlerWithOptions(si ServerInterface, options GorillaServerOptions) http.H
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"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",
-	"AAD//7CuyldDXwAA",
+	"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",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file

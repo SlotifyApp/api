@@ -22,7 +22,7 @@ type RefreshToken struct {
 	Revoked bool   `json:"revoked"`
 }
 
-type Team struct {
+type SlotifyGroup struct {
 	ID   uint32 `json:"id"`
 	Name string `json:"name"`
 }
@@ -35,13 +35,13 @@ type User struct {
 	MsftHomeAccountID sql.NullString `json:"msftHomeAccountId"`
 }
 
-type UserToTeam struct {
-	UserID uint32 `json:"userId"`
-	TeamID uint32 `json:"teamId"`
-}
-
 type Usertonotification struct {
 	UserID         uint32 `json:"userId"`
 	NotificationID uint32 `json:"notificationId"`
 	IsRead         bool   `json:"isRead"`
+}
+
+type Usertoslotifygroup struct {
+	UserID         uint32 `json:"userId"`
+	SlotifyGroupID uint32 `json:"slotifyGroupId"`
 }

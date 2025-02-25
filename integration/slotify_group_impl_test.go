@@ -19,7 +19,7 @@ import (
 	"go.uber.org/mock/gomock"
 )
 
-func TestTeam_GetTeams(t *testing.T) {
+func TestSlotifyGroup_GetSlotifyGroups(t *testing.T) {
 	t.Parallel()
 
 	var err error
@@ -32,26 +32,26 @@ func TestTeam_GetTeams(t *testing.T) {
 		testutil.CloseDB(db)
 	})
 
-	insertedTeam := testutil.InsertTeam(t, db)
+	insertedSlotifyGroup := testutil.InsertSlotifyGroup(t, db)
 
 	tests := map[string]struct {
-		httpStatus    int
-		teamName      string
-		expectedTeams api.Teams
-		testMsg       string
-		route         string
+		httpStatus            int
+		slotifyGroupName      string
+		expectedSlotifyGroups api.SlotifyGroups
+		testMsg               string
+		route                 string
 	}{
-		"team does not exist": {
-			httpStatus:    http.StatusOK,
-			teamName:      "DoesntExist",
-			expectedTeams: api.Teams{},
-			testMsg:       "empty array is returned when team does not exist",
+		"slotifyGroup does not exist": {
+			httpStatus:            http.StatusOK,
+			slotifyGroupName:      "DoesntExist",
+			expectedSlotifyGroups: api.SlotifyGroups{},
+			testMsg:               "empty array is returned when slotifyGroup does not exist",
 		},
-		"team does exist": {
-			httpStatus:    http.StatusOK,
-			teamName:      insertedTeam.Name,
-			expectedTeams: api.Teams{insertedTeam},
-			testMsg:       "correct array is returned when team exists",
+		"slotifyGroup does exist": {
+			httpStatus:            http.StatusOK,
+			slotifyGroupName:      insertedSlotifyGroup.Name,
+			expectedSlotifyGroups: api.SlotifyGroups{insertedSlotifyGroup},
+			testMsg:               "correct array is returned when slotifyGroup exists",
 		},
 	}
 
@@ -59,28 +59,28 @@ func TestTeam_GetTeams(t *testing.T) {
 		t.Run(testName, func(t *testing.T) {
 			t.Parallel()
 
-			params := api.GetAPITeamsParams{
-				Name: &tt.teamName,
+			params := api.GetAPISlotifyGroupsParams{
+				Name: &tt.slotifyGroupName,
 			}
 			rr := httptest.NewRecorder()
 
 			req := httptest.NewRequest(http.MethodGet,
-				fmt.Sprintf("/api/teams?name=%s", url.QueryEscape(*params.Name)), nil)
+				fmt.Sprintf("/api/slotify-groups?name=%s", url.QueryEscape(*params.Name)), nil)
 
-			server.GetAPITeams(rr, req, params)
+			server.GetAPISlotifyGroups(rr, req, params)
 
-			var teams api.Teams
+			var slotifyGroups api.SlotifyGroups
 			require.Equal(t, tt.httpStatus, rr.Result().StatusCode)
-			err = json.NewDecoder(rr.Result().Body).Decode(&teams)
-			require.NoError(t, err, "response cannot be decoded into Teams struct")
-			require.Equal(t, tt.expectedTeams, teams, tt.testMsg)
+			err = json.NewDecoder(rr.Result().Body).Decode(&slotifyGroups)
+			require.NoError(t, err, "response cannot be decoded into SlotifyGroups struct")
+			require.Equal(t, tt.expectedSlotifyGroups, slotifyGroups, tt.testMsg)
 
 			testutil.OpenAPIValidateTest(t, rr, req)
 		})
 	}
 }
 
-func TestTeam_PostTeams(t *testing.T) {
+func TestSlotifyGroup_PostSlotifyGroups(t *testing.T) {
 	t.Parallel()
 
 	ctrl := gomock.NewController(t)
@@ -102,31 +102,31 @@ func TestTeam_PostTeams(t *testing.T) {
 	})
 	user := testutil.InsertUser(t, db)
 	// Setup
-	insertedTeam := testutil.InsertTeam(t, db)
-	newTeamName := gofakeit.ProductName()
+	insertedSlotifyGroup := testutil.InsertSlotifyGroup(t, db)
+	newSlotifyGroupName := gofakeit.ProductName()
 
 	tests := map[string]struct {
 		httpStatus       int
-		teamBody         api.TeamCreate
-		teamName         string
+		slotifyGroupBody api.SlotifyGroupCreate
+		slotifyGroupName string
 		expectedRespBody any
 		testMsg          string
 	}{
-		"team inserted correctly": {
-			httpStatus: http.StatusCreated,
-			teamName:   newTeamName,
-			teamBody: api.TeamCreate{
-				Name: newTeamName,
+		"slotifyGroup inserted correctly": {
+			httpStatus:       http.StatusCreated,
+			slotifyGroupName: newSlotifyGroupName,
+			slotifyGroupBody: api.SlotifyGroupCreate{
+				Name: newSlotifyGroupName,
 			},
-			testMsg: "team made successfully",
+			testMsg: "slotifyGroup made successfully",
 		},
-		"team already exists": {
+		"slotifyGroup already exists": {
 			httpStatus: http.StatusBadRequest,
-			teamBody: api.TeamCreate{
-				Name: insertedTeam.Name,
+			slotifyGroupBody: api.SlotifyGroupCreate{
+				Name: insertedSlotifyGroup.Name,
 			},
-			expectedRespBody: fmt.Sprintf("team with name %s already exists", insertedTeam.Name),
-			testMsg:          "team that already exists",
+			expectedRespBody: fmt.Sprintf("slotifyGroup with name %s already exists", insertedSlotifyGroup.Name),
+			testMsg:          "slotifyGroup that already exists",
 		},
 	}
 
@@ -134,24 +134,24 @@ func TestTeam_PostTeams(t *testing.T) {
 		t.Run(testName, func(t *testing.T) {
 			t.Parallel()
 
-			body, err := json.Marshal(tt.teamBody)
-			require.NoError(t, err, "could not marshal json req body team")
+			body, err := json.Marshal(tt.slotifyGroupBody)
+			require.NoError(t, err, "could not marshal json req body slotifyGroup")
 			rr := httptest.NewRecorder()
-			req := httptest.NewRequest(http.MethodPost, "/api/teams", bytes.NewReader(body))
+			req := httptest.NewRequest(http.MethodPost, "/api/slotify-groups", bytes.NewReader(body))
 			req.Header.Add("Content-Type", "application/json")
 
 			ctx := context.WithValue(req.Context(), api.UserIDCtxKey{}, user.Id)
 			req = req.WithContext(ctx)
 
-			server.PostAPITeams(rr, req)
+			server.PostAPISlotifyGroups(rr, req)
 
 			if tt.httpStatus == http.StatusCreated {
-				var team api.Team
+				var slotifyGroup api.SlotifyGroup
 				require.Equal(t, tt.httpStatus, rr.Result().StatusCode)
-				err = json.NewDecoder(rr.Result().Body).Decode(&team)
-				require.NoError(t, err, "response cannot be decoded into Team struct")
+				err = json.NewDecoder(rr.Result().Body).Decode(&slotifyGroup)
+				require.NoError(t, err, "response cannot be decoded into SlotifyGroup struct")
 
-				require.Equal(t, tt.teamName, team.Name, tt.testMsg)
+				require.Equal(t, tt.slotifyGroupName, slotifyGroup.Name, tt.testMsg)
 			} else {
 				var errMsg string
 				require.Equal(t, tt.httpStatus, rr.Result().StatusCode)
@@ -166,7 +166,7 @@ func TestTeam_PostTeams(t *testing.T) {
 	}
 }
 
-func TestTeam_DeleteTeamsTeamID(t *testing.T) {
+func TestSlotifyGroup_DeleteSlotifyGroupsSlotifyGroupID(t *testing.T) {
 	t.Parallel()
 
 	var err error
@@ -177,24 +177,24 @@ func TestTeam_DeleteTeamsTeamID(t *testing.T) {
 		testutil.CloseDB(db)
 	})
 
-	teamInserted := testutil.InsertTeam(t, db)
+	slotifyGroupInserted := testutil.InsertSlotifyGroup(t, db)
 
 	tests := map[string]struct {
 		expectedRespBody any
 		httpStatus       int
-		teamID           uint32
+		slotifyGroupID   uint32
 		testMsg          string
 	}{
-		"deleting team that doesn't exist": {
-			expectedRespBody: "team api: incorrect team id",
+		"deleting slotifyGroup that doesn't exist": {
+			expectedRespBody: "slotifyGroup api: incorrect slotifyGroup id",
 			httpStatus:       http.StatusBadRequest,
-			teamID:           10000,
-			testMsg:          "team that doesn't exist, returns client error",
-		}, "deleting team that exists": {
-			expectedRespBody: "team api: team deleted successfully",
+			slotifyGroupID:   10000,
+			testMsg:          "slotifyGroup that doesn't exist, returns client error",
+		}, "deleting slotifyGroup that exists": {
+			expectedRespBody: "slotifyGroup api: slotifyGroup deleted successfully",
 			httpStatus:       http.StatusOK,
-			teamID:           teamInserted.Id,
-			testMsg:          "deleting team that exists is successful",
+			slotifyGroupID:   slotifyGroupInserted.Id,
+			testMsg:          "deleting slotifyGroup that exists is successful",
 		},
 	}
 
@@ -203,9 +203,9 @@ func TestTeam_DeleteTeamsTeamID(t *testing.T) {
 			t.Parallel()
 
 			rr := httptest.NewRecorder()
-			req := httptest.NewRequest(http.MethodDelete, fmt.Sprintf("/api/teams/%d", tt.teamID), nil)
+			req := httptest.NewRequest(http.MethodDelete, fmt.Sprintf("/api/slotify-groups/%d", tt.slotifyGroupID), nil)
 
-			server.DeleteAPITeamsTeamID(rr, req, tt.teamID)
+			server.DeleteAPISlotifyGroupsSlotifyGroupID(rr, req, tt.slotifyGroupID)
 
 			testutil.OpenAPIValidateTest(t, rr, req)
 			var errMsg string
@@ -217,7 +217,7 @@ func TestTeam_DeleteTeamsTeamID(t *testing.T) {
 	}
 }
 
-func TestTeam_GetTeamsTeamID(t *testing.T) {
+func TestSlotifyGroup_GetSlotifyGroupsSlotifyGroupID(t *testing.T) {
 	t.Parallel()
 
 	var err error
@@ -227,25 +227,25 @@ func TestTeam_GetTeamsTeamID(t *testing.T) {
 		testutil.CloseDB(db)
 	})
 
-	teamInserted := testutil.InsertTeam(t, db)
+	slotifyGroupInserted := testutil.InsertSlotifyGroup(t, db)
 
 	tests := map[string]struct {
 		expectedRespBody any
 		httpStatus       int
-		teamID           uint32
+		slotifyGroupID   uint32
 		testMsg          string
 	}{
-		"get team that exists": {
-			expectedRespBody: teamInserted,
+		"get slotifyGroup that exists": {
+			expectedRespBody: slotifyGroupInserted,
 			httpStatus:       http.StatusOK,
-			teamID:           teamInserted.Id,
-			testMsg:          "can get team that exists successfully",
+			slotifyGroupID:   slotifyGroupInserted.Id,
+			testMsg:          "can get slotifyGroup that exists successfully",
 		},
-		"get team that doesn't exist": {
-			expectedRespBody: "team api: team with id 1000 does not exist",
+		"get slotifyGroup that doesn't exist": {
+			expectedRespBody: "slotifyGroup api: slotifyGroup with id 1000 does not exist",
 			httpStatus:       http.StatusNotFound,
-			teamID:           1000,
-			testMsg:          "deleting team that doesn't exist is unsuccessful",
+			slotifyGroupID:   1000,
+			testMsg:          "deleting slotifyGroup that doesn't exist is unsuccessful",
 		},
 	}
 
@@ -254,17 +254,17 @@ func TestTeam_GetTeamsTeamID(t *testing.T) {
 			t.Parallel()
 
 			rr := httptest.NewRecorder()
-			req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/teams/%d", tt.teamID), nil)
+			req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/slotify-groups/%d", tt.slotifyGroupID), nil)
 
-			server.GetAPITeamsTeamID(rr, req, tt.teamID)
+			server.GetAPISlotifyGroupsSlotifyGroupID(rr, req, tt.slotifyGroupID)
 
 			testutil.OpenAPIValidateTest(t, rr, req)
 			if tt.httpStatus == http.StatusOK {
-				var team api.Team
+				var slotifyGroup api.SlotifyGroup
 				require.Equal(t, tt.httpStatus, rr.Result().StatusCode)
-				err = json.NewDecoder(rr.Result().Body).Decode(&team)
-				require.NoError(t, err, "response cannot be decoded into a team")
-				require.Equal(t, tt.expectedRespBody, team, tt.testMsg)
+				err = json.NewDecoder(rr.Result().Body).Decode(&slotifyGroup)
+				require.NoError(t, err, "response cannot be decoded into a slotifyGroup")
+				require.Equal(t, tt.expectedRespBody, slotifyGroup, tt.testMsg)
 			} else {
 				var errMsg string
 				require.Equal(t, tt.httpStatus, rr.Result().StatusCode)
@@ -276,7 +276,7 @@ func TestTeam_GetTeamsTeamID(t *testing.T) {
 	}
 }
 
-func TestTeam_PostTeamsTeamIDUsersUserID(t *testing.T) {
+func TestSlotifyGroup_PostSlotifyGroupsSlotifyGroupIDUsersUserID(t *testing.T) {
 	t.Parallel()
 
 	ctrl := gomock.NewController(t)
@@ -298,50 +298,51 @@ func TestTeam_PostTeamsTeamIDUsersUserID(t *testing.T) {
 		testutil.CloseDB(db)
 	})
 
-	teamInserted := testutil.InsertTeam(t, db)
+	slotifyGroupInserted := testutil.InsertSlotifyGroup(t, db)
 
 	userInserted := testutil.InsertUser(t, db)
 
 	tests := map[string]struct {
 		expectedRespBody any
 		httpStatus       int
-		teamID           uint32
+		slotifyGroupID   uint32
 		userID           uint32
 		testMsg          string
 	}{
-		"insert a user into a team": {
-			expectedRespBody: api.Team{
-				Id:   teamInserted.Id,
-				Name: teamInserted.Name,
+		"insert a user into a slotifyGroup": {
+			expectedRespBody: api.SlotifyGroup{
+				Id:   slotifyGroupInserted.Id,
+				Name: slotifyGroupInserted.Name,
 			},
-			httpStatus: http.StatusCreated,
-			userID:     userInserted.Id,
-			teamID:     teamInserted.Id,
-			testMsg:    "can add user to team where both exist successfully",
+			httpStatus:     http.StatusCreated,
+			userID:         userInserted.Id,
+			slotifyGroupID: slotifyGroupInserted.Id,
+			testMsg:        "can add user to slotifyGroup where both exist successfully",
 		},
-		"insert a user into a non-existent team": {
-			expectedRespBody: fmt.Sprintf("team api: team id(%d) or user id(%d) was invalid",
+		"insert a user into a non-existent slotifyGroup": {
+			expectedRespBody: fmt.Sprintf("slotifyGroup api: slotifyGroup id(%d) or user id(%d) was invalid",
 				1000, userInserted.Id),
-			httpStatus: http.StatusForbidden,
-			userID:     userInserted.Id,
-			teamID:     1000,
-			testMsg:    "cannot add user to team where team does not exist",
+			httpStatus:     http.StatusForbidden,
+			userID:         userInserted.Id,
+			slotifyGroupID: 1000,
+			testMsg:        "cannot add user to slotifyGroup where slotifyGroup does not exist",
 		},
 
-		"insert an non-existent user into a team": {
-			expectedRespBody: fmt.Sprintf("team api: team id(%d) or user id(%d) was invalid", teamInserted.Id, 10000),
-			httpStatus:       http.StatusForbidden,
-			userID:           10000,
-			teamID:           teamInserted.Id,
-			testMsg:          "cannot add user to team where user does not exist",
+		"insert an non-existent user into a slotifyGroup": {
+			expectedRespBody: fmt.Sprintf("slotifyGroup api: slotifyGroup id(%d) or user id(%d) was invalid",
+				slotifyGroupInserted.Id, 10000),
+			httpStatus:     http.StatusForbidden,
+			userID:         10000,
+			slotifyGroupID: slotifyGroupInserted.Id,
+			testMsg:        "cannot add user to slotifyGroup where user does not exist",
 		},
 
-		"user and team ids do not exist": {
-			expectedRespBody: fmt.Sprintf("team api: team id(%d) or user id(%d) was invalid", 10000, 10000),
+		"user and slotifyGroup ids do not exist": {
+			expectedRespBody: fmt.Sprintf("slotifyGroup api: slotifyGroup id(%d) or user id(%d) was invalid", 10000, 10000),
 			httpStatus:       http.StatusForbidden,
 			userID:           10000,
-			teamID:           10000,
-			testMsg:          "cannot add user to team where neither exists",
+			slotifyGroupID:   10000,
+			testMsg:          "cannot add user to slotifyGroup where neither exists",
 		},
 	}
 
@@ -350,18 +351,19 @@ func TestTeam_PostTeamsTeamIDUsersUserID(t *testing.T) {
 			t.Parallel()
 
 			rr := httptest.NewRecorder()
-			req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/api/teams/%d/users/%d", tt.teamID, tt.userID), nil)
+			req := httptest.NewRequest(http.MethodPost,
+				fmt.Sprintf("/api/slotify-groups/%d/users/%d", tt.slotifyGroupID, tt.userID), nil)
 
-			server.PostAPITeamsTeamIDUsersUserID(rr, req, tt.teamID, tt.userID)
+			server.PostAPISlotifyGroupsSlotifyGroupIDUsersUserID(rr, req, tt.slotifyGroupID, tt.userID)
 
 			testutil.OpenAPIValidateTest(t, rr, req)
 
 			if tt.httpStatus == http.StatusCreated {
-				var team api.Team
+				var slotifyGroup api.SlotifyGroup
 				require.Equal(t, tt.httpStatus, rr.Result().StatusCode)
-				err = json.NewDecoder(rr.Result().Body).Decode(&team)
-				require.NoError(t, err, "response cannot be decoded into Team struct")
-				require.Equal(t, tt.expectedRespBody, team, tt.testMsg)
+				err = json.NewDecoder(rr.Result().Body).Decode(&slotifyGroup)
+				require.NoError(t, err, "response cannot be decoded into SlotifyGroup struct")
+				require.Equal(t, tt.expectedRespBody, slotifyGroup, tt.testMsg)
 			} else {
 				var respBody string
 				require.Equal(t, tt.httpStatus, rr.Result().StatusCode)
@@ -373,7 +375,7 @@ func TestTeam_PostTeamsTeamIDUsersUserID(t *testing.T) {
 	}
 }
 
-func TestTeam_GetTeamsTeamIDUsers(t *testing.T) {
+func TestSlotifyGroup_GetSlotifyGroupsSlotifyGroupIDUsers(t *testing.T) {
 	t.Parallel()
 
 	var err error
@@ -383,31 +385,31 @@ func TestTeam_GetTeamsTeamIDUsers(t *testing.T) {
 		testutil.CloseDB(db)
 	})
 
-	teamInserted := testutil.InsertTeam(t, db)
+	slotifyGroupInserted := testutil.InsertSlotifyGroup(t, db)
 
 	userInserted := testutil.InsertUser(t, db)
 	userInserted2 := testutil.InsertUser(t, db)
 
-	testutil.AddUserToTeam(t, db, userInserted.Id, teamInserted.Id)
-	testutil.AddUserToTeam(t, db, userInserted2.Id, teamInserted.Id)
+	testutil.AddUserToSlotifyGroup(t, db, userInserted.Id, slotifyGroupInserted.Id)
+	testutil.AddUserToSlotifyGroup(t, db, userInserted2.Id, slotifyGroupInserted.Id)
 
 	tests := map[string]struct {
 		expectedRespBody any
 		httpStatus       int
-		teamID           uint32
+		slotifyGroupID   uint32
 		testMsg          string
 	}{
-		"get members of a non-existing team": {
-			expectedRespBody: "team api: team with id(10000) does not exist",
+		"get members of a non-existing slotifyGroup": {
+			expectedRespBody: "slotifyGroup api: slotifyGroup with id(10000) does not exist",
 			httpStatus:       http.StatusForbidden,
-			teamID:           10000,
-			testMsg:          "correct error returns when team doesn't exist",
+			slotifyGroupID:   10000,
+			testMsg:          "correct error returns when slotifyGroup doesn't exist",
 		},
-		"get members of an existing team": {
+		"get members of an existing slotifyGroup": {
 			expectedRespBody: api.Users{userInserted, userInserted2},
 			httpStatus:       http.StatusOK,
-			teamID:           teamInserted.Id,
-			testMsg:          "correctly get members of a team",
+			slotifyGroupID:   slotifyGroupInserted.Id,
+			testMsg:          "correctly get members of a slotifyGroup",
 		},
 	}
 
@@ -416,9 +418,9 @@ func TestTeam_GetTeamsTeamIDUsers(t *testing.T) {
 			t.Parallel()
 
 			rr := httptest.NewRecorder()
-			req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/teams/%d/users", tt.teamID), nil)
+			req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/slotify-groups/%d/users", tt.slotifyGroupID), nil)
 
-			server.GetAPITeamsTeamIDUsers(rr, req, tt.teamID)
+			server.GetAPISlotifyGroupsSlotifyGroupIDUsers(rr, req, tt.slotifyGroupID)
 
 			testutil.OpenAPIValidateTest(t, rr, req)
 
@@ -439,7 +441,7 @@ func TestTeam_GetTeamsTeamIDUsers(t *testing.T) {
 	}
 }
 
-func TestTeam_GetAPITeamsMe(t *testing.T) {
+func TestSlotifyGroup_GetAPISlotifyGroupsMe(t *testing.T) {
 	t.Parallel()
 
 	var err error
@@ -451,11 +453,11 @@ func TestTeam_GetAPITeamsMe(t *testing.T) {
 
 	user1 := testutil.InsertUser(t, db, testutil.WithEmail("blah@example.com"))
 
-	insertedTeam1 := testutil.InsertTeam(t, db)
-	insertedTeam2 := testutil.InsertTeam(t, db)
+	insertedSlotifyGroup1 := testutil.InsertSlotifyGroup(t, db)
+	insertedSlotifyGroup2 := testutil.InsertSlotifyGroup(t, db)
 	user2 := testutil.InsertUser(t, db)
-	testutil.AddUserToTeam(t, db, user2.Id, insertedTeam1.Id)
-	testutil.AddUserToTeam(t, db, user2.Id, insertedTeam2.Id)
+	testutil.AddUserToSlotifyGroup(t, db, user2.Id, insertedSlotifyGroup1.Id)
+	testutil.AddUserToSlotifyGroup(t, db, user2.Id, insertedSlotifyGroup2.Id)
 
 	tests := map[string]struct {
 		expectedRespBody any
@@ -463,16 +465,16 @@ func TestTeam_GetAPITeamsMe(t *testing.T) {
 		testMsg          string
 		userID           uint32
 	}{
-		"get teams of user who has no teams": {
-			expectedRespBody: api.Teams{},
+		"get slotifyGroups of user who has no slotifyGroups": {
+			expectedRespBody: api.SlotifyGroups{},
 			httpStatus:       http.StatusOK,
-			testMsg:          "user who has no teams returns empty list",
+			testMsg:          "user who has no slotifyGroups returns empty list",
 			userID:           user1.Id,
 		},
-		"get teams of user who has many teams": {
-			expectedRespBody: api.Teams{insertedTeam1, insertedTeam2},
+		"get slotifyGroups of user who has many slotifyGroups": {
+			expectedRespBody: api.SlotifyGroups{insertedSlotifyGroup1, insertedSlotifyGroup2},
 			httpStatus:       http.StatusOK,
-			testMsg:          "correctly get all of a user's teams",
+			testMsg:          "correctly get all of a user's slotifyGroups",
 			userID:           user2.Id,
 		},
 	}
@@ -482,17 +484,17 @@ func TestTeam_GetAPITeamsMe(t *testing.T) {
 			t.Parallel()
 
 			rr := httptest.NewRecorder()
-			req := httptest.NewRequest(http.MethodGet, "/api/teams/me", nil)
+			req := httptest.NewRequest(http.MethodGet, "/api/slotify-groups/me", nil)
 
 			ctx := context.WithValue(req.Context(), api.UserIDCtxKey{}, tt.userID)
 			req = req.WithContext(ctx)
 
-			server.GetAPITeamsMe(rr, req)
+			server.GetAPISlotifyGroupsMe(rr, req)
 
 			testutil.OpenAPIValidateTest(t, rr, req)
 
 			if tt.httpStatus == http.StatusOK {
-				var respBody api.Teams
+				var respBody api.SlotifyGroups
 				require.Equal(t, tt.httpStatus, rr.Result().StatusCode)
 				err = json.NewDecoder(rr.Result().Body).Decode(&respBody)
 				require.NoError(t, err, "response cannot be decoded into Users struct")

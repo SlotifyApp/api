@@ -11,41 +11,41 @@ import (
 	"time"
 )
 
-const addTeam = `-- name: AddTeam :execlastid
-INSERT INTO Team (name) VALUES (?)
+const addSlotifyGroup = `-- name: AddSlotifyGroup :execlastid
+INSERT INTO SlotifyGroup (name) VALUES (?)
 `
 
-func (q *Queries) AddTeam(ctx context.Context, name string) (int64, error) {
-	result, err := q.exec(ctx, q.addTeamStmt, addTeam, name)
+func (q *Queries) AddSlotifyGroup(ctx context.Context, name string) (int64, error) {
+	result, err := q.exec(ctx, q.addSlotifyGroupStmt, addSlotifyGroup, name)
 	if err != nil {
 		return 0, err
 	}
 	return result.LastInsertId()
 }
 
-const addUserToTeam = `-- name: AddUserToTeam :execrows
-INSERT INTO UserToTeam (user_id, team_id) VALUES (?, ?)
+const addUserToSlotifyGroup = `-- name: AddUserToSlotifyGroup :execrows
+INSERT INTO UserToSlotifyGroup (user_id, slotify_group_id) VALUES (?, ?)
 `
 
-type AddUserToTeamParams struct {
-	UserID uint32 `json:"userId"`
-	TeamID uint32 `json:"teamId"`
+type AddUserToSlotifyGroupParams struct {
+	UserID         uint32 `json:"userId"`
+	SlotifyGroupID uint32 `json:"slotifyGroupId"`
 }
 
-func (q *Queries) AddUserToTeam(ctx context.Context, arg AddUserToTeamParams) (int64, error) {
-	result, err := q.exec(ctx, q.addUserToTeamStmt, addUserToTeam, arg.UserID, arg.TeamID)
+func (q *Queries) AddUserToSlotifyGroup(ctx context.Context, arg AddUserToSlotifyGroupParams) (int64, error) {
+	result, err := q.exec(ctx, q.addUserToSlotifyGroupStmt, addUserToSlotifyGroup, arg.UserID, arg.SlotifyGroupID)
 	if err != nil {
 		return 0, err
 	}
 	return result.RowsAffected()
 }
 
-const countTeamByID = `-- name: CountTeamByID :one
-SELECT COUNT(*) FROM Team WHERE id=?
+const countSlotifyGroupByID = `-- name: CountSlotifyGroupByID :one
+SELECT COUNT(*) FROM SlotifyGroup WHERE id=?
 `
 
-func (q *Queries) CountTeamByID(ctx context.Context, id uint32) (int64, error) {
-	row := q.queryRow(ctx, q.countTeamByIDStmt, countTeamByID, id)
+func (q *Queries) CountSlotifyGroupByID(ctx context.Context, id uint32) (int64, error) {
+	row := q.queryRow(ctx, q.countSlotifyGroupByIDStmt, countSlotifyGroupByID, id)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -154,12 +154,12 @@ func (q *Queries) DeleteRefreshTokenByUserID(ctx context.Context, userID uint32)
 	return result.RowsAffected()
 }
 
-const deleteTeamByID = `-- name: DeleteTeamByID :execrows
-DELETE FROM Team WHERE id=?
+const deleteSlotifyGroupByID = `-- name: DeleteSlotifyGroupByID :execrows
+DELETE FROM SlotifyGroup WHERE id=?
 `
 
-func (q *Queries) DeleteTeamByID(ctx context.Context, id uint32) (int64, error) {
-	result, err := q.exec(ctx, q.deleteTeamByIDStmt, deleteTeamByID, id)
+func (q *Queries) DeleteSlotifyGroupByID(ctx context.Context, id uint32) (int64, error) {
+	result, err := q.exec(ctx, q.deleteSlotifyGroupByIDStmt, deleteSlotifyGroupByID, id)
 	if err != nil {
 		return 0, err
 	}
@@ -178,29 +178,29 @@ func (q *Queries) DeleteUserByID(ctx context.Context, id uint32) (int64, error) 
 	return result.RowsAffected()
 }
 
-const getAllTeamMembers = `-- name: GetAllTeamMembers :many
-SELECT u.id, u.email, u.first_name, u.last_name FROM Team t
-JOIN UserToTeam utt ON t.id=utt.team_id
-JOIN User u ON u.id=utt.user_id 
-WHERE t.id=?
+const getAllSlotifyGroupMembers = `-- name: GetAllSlotifyGroupMembers :many
+SELECT u.id, u.email, u.first_name, u.last_name FROM SlotifyGroup sg
+JOIN UserToSlotifyGroup utsg ON sg.id=utsg.slotify_group_id
+JOIN User u ON u.id=utsg.user_id 
+WHERE sg.id=?
 `
 
-type GetAllTeamMembersRow struct {
+type GetAllSlotifyGroupMembersRow struct {
 	ID        uint32 `json:"id"`
 	Email     string `json:"email"`
 	FirstName string `json:"firstName"`
 	LastName  string `json:"lastName"`
 }
 
-func (q *Queries) GetAllTeamMembers(ctx context.Context, id uint32) ([]GetAllTeamMembersRow, error) {
-	rows, err := q.query(ctx, q.getAllTeamMembersStmt, getAllTeamMembers, id)
+func (q *Queries) GetAllSlotifyGroupMembers(ctx context.Context, id uint32) ([]GetAllSlotifyGroupMembersRow, error) {
+	rows, err := q.query(ctx, q.getAllSlotifyGroupMembersStmt, getAllSlotifyGroupMembers, id)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []GetAllTeamMembersRow{}
+	items := []GetAllSlotifyGroupMembersRow{}
 	for rows.Next() {
-		var i GetAllTeamMembersRow
+		var i GetAllSlotifyGroupMembersRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.Email,
@@ -220,20 +220,20 @@ func (q *Queries) GetAllTeamMembers(ctx context.Context, id uint32) ([]GetAllTea
 	return items, nil
 }
 
-const getAllTeamMembersExcept = `-- name: GetAllTeamMembersExcept :many
-SELECT u.id FROM Team t
-JOIN UserToTeam utt ON t.id=utt.team_id
-JOIN User u ON u.id=utt.user_id 
-WHERE t.id=? AND u.id!=?
+const getAllSlotifyGroupMembersExcept = `-- name: GetAllSlotifyGroupMembersExcept :many
+SELECT u.id FROM SlotifyGroup sg
+JOIN UserToSlotifyGroup utsg ON sg.id=utsg.slotify_group_id
+JOIN User u ON u.id=utsg.user_id 
+WHERE sg.id=? AND u.id!=?
 `
 
-type GetAllTeamMembersExceptParams struct {
-	TeamID uint32 `json:"teamID"`
-	UserID uint32 `json:"userID"`
+type GetAllSlotifyGroupMembersExceptParams struct {
+	SlotifyGroupID uint32 `json:"slotifyGroupID"`
+	UserID         uint32 `json:"userID"`
 }
 
-func (q *Queries) GetAllTeamMembersExcept(ctx context.Context, arg GetAllTeamMembersExceptParams) ([]uint32, error) {
-	rows, err := q.query(ctx, q.getAllTeamMembersExceptStmt, getAllTeamMembersExcept, arg.TeamID, arg.UserID)
+func (q *Queries) GetAllSlotifyGroupMembersExcept(ctx context.Context, arg GetAllSlotifyGroupMembersExceptParams) ([]uint32, error) {
+	rows, err := q.query(ctx, q.getAllSlotifyGroupMembersExceptStmt, getAllSlotifyGroupMembersExcept, arg.SlotifyGroupID, arg.UserID)
 	if err != nil {
 		return nil, err
 	}
@@ -255,22 +255,22 @@ func (q *Queries) GetAllTeamMembersExcept(ctx context.Context, arg GetAllTeamMem
 	return items, nil
 }
 
-const getJoinableTeams = `-- name: GetJoinableTeams :many
-SELECT t.id, t.name FROM Team t
-LEFT JOIN UserToTeam utt ON
-     t.id = utt.team_id AND utt.user_id = ? 
-WHERE utt.user_id IS NULL
+const getJoinableSlotifyGroups = `-- name: GetJoinableSlotifyGroups :many
+SELECT sg.id, sg.name FROM SlotifyGroup sg
+LEFT JOIN UserToSlotifyGroup utsg ON
+     sg.id = utsg.slotify_group_id AND utsg.user_id = ? 
+WHERE utsg.user_id IS NULL
 `
 
-func (q *Queries) GetJoinableTeams(ctx context.Context, userID uint32) ([]Team, error) {
-	rows, err := q.query(ctx, q.getJoinableTeamsStmt, getJoinableTeams, userID)
+func (q *Queries) GetJoinableSlotifyGroups(ctx context.Context, userID uint32) ([]SlotifyGroup, error) {
+	rows, err := q.query(ctx, q.getJoinableSlotifyGroupsStmt, getJoinableSlotifyGroups, userID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []Team{}
+	items := []SlotifyGroup{}
 	for rows.Next() {
-		var i Team
+		var i SlotifyGroup
 		if err := rows.Scan(&i.ID, &i.Name); err != nil {
 			return nil, err
 		}
@@ -301,13 +301,13 @@ func (q *Queries) GetRefreshTokenByUserID(ctx context.Context, userID uint32) (R
 	return i, err
 }
 
-const getTeamByID = `-- name: GetTeamByID :one
-SELECT id, name FROM Team WHERE id=?
+const getSlotifyGroupByID = `-- name: GetSlotifyGroupByID :one
+SELECT id, name FROM SlotifyGroup WHERE id=?
 `
 
-func (q *Queries) GetTeamByID(ctx context.Context, id uint32) (Team, error) {
-	row := q.queryRow(ctx, q.getTeamByIDStmt, getTeamByID, id)
-	var i Team
+func (q *Queries) GetSlotifyGroupByID(ctx context.Context, id uint32) (SlotifyGroup, error) {
+	row := q.queryRow(ctx, q.getSlotifyGroupByIDStmt, getSlotifyGroupByID, id)
+	var i SlotifyGroup
 	err := row.Scan(&i.ID, &i.Name)
 	return i, err
 }
@@ -376,21 +376,21 @@ func (q *Queries) GetUserByID(ctx context.Context, id uint32) (User, error) {
 	return i, err
 }
 
-const getUsersTeams = `-- name: GetUsersTeams :many
-SELECT t.id, t.name FROM UserToTeam utt
-JOIN Team t ON utt.team_id=t.id 
-WHERE utt.user_id=?
+const getUsersSlotifyGroups = `-- name: GetUsersSlotifyGroups :many
+SELECT sg.id, sg.name FROM UserToSlotifyGroup utsg
+JOIN SlotifyGroup sg ON utsg.slotify_group_id=sg.id 
+WHERE utsg.user_id=?
 `
 
-func (q *Queries) GetUsersTeams(ctx context.Context, userID uint32) ([]Team, error) {
-	rows, err := q.query(ctx, q.getUsersTeamsStmt, getUsersTeams, userID)
+func (q *Queries) GetUsersSlotifyGroups(ctx context.Context, userID uint32) ([]SlotifyGroup, error) {
+	rows, err := q.query(ctx, q.getUsersSlotifyGroupsStmt, getUsersSlotifyGroups, userID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []Team{}
+	items := []SlotifyGroup{}
 	for rows.Next() {
-		var i Team
+		var i SlotifyGroup
 		if err := rows.Scan(&i.ID, &i.Name); err != nil {
 			return nil, err
 		}
@@ -405,20 +405,20 @@ func (q *Queries) GetUsersTeams(ctx context.Context, userID uint32) ([]Team, err
 	return items, nil
 }
 
-const listTeams = `-- name: ListTeams :many
-SELECT id, name FROM Team
+const listSlotifyGroups = `-- name: ListSlotifyGroups :many
+SELECT id, name FROM SlotifyGroup
 WHERE name = ifnull(?, name)
 `
 
-func (q *Queries) ListTeams(ctx context.Context, name interface{}) ([]Team, error) {
-	rows, err := q.query(ctx, q.listTeamsStmt, listTeams, name)
+func (q *Queries) ListSlotifyGroups(ctx context.Context, name interface{}) ([]SlotifyGroup, error) {
+	rows, err := q.query(ctx, q.listSlotifyGroupsStmt, listSlotifyGroups, name)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []Team{}
+	items := []SlotifyGroup{}
 	for rows.Next() {
-		var i Team
+		var i SlotifyGroup
 		if err := rows.Scan(&i.ID, &i.Name); err != nil {
 			return nil, err
 		}
