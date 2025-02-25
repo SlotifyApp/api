@@ -41,21 +41,27 @@ fix errors after pushing.
 ## Project Structure
 
 ```
+
 .
-├── api # API code
-├── api_docs # API Docs that were automatically generated (see below)
+├── api  # API code
 ├── cmd # Entry point to our API
 ├── database # Database utilities
+├── docs #Docs screenshots
 ├── generate # Defines go files for oapi-codegen generation (see below)
 ├── go.mod
 ├── go.sum
 ├── integration # Integration tests
+├── jwt # jwt utilities package
+├── logger # logger utility package
 ├── Makefile # Defines commands to use for this app (eg. make run)
+├── mocks # generated mocks
+├── notification # real-time notification service package
 ├── oapi_codegen_cfg_schema.json # schema for oapi-codegen options (see below)
 ├── README.md
 ├── shared # shared repo submodule (containing docker containers and db schema)
-├── testutil # test utilities
-└── tools # Folder is needed for oapi-codegen dependencies, so it doesn't clutter our main go.mod
+├── sqlc # sqlc generated sql queries
+├── sqlc.yaml # sqlc config
+└── testutil # test utilities
 ```
 
 ## OpenAPI
