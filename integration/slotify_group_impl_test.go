@@ -8,7 +8,6 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"testing"
 
 	"github.com/SlotifyApp/slotify-backend/api"
@@ -18,67 +17,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 )
-
-func TestSlotifyGroup_GetSlotifyGroups(t *testing.T) {
-	t.Parallel()
-
-	var err error
-	database, server := testutil.NewServerAndDB(t, t.Context())
-	// For testing, we want the underlying db connection rather than the
-	// sqlc queries.
-	db := database.DB
-
-	t.Cleanup(func() {
-		testutil.CloseDB(db)
-	})
-
-	insertedSlotifyGroup := testutil.InsertSlotifyGroup(t, db)
-
-	tests := map[string]struct {
-		httpStatus            int
-		slotifyGroupName      string
-		expectedSlotifyGroups api.SlotifyGroups
-		testMsg               string
-		route                 string
-	}{
-		"slotifyGroup does not exist": {
-			httpStatus:            http.StatusOK,
-			slotifyGroupName:      "DoesntExist",
-			expectedSlotifyGroups: api.SlotifyGroups{},
-			testMsg:               "empty array is returned when slotifyGroup does not exist",
-		},
-		"slotifyGroup does exist": {
-			httpStatus:            http.StatusOK,
-			slotifyGroupName:      insertedSlotifyGroup.Name,
-			expectedSlotifyGroups: api.SlotifyGroups{insertedSlotifyGroup},
-			testMsg:               "correct array is returned when slotifyGroup exists",
-		},
-	}
-
-	for testName, tt := range tests {
-		t.Run(testName, func(t *testing.T) {
-			t.Parallel()
-
-			params := api.GetAPISlotifyGroupsParams{
-				Name: &tt.slotifyGroupName,
-			}
-			rr := httptest.NewRecorder()
-
-			req := httptest.NewRequest(http.MethodGet,
-				fmt.Sprintf("/api/slotify-groups?name=%s", url.QueryEscape(*params.Name)), nil)
-
-			server.GetAPISlotifyGroups(rr, req, params)
-
-			var slotifyGroups api.SlotifyGroups
-			require.Equal(t, tt.httpStatus, rr.Result().StatusCode)
-			err = json.NewDecoder(rr.Result().Body).Decode(&slotifyGroups)
-			require.NoError(t, err, "response cannot be decoded into SlotifyGroups struct")
-			require.Equal(t, tt.expectedSlotifyGroups, slotifyGroups, tt.testMsg)
-
-			testutil.OpenAPIValidateTest(t, rr, req)
-		})
-	}
-}
 
 func TestSlotifyGroup_PostSlotifyGroups(t *testing.T) {
 	t.Parallel()
@@ -271,105 +209,6 @@ func TestSlotifyGroup_GetSlotifyGroupsSlotifyGroupID(t *testing.T) {
 				err = json.NewDecoder(rr.Result().Body).Decode(&errMsg)
 				require.NoError(t, err, "response cannot be decoded into string")
 				require.Equal(t, tt.expectedRespBody, errMsg, tt.testMsg)
-			}
-		})
-	}
-}
-
-func TestSlotifyGroup_PostSlotifyGroupsSlotifyGroupIDUsersUserID(t *testing.T) {
-	t.Parallel()
-
-	ctrl := gomock.NewController(t)
-	mockNotifService := mocks.NewMockService(ctrl)
-
-	mockNotifService.
-		EXPECT().
-		SendNotification(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
-		Return(nil).
-		AnyTimes()
-
-	var err error
-	database, server := testutil.NewServerAndDB(t,
-		t.Context(),
-		testutil.WithNotificationService(mockNotifService))
-
-	db := database.DB
-	t.Cleanup(func() {
-		testutil.CloseDB(db)
-	})
-
-	slotifyGroupInserted := testutil.InsertSlotifyGroup(t, db)
-
-	userInserted := testutil.InsertUser(t, db)
-
-	tests := map[string]struct {
-		expectedRespBody any
-		httpStatus       int
-		slotifyGroupID   uint32
-		userID           uint32
-		testMsg          string
-	}{
-		"insert a user into a slotifyGroup": {
-			expectedRespBody: api.SlotifyGroup{
-				Id:   slotifyGroupInserted.Id,
-				Name: slotifyGroupInserted.Name,
-			},
-			httpStatus:     http.StatusCreated,
-			userID:         userInserted.Id,
-			slotifyGroupID: slotifyGroupInserted.Id,
-			testMsg:        "can add user to slotifyGroup where both exist successfully",
-		},
-		"insert a user into a non-existent slotifyGroup": {
-			expectedRespBody: fmt.Sprintf("slotifyGroup api: slotifyGroup id(%d) or user id(%d) was invalid",
-				1000, userInserted.Id),
-			httpStatus:     http.StatusForbidden,
-			userID:         userInserted.Id,
-			slotifyGroupID: 1000,
-			testMsg:        "cannot add user to slotifyGroup where slotifyGroup does not exist",
-		},
-
-		"insert an non-existent user into a slotifyGroup": {
-			expectedRespBody: fmt.Sprintf("slotifyGroup api: slotifyGroup id(%d) or user id(%d) was invalid",
-				slotifyGroupInserted.Id, 10000),
-			httpStatus:     http.StatusForbidden,
-			userID:         10000,
-			slotifyGroupID: slotifyGroupInserted.Id,
-			testMsg:        "cannot add user to slotifyGroup where user does not exist",
-		},
-
-		"user and slotifyGroup ids do not exist": {
-			expectedRespBody: fmt.Sprintf("slotifyGroup api: slotifyGroup id(%d) or user id(%d) was invalid", 10000, 10000),
-			httpStatus:       http.StatusForbidden,
-			userID:           10000,
-			slotifyGroupID:   10000,
-			testMsg:          "cannot add user to slotifyGroup where neither exists",
-		},
-	}
-
-	for testName, tt := range tests {
-		t.Run(testName, func(t *testing.T) {
-			t.Parallel()
-
-			rr := httptest.NewRecorder()
-			req := httptest.NewRequest(http.MethodPost,
-				fmt.Sprintf("/api/slotify-groups/%d/users/%d", tt.slotifyGroupID, tt.userID), nil)
-
-			server.PostAPISlotifyGroupsSlotifyGroupIDUsersUserID(rr, req, tt.slotifyGroupID, tt.userID)
-
-			testutil.OpenAPIValidateTest(t, rr, req)
-
-			if tt.httpStatus == http.StatusCreated {
-				var slotifyGroup api.SlotifyGroup
-				require.Equal(t, tt.httpStatus, rr.Result().StatusCode)
-				err = json.NewDecoder(rr.Result().Body).Decode(&slotifyGroup)
-				require.NoError(t, err, "response cannot be decoded into SlotifyGroup struct")
-				require.Equal(t, tt.expectedRespBody, slotifyGroup, tt.testMsg)
-			} else {
-				var respBody string
-				require.Equal(t, tt.httpStatus, rr.Result().StatusCode)
-				err = json.NewDecoder(rr.Result().Body).Decode(&respBody)
-				require.NoError(t, err, "response cannot be decoded into string")
-				require.Equal(t, tt.expectedRespBody, respBody, tt.testMsg)
 			}
 		})
 	}

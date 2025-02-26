@@ -95,7 +95,7 @@ func ParseJWT(tk string, keyEnv string) (CustomClaims, error) {
 		return CustomClaims{}, fmt.Errorf("failed to parse jwt: %s env var missing", AccessTokenJWTSecretEnv)
 	}
 
-	token, err := goJWT.ParseWithClaims(tk, &CustomClaims{}, func(token *goJWT.Token) (interface{}, error) {
+	token, err := goJWT.ParseWithClaims(tk, &CustomClaims{}, func(token *goJWT.Token) (any, error) {
 		if _, ok := token.Method.(*goJWT.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("failed to parse token: unexpected signing method: %v", token.Header["alg"])
 		}

@@ -28,11 +28,6 @@ func CreateInviteWrapper(ctx context.Context, db *Database, params CreateInviteP
 
 func DeleteInviteByIDWrapper(ctx context.Context, db *Database, inviteID uint32) error {
 	rows, err := db.DeleteInviteByID(ctx, inviteID)
-
-	if rows != 1 {
-		return WrongNumberSQLRowsError{ActualRows: rows, ExpectedRows: []int64{1}}
-	}
-
 	if err != nil {
 		switch {
 		case errors.Is(err, context.Canceled):
@@ -45,22 +40,9 @@ func DeleteInviteByIDWrapper(ctx context.Context, db *Database, inviteID uint32)
 		}
 	}
 
-	return err
-}
-
-func GetInviteByIDWrapper(ctx context.Context, db *Database, inviteID uint32) (Invite, error) {
-	invite, err := db.GetInviteByID(ctx, inviteID)
-	if err != nil {
-		switch {
-		case errors.Is(err, context.Canceled):
-			return Invite{}, fmt.Errorf("context cancelled getting invite by id: %w",
-				err)
-		case errors.Is(err, context.DeadlineExceeded):
-			return Invite{}, fmt.Errorf("deadline exceeded getting invite by id: %w", err)
-		default:
-			return Invite{}, fmt.Errorf("failed to get invite by id: %w", err)
-		}
+	if rows != 1 {
+		return WrongNumberSQLRowsError{ActualRows: rows, ExpectedRows: []int64{1}}
 	}
 
-	return invite, nil
+	return err
 }
