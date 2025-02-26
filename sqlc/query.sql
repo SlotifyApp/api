@@ -105,6 +105,10 @@ WHERE user_id=? AND notification_id=?;
 
 
 
+-- name: GetInviteByID :one
+SELECT * FROM Invite
+WHERE id=?;
+
 -- name: CreateInvite :execrows
 INSERT INTO Invite (slotify_group_id, from_user_id, to_user_id, message, created_at)
 VALUES(?, ?, ?, ?, ?);

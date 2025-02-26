@@ -311,6 +311,26 @@ func (q *Queries) GetAllSlotifyGroupMembersExcept(ctx context.Context, arg GetAl
 	return items, nil
 }
 
+const getInviteByID = `-- name: GetInviteByID :one
+SELECT id, slotify_group_id, from_user_id, to_user_id, message, status, created_at FROM Invite
+WHERE id=?
+`
+
+func (q *Queries) GetInviteByID(ctx context.Context, id uint32) (Invite, error) {
+	row := q.queryRow(ctx, q.getInviteByIDStmt, getInviteByID, id)
+	var i Invite
+	err := row.Scan(
+		&i.ID,
+		&i.SlotifyGroupID,
+		&i.FromUserID,
+		&i.ToUserID,
+		&i.Message,
+		&i.Status,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const getJoinableSlotifyGroups = `-- name: GetJoinableSlotifyGroups :many
 SELECT sg.id, sg.name FROM SlotifyGroup sg
 LEFT JOIN UserToSlotifyGroup utsg ON

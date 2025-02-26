@@ -11,6 +11,29 @@ import (
 	"go.uber.org/zap"
 )
 
+// InviteStatusSet represents a set of invite statuses.
+type InviteStatusSet map[InviteStatus]struct{}
+
+// nolint: gochecknoglobals // immutable map, wont change at runtime
+var allowedInviteStatusTransitions = map[InviteStatus]InviteStatusSet{
+	InviteStatusPending: {
+		InviteStatusAccepted: {},
+		InviteStatusDeclined: {},
+		InviteStatusExpired:  {},
+	},
+	InviteStatusAccepted: {},
+	InviteStatusDeclined: {},
+	InviteStatusExpired:  {},
+}
+
+func validateInviteStatusTransition(oldInviteStatus InviteStatus, newInviteStatus InviteStatus) bool {
+	possibleNextStates := allowedInviteStatusTransitions[oldInviteStatus]
+
+	var ok bool
+	_, ok = possibleNextStates[newInviteStatus]
+	return ok
+}
+
 type checkIfUsersInGroupParams struct {
 	ctx              context.Context
 	db               *database.Database
@@ -24,8 +47,7 @@ type checkIfUsersInGroupParams struct {
 
 func checkIfUsersInGroup(p checkIfUsersInGroupParams) error {
 	var fromUserInGroup bool
-	var err error
-	// check if user creating the invite is in the group
+	var err error // check if user creating the invite is in the group
 	if fromUserInGroup, err = database.CheckMemberIsInSlotifyGroup(p.ctx, p.db,
 		database.CheckMemberInSlotifyGroupParams{
 			UserID:         p.fromUserID,

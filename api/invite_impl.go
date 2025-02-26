@@ -73,7 +73,7 @@ func (s Server) PostAPIInvites(w http.ResponseWriter, r *http.Request) {
 	}
 
 	err = retry.Do(func() error {
-		return database.CreateInvite(ctx, s.DB, params)
+		return database.CreateInviteWrapper(ctx, s.DB, params)
 	}, retry.Attempts(3), retry.Delay(time.Millisecond*500))
 	if err != nil {
 		s.Logger.Error("failed to create invite", zap.Error(err))
@@ -129,32 +129,44 @@ func (s Server) GetAPIInvitesMe(w http.ResponseWriter, r *http.Request, params G
 	SetHeaderAndWriteResponse(w, http.StatusOK, invites)
 }
 
-// (DELETE /api/invites/{inviteID}Delete an invite).
+// (DELETE /api/invites/{inviteID} Delete an invite).
 func (s Server) DeleteAPIInvitesInviteID(w http.ResponseWriter, r *http.Request, inviteID uint32) {
 	ctx, cancel := context.WithTimeout(r.Context(), 2*database.DatabaseTimeout)
 	defer cancel()
 
+	userID, ok := r.Context().Value(UserIDCtxKey{}).(uint32)
+	if !ok {
+		s.Logger.Error("failed to get userid from request context")
+		sendError(w, http.StatusUnauthorized, "Try again later.")
+		return
+	}
+
+	var invite database.Invite
 	var err error
+	if invite, err = database.GetInviteByIDWrapper(ctx, s.DB, inviteID); err != nil {
+		s.Logger.Error("failed to get invite by id", zap.Error(err))
+		sendError(w, http.StatusBadGateway, "Failed to get invite by id")
+		return
+	}
+
+	var userIsInGroup bool
+	if userIsInGroup, err = database.CheckMemberIsInSlotifyGroup(ctx, s.DB, database.CheckMemberInSlotifyGroupParams{
+		UserID:         userID,
+		SlotifyGroupID: invite.SlotifyGroupID,
+	}); err != nil {
+		s.Logger.Error("failed to see if user is in group", zap.Error(err))
+		sendError(w, http.StatusInternalServerError, "failed to see if user is in group")
+		return
+	}
+
+	if !userIsInGroup {
+		s.Logger.Error("user is not in group, cannot delete invite", zap.Error(err))
+		sendError(w, http.StatusUnauthorized, "You are not apart of the group, cannto delete invite.")
+		return
+	}
+
 	err = retry.Do(func() error {
-		var rows int64
-		rows, err = s.DB.DeleteInviteByID(ctx, inviteID)
-
-		if rows != 1 {
-			return database.WrongNumberSQLRowsError{ActualRows: rows, ExpectedRows: []int64{1}}
-		}
-
-		if err != nil {
-			switch {
-			case errors.Is(err, context.Canceled):
-				return fmt.Errorf("context cancelled deleting invite: %w",
-					err)
-			case errors.Is(err, context.DeadlineExceeded):
-				return fmt.Errorf("deadline exceeded during deleting invite: %w", err)
-			default:
-				return fmt.Errorf("failed to delete invite: %w", err)
-			}
-		}
-		return nil
+		return database.DeleteInviteByIDWrapper(ctx, s.DB, inviteID)
 	}, retry.Attempts(3), retry.Delay(time.Millisecond*500))
 	if err != nil {
 		s.Logger.Error("failed to delete invite", zap.Error(err))
@@ -182,6 +194,20 @@ func (s Server) PatchAPIInvitesInviteID(w http.ResponseWriter, r *http.Request, 
 	if err = json.NewDecoder(r.Body).Decode(&body); err != nil {
 		s.Logger.Error(ErrUnmarshalBody, zap.Object("body", body), zap.Error(err))
 		sendError(w, http.StatusBadRequest, ErrUnmarshalBody.Error())
+		return
+	}
+
+	var invite database.Invite
+	if invite, err = database.GetInviteByIDWrapper(ctx, s.DB, inviteID); err != nil {
+		s.Logger.Error("failed to get invite details from invite id", zap.Error(err))
+		sendError(w, http.StatusInternalServerError, "failed to get invite details for invite id")
+		return
+	}
+
+	if invite.FromUserID != userID {
+		s.Logger.Error("user cannot", zap.Error(err))
+		sendError(w, http.StatusUnauthorized,
+			"can only edit your invite message, contact the person who created the invite")
 		return
 	}
 
@@ -227,7 +253,36 @@ func (s Server) PatchAPIInvitesInviteIDStatusNewStatus(w http.ResponseWriter, r 
 	ctx, cancel := context.WithTimeout(r.Context(), 2*database.DatabaseTimeout)
 	defer cancel()
 
+	userID, ok := r.Context().Value(UserIDCtxKey{}).(uint32)
+	if !ok {
+		s.Logger.Error("failed to get userid from request context")
+		sendError(w, http.StatusUnauthorized, "Try again later.")
+		return
+	}
+
 	var err error
+	var invite database.Invite
+	if invite, err = database.GetInviteByIDWrapper(ctx, s.DB, inviteID); err != nil {
+		s.Logger.Error("failed to get invite details from invite id", zap.Error(err))
+		sendError(w, http.StatusInternalServerError, "failed to get invite details for invite id")
+		return
+	}
+
+	if invite.ToUserID != userID {
+		s.Logger.Error("only the user the invite is sent to can edit the status", zap.Error(err))
+		sendError(w, http.StatusUnauthorized,
+			"only the user the invite is sent to can edit the status")
+		return
+	}
+
+	if ok = validateInviteStatusTransition(InviteStatus(invite.Status), newStatus); !ok {
+		s.Logger.Error("invalid invite state transition", zap.Error(err))
+		sendError(w, http.StatusBadRequest, fmt.Sprintf(
+			"invalid invite state transition, cannot go from %s to %s", invite.Status, newStatus,
+		))
+		return
+	}
+
 	err = retry.Do(func() error {
 		var rows int64
 		rows, err = s.DB.UpdateInviteStatus(ctx,

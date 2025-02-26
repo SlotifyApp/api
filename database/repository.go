@@ -75,6 +75,9 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.getAllSlotifyGroupMembersExceptStmt, err = db.PrepareContext(ctx, getAllSlotifyGroupMembersExcept); err != nil {
 		return nil, fmt.Errorf("error preparing query GetAllSlotifyGroupMembersExcept: %w", err)
 	}
+	if q.getInviteByIDStmt, err = db.PrepareContext(ctx, getInviteByID); err != nil {
+		return nil, fmt.Errorf("error preparing query GetInviteByID: %w", err)
+	}
 	if q.getJoinableSlotifyGroupsStmt, err = db.PrepareContext(ctx, getJoinableSlotifyGroups); err != nil {
 		return nil, fmt.Errorf("error preparing query GetJoinableSlotifyGroups: %w", err)
 	}
@@ -210,6 +213,11 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing getAllSlotifyGroupMembersExceptStmt: %w", cerr)
 		}
 	}
+	if q.getInviteByIDStmt != nil {
+		if cerr := q.getInviteByIDStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getInviteByIDStmt: %w", cerr)
+		}
+	}
 	if q.getJoinableSlotifyGroupsStmt != nil {
 		if cerr := q.getJoinableSlotifyGroupsStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing getJoinableSlotifyGroupsStmt: %w", cerr)
@@ -341,6 +349,7 @@ type Queries struct {
 	deleteUserByIDStmt                  *sql.Stmt
 	getAllSlotifyGroupMembersStmt       *sql.Stmt
 	getAllSlotifyGroupMembersExceptStmt *sql.Stmt
+	getInviteByIDStmt                   *sql.Stmt
 	getJoinableSlotifyGroupsStmt        *sql.Stmt
 	getRefreshTokenByUserIDStmt         *sql.Stmt
 	getSlotifyGroupByIDStmt             *sql.Stmt
@@ -379,6 +388,7 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		deleteUserByIDStmt:                  q.deleteUserByIDStmt,
 		getAllSlotifyGroupMembersStmt:       q.getAllSlotifyGroupMembersStmt,
 		getAllSlotifyGroupMembersExceptStmt: q.getAllSlotifyGroupMembersExceptStmt,
+		getInviteByIDStmt:                   q.getInviteByIDStmt,
 		getJoinableSlotifyGroupsStmt:        q.getJoinableSlotifyGroupsStmt,
 		getRefreshTokenByUserIDStmt:         q.getRefreshTokenByUserIDStmt,
 		getSlotifyGroupByIDStmt:             q.getSlotifyGroupByIDStmt,
