@@ -40,6 +40,23 @@ func (q *Queries) AddUserToSlotifyGroup(ctx context.Context, arg AddUserToSlotif
 	return result.RowsAffected()
 }
 
+const checkMemberInSlotifyGroup = `-- name: CheckMemberInSlotifyGroup :one
+SELECT COUNT(*) FROM UserToSlotifyGroup
+WHERE user_id=? AND slotify_group_id=?
+`
+
+type CheckMemberInSlotifyGroupParams struct {
+	UserID         uint32 `json:"userId"`
+	SlotifyGroupID uint32 `json:"slotifyGroupId"`
+}
+
+func (q *Queries) CheckMemberInSlotifyGroup(ctx context.Context, arg CheckMemberInSlotifyGroupParams) (int64, error) {
+	row := q.queryRow(ctx, q.checkMemberInSlotifyGroupStmt, checkMemberInSlotifyGroup, arg.UserID, arg.SlotifyGroupID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const countSlotifyGroupByID = `-- name: CountSlotifyGroupByID :one
 SELECT COUNT(*) FROM SlotifyGroup WHERE id=?
 `

@@ -30,6 +30,9 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.addUserToSlotifyGroupStmt, err = db.PrepareContext(ctx, addUserToSlotifyGroup); err != nil {
 		return nil, fmt.Errorf("error preparing query AddUserToSlotifyGroup: %w", err)
 	}
+	if q.checkMemberInSlotifyGroupStmt, err = db.PrepareContext(ctx, checkMemberInSlotifyGroup); err != nil {
+		return nil, fmt.Errorf("error preparing query CheckMemberInSlotifyGroup: %w", err)
+	}
 	if q.countSlotifyGroupByIDStmt, err = db.PrepareContext(ctx, countSlotifyGroupByID); err != nil {
 		return nil, fmt.Errorf("error preparing query CountSlotifyGroupByID: %w", err)
 	}
@@ -130,6 +133,11 @@ func (q *Queries) Close() error {
 	if q.addUserToSlotifyGroupStmt != nil {
 		if cerr := q.addUserToSlotifyGroupStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing addUserToSlotifyGroupStmt: %w", cerr)
+		}
+	}
+	if q.checkMemberInSlotifyGroupStmt != nil {
+		if cerr := q.checkMemberInSlotifyGroupStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing checkMemberInSlotifyGroupStmt: %w", cerr)
 		}
 	}
 	if q.countSlotifyGroupByIDStmt != nil {
@@ -318,6 +326,7 @@ type Queries struct {
 	tx                                  *sql.Tx
 	addSlotifyGroupStmt                 *sql.Stmt
 	addUserToSlotifyGroupStmt           *sql.Stmt
+	checkMemberInSlotifyGroupStmt       *sql.Stmt
 	countSlotifyGroupByIDStmt           *sql.Stmt
 	countUserByEmailStmt                *sql.Stmt
 	countUserByIDStmt                   *sql.Stmt
@@ -355,6 +364,7 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		tx:                                  tx,
 		addSlotifyGroupStmt:                 q.addSlotifyGroupStmt,
 		addUserToSlotifyGroupStmt:           q.addUserToSlotifyGroupStmt,
+		checkMemberInSlotifyGroupStmt:       q.checkMemberInSlotifyGroupStmt,
 		countSlotifyGroupByIDStmt:           q.countSlotifyGroupByIDStmt,
 		countUserByEmailStmt:                q.countUserByEmailStmt,
 		countUserByIDStmt:                   q.countUserByIDStmt,

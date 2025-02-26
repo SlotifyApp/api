@@ -70,6 +70,10 @@ WHERE name = ifnull(sqlc.arg('name'), name);
 -- name: AddSlotifyGroup :execlastid
 INSERT INTO SlotifyGroup (name) VALUES (?);
 
+-- name: CheckMemberInSlotifyGroup :one
+SELECT COUNT(*) FROM UserToSlotifyGroup
+WHERE user_id=? AND slotify_group_id=?;
+
 
 
 
