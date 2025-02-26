@@ -1,7 +1,6 @@
 package notification_test
 
 import (
-	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -298,7 +297,7 @@ func Test_SSESendNotification(t *testing.T) {
 			require.Equal(t, struct{}{}, present, "client was correctly registered for user")
 
 			err := sseNotificationService.
-				SendNotification(context.Background(), l, mockNotificationDB, []uint32{tt.userID}, notifParams)
+				SendNotification(t.Context(), l, mockNotificationDB, []uint32{tt.userID}, notifParams)
 			require.NoError(t, err,
 				"send notification should execute successfully and produce no error")
 
@@ -367,13 +366,13 @@ func Test_SSESendNotification(t *testing.T) {
 
 		// send both notifications
 		err := sseNotificationService.
-			SendNotification(context.Background(), l, mockNotificationDB, []uint32{userID}, notifParams1)
+			SendNotification(t.Context(), l, mockNotificationDB, []uint32{userID}, notifParams1)
 
 		require.NoError(t, err,
 			"send notification should execute successfully and produce no error")
 
 		err = sseNotificationService.
-			SendNotification(context.Background(), l, mockNotificationDB, []uint32{userID}, notifParams2)
+			SendNotification(t.Context(), l, mockNotificationDB, []uint32{userID}, notifParams2)
 
 		require.NoError(t, err,
 			"send notification should execute successfully and produce no error")

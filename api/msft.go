@@ -15,10 +15,7 @@ import (
 	"github.com/AzureAD/microsoft-authentication-library-for-go/apps/confidential"
 	"github.com/SlotifyApp/slotify-backend/database"
 	"github.com/coreos/go-oidc/v3/oidc"
-	"github.com/google/uuid"
 	msgraphsdk "github.com/microsoftgraph/msgraph-sdk-go"
-	graphmodels "github.com/microsoftgraph/msgraph-sdk-go/models"
-	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
 const (
@@ -252,67 +249,6 @@ func CreateMSFTGraphClient(ctx context.Context, msalClient *confidential.Client,
 	return graph, nil
 }
 
-// parseMSFTAttendees filters out attributes of MSFT attendees.
-// see openapi spec to find docs about this.
-func parseMSFTAttendees(e graphmodels.Eventable) []Attendee {
-	msftAttendees := e.GetAttendees()
-	var attendees []Attendee
-	// Go through MSFT attendees and parse information we need
-	for _, a := range msftAttendees {
-		var email openapi_types.Email
-		emailStr := a.GetEmailAddress().GetAddress()
-		if a.GetEmailAddress() != nil && a.GetEmailAddress().GetAddress() != nil {
-			email = openapi_types.Email(*emailStr)
-		}
-
-		var responseStatus AttendeeResponseStatus
-		if e.GetResponseStatus() != nil && e.GetResponseStatus().GetResponse() != nil {
-			responseStatus = AttendeeResponseStatus(e.GetResponseStatus().GetResponse().String())
-		}
-
-		var attendeeType AttendeeType
-		if e.GetTypeEscaped() != nil {
-			attendeeType = AttendeeType(e.GetTypeEscaped().String())
-		}
-
-		attendee := Attendee{
-			Email:          &email,
-			ResponseStatus: &responseStatus,
-			Type:           &attendeeType,
-		}
-		attendees = append(attendees, attendee)
-	}
-	return attendees
-}
-
-// parseMSFTLocations filters out attributes of MSFT locations.
-// see openapi spec to find docs about this.
-func parseMSFTLocations(e graphmodels.Eventable) []Location {
-	msftLocations := e.GetLocations()
-	var locations []Location
-	for _, l := range msftLocations {
-		var roomType LocationRoomType
-		if l.GetLocationType() != nil {
-			roomType = LocationRoomType(l.GetLocationType().String())
-		}
-
-		var street *string
-		if l.GetAddress() != nil {
-			street = l.GetAddress().GetStreet()
-		}
-
-		parsedLoc := Location{
-			Id:       l.GetUniqueId(),
-			Name:     l.GetDisplayName(),
-			Street:   street,
-			RoomType: &roomType,
-		}
-
-		locations = append(locations, parsedLoc)
-	}
-	return locations
-}
-
 // getOrInsertUserByClaimEmail will get a user by the claim email,
 // or if first time log in, it will create a new user.
 func getOrInsertUserByClaimEmail(ctx context.Context,
@@ -370,76 +306,4 @@ func getOrInsertUserByClaimEmail(ctx context.Context,
 	}
 
 	return u, nil
-}
-
-// parseCalendarEventToMSFTEvent parses CalendarEvent to create a MSFT Event.
-func parseCalendarEventToMSFTEvent(eventRequest CalendarEvent) *graphmodels.Event {
-	event := graphmodels.NewEvent()
-	event.SetSubject(eventRequest.Subject)
-
-	contentType := graphmodels.HTML_BODYTYPE
-	body := graphmodels.NewItemBody()
-	body.SetContentType(&contentType)
-	body.SetContent(eventRequest.Body)
-	event.SetBody(body)
-
-	timeZone := "UTC"
-
-	start := graphmodels.NewDateTimeTimeZone()
-	start.SetDateTime(eventRequest.StartTime)
-	start.SetTimeZone(&timeZone)
-	event.SetStart(start)
-
-	end := graphmodels.NewDateTimeTimeZone()
-	end.SetDateTime(eventRequest.EndTime)
-	end.SetTimeZone(&timeZone)
-	event.SetEnd(end)
-
-	// is location required and roomtype is not a property of location in graph
-	var location *graphmodels.Location
-	if eventRequest.Locations != nil && len(*eventRequest.Locations) > 0 {
-		location.SetDisplayName((*eventRequest.Locations)[0].Name)
-	}
-
-	var attendees []graphmodels.Attendeeable
-	if eventRequest.Attendees != nil {
-		for _, inviteAttendee := range *eventRequest.Attendees {
-			var email *graphmodels.EmailAddress
-			if inviteAttendee.Email != nil {
-				email = graphmodels.NewEmailAddress()
-				email.SetAddress((*string)(inviteAttendee.Email))
-			}
-
-			attendee := graphmodels.NewAttendee()
-			attendee.SetEmailAddress(email)
-
-			var attendeeType graphmodels.AttendeeType
-			if inviteAttendee.Type != nil {
-				switch *inviteAttendee.Type {
-				case Required:
-					attendeeType = graphmodels.REQUIRED_ATTENDEETYPE
-				case Optional:
-					attendeeType = graphmodels.OPTIONAL_ATTENDEETYPE
-				case Resource:
-					attendeeType = graphmodels.RESOURCE_ATTENDEETYPE
-				default:
-					attendeeType = graphmodels.REQUIRED_ATTENDEETYPE
-				}
-			}
-			attendee.SetTypeEscaped(&attendeeType)
-
-			// response status?
-			responseStatus := graphmodels.NewResponseStatus()
-			response := graphmodels.NOTRESPONDED_RESPONSETYPE
-			responseStatus.SetResponse(&response)
-			attendees = append(attendees, attendee)
-		}
-	}
-
-	event.SetAttendees(attendees)
-
-	transactionID := uuid.New().String()
-	event.SetTransactionId(&transactionID)
-
-	return event
 }

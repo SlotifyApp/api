@@ -23,7 +23,7 @@ func TestTeam_GetTeams(t *testing.T) {
 	t.Parallel()
 
 	var err error
-	database, server := testutil.NewServerAndDB(t, context.Background())
+	database, server := testutil.NewServerAndDB(t, t.Context())
 	// For testing, we want the underlying db connection rather than the
 	// sqlc queries.
 	db := database.DB
@@ -93,7 +93,7 @@ func TestTeam_PostTeams(t *testing.T) {
 		AnyTimes()
 
 	database, server := testutil.NewServerAndDB(t,
-		context.Background(),
+		t.Context(),
 		testutil.WithNotificationService(mockNotifService))
 
 	db := database.DB
@@ -171,7 +171,7 @@ func TestTeam_DeleteTeamsTeamID(t *testing.T) {
 
 	var err error
 
-	database, server := testutil.NewServerAndDB(t, context.Background())
+	database, server := testutil.NewServerAndDB(t, t.Context())
 	db := database.DB
 	t.Cleanup(func() {
 		testutil.CloseDB(db)
@@ -221,7 +221,7 @@ func TestTeam_GetTeamsTeamID(t *testing.T) {
 	t.Parallel()
 
 	var err error
-	database, server := testutil.NewServerAndDB(t, context.Background())
+	database, server := testutil.NewServerAndDB(t, t.Context())
 	db := database.DB
 	t.Cleanup(func() {
 		testutil.CloseDB(db)
@@ -290,7 +290,7 @@ func TestTeam_PostTeamsTeamIDUsersUserID(t *testing.T) {
 
 	var err error
 	database, server := testutil.NewServerAndDB(t,
-		context.Background(),
+		t.Context(),
 		testutil.WithNotificationService(mockNotifService))
 
 	db := database.DB
@@ -377,7 +377,7 @@ func TestTeam_GetTeamsTeamIDUsers(t *testing.T) {
 	t.Parallel()
 
 	var err error
-	database, server := testutil.NewServerAndDB(t, context.Background())
+	database, server := testutil.NewServerAndDB(t, t.Context())
 	db := database.DB
 	t.Cleanup(func() {
 		testutil.CloseDB(db)
@@ -443,7 +443,7 @@ func TestTeam_GetAPITeamsMe(t *testing.T) {
 	t.Parallel()
 
 	var err error
-	database, server := testutil.NewServerAndDB(t, context.Background())
+	database, server := testutil.NewServerAndDB(t, t.Context())
 	db := database.DB
 	t.Cleanup(func() {
 		testutil.CloseDB(db)

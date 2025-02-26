@@ -5,18 +5,20 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/avast/retry-go"
 	msgraphsdkgo "github.com/microsoftgraph/msgraph-sdk-go"
-	"github.com/microsoftgraph/msgraph-sdk-go/models"
 	graphusers "github.com/microsoftgraph/msgraph-sdk-go/users"
 
 	openapi_types "github.com/oapi-codegen/runtime/types"
+
+	graphmodels "github.com/microsoftgraph/msgraph-sdk-go/models"
 )
 
 // parseEventableResp takes in MSFT's version of events and parses them to extract needed attributes.
 // See [MSFT Event Properties] for all of the MSFT event properties.
 //
 // [MSFT Event Properties]: https://learn.microsoft.com/en-us/graph/api/resources/event?view=graph-rest-1.0#properties
-func parseEventableResp(events []models.Eventable) []CalendarEvent {
+func parseEventableResp(events []graphmodels.Eventable) []CalendarEvent {
 	calendarEvents := []CalendarEvent{}
 	for _, e := range events {
 		// Returned interfaces can be nil
@@ -24,7 +26,7 @@ func parseEventableResp(events []models.Eventable) []CalendarEvent {
 			continue
 		}
 		attendees := parseMSFTAttendees(e)
-		locations := parseMSFTLocations(e)
+		locations := parseMSFTLocations(e.GetLocations())
 
 		var joinURL *string
 		if e.GetOnlineMeeting() != nil {
@@ -42,14 +44,14 @@ func parseEventableResp(events []models.Eventable) []CalendarEvent {
 		}
 
 		ce := CalendarEvent{
-			Attendees:   &attendees,
+			Attendees:   attendees,
 			Body:        e.GetBodyPreview(),
 			Created:     e.GetCreatedDateTime(),
 			EndTime:     endTime,
 			Id:          e.GetId(),
 			IsCancelled: e.GetIsCancelled(),
 			JoinURL:     joinURL,
-			Locations:   &locations,
+			Locations:   locations,
 			Organizer:   (*openapi_types.Email)(e.GetOrganizer().GetEmailAddress().GetAddress()),
 			StartTime:   startTime,
 			Subject:     e.GetSubject(),
@@ -86,9 +88,18 @@ func makeCalendarMeAPICall(graph *msgraphsdkgo.GraphServiceClient, startTime,
 	}
 
 	// Make actual API request.
-	events, err := graph.Me().Calendar().CalendarView().Get(context.Background(), configuration)
-	if err != nil || events == nil {
-		return nil, fmt.Errorf("failed to make graph client call: %w", err)
+
+	var events graphmodels.EventCollectionResponseable
+	var err error
+	err = retry.Do(func() error {
+		events, err = graph.Me().Calendar().CalendarView().Get(context.Background(), configuration)
+		if err != nil || events == nil {
+			return fmt.Errorf("failed to make graph client call: %w", err)
+		}
+		return nil
+	}, retry.Attempts(3), retry.Delay(time.Millisecond*500))
+	if err != nil {
+		return nil, fmt.Errorf("failed msft create event after 3 retries: %w", err)
 	}
 
 	// Filter out attributes that we want.

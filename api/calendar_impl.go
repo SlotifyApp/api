@@ -3,11 +3,15 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"time"
 
 	"github.com/SlotifyApp/slotify-backend/database"
+	"github.com/avast/retry-go"
 	"go.uber.org/zap"
+
+	graphmodels "github.com/microsoftgraph/msgraph-sdk-go/models"
 )
 
 // (GET /calendar/me).
@@ -69,7 +73,14 @@ func (s Server) PostAPICalendarMe(w http.ResponseWriter, r *http.Request) {
 
 	event := parseCalendarEventToMSFTEvent(eventRequest)
 
-	events, err := graph.Me().Events().Post(ctx, event, nil)
+	var events graphmodels.Eventable
+	err = retry.Do(func() error {
+		events, err = graph.Me().Events().Post(ctx, event, nil)
+		if err != nil {
+			return fmt.Errorf("graph api create calendar failed: %w", err)
+		}
+		return nil
+	}, retry.Attempts(3), retry.Delay(time.Millisecond*500))
 	if err != nil {
 		s.Logger.Error("failed to create calendar event", zap.Error(err))
 		sendError(w, http.StatusBadGateway, "Failed to create event")
