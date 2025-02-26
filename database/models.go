@@ -62,6 +62,7 @@ type Invite struct {
 	ToUserID       uint32       `json:"toUserId"`
 	Message        string       `json:"message"`
 	Status         InviteStatus `json:"status"`
+	ExpiryDate     time.Time    `json:"expiryDate"`
 	CreatedAt      time.Time    `json:"createdAt"`
 }
 

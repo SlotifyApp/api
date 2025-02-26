@@ -40,6 +40,55 @@ func (q *Queries) AddUserToSlotifyGroup(ctx context.Context, arg AddUserToSlotif
 	return result.RowsAffected()
 }
 
+const batchDeleteWeekOldInvites = `-- name: BatchDeleteWeekOldInvites :execrows
+DELETE FROM Invite
+WHERE created_at + INTERVAL 1 WEEK <= CURDATE()
+  AND id >= (SELECT MIN(id) FROM Invite WHERE created_at + INTERVAL 1 WEEK <= CURDATE())
+ORDER BY id
+LIMIT ?
+`
+
+func (q *Queries) BatchDeleteWeekOldInvites(ctx context.Context, limit int32) (int64, error) {
+	result, err := q.exec(ctx, q.batchDeleteWeekOldInvitesStmt, batchDeleteWeekOldInvites, limit)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const batchDeleteWeekOldNotifications = `-- name: BatchDeleteWeekOldNotifications :execrows
+DELETE FROM Notification
+WHERE created + INTERVAL 1 WEEK <= CURDATE()
+  AND id >= (SELECT MIN(id) FROM Notification WHERE created + INTERVAL 1 WEEK <= CURDATE())
+ORDER BY id
+LIMIT ?
+`
+
+func (q *Queries) BatchDeleteWeekOldNotifications(ctx context.Context, limit int32) (int64, error) {
+	result, err := q.exec(ctx, q.batchDeleteWeekOldNotificationsStmt, batchDeleteWeekOldNotifications, limit)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const batchExpireInvites = `-- name: BatchExpireInvites :execrows
+UPDATE Invite SET status = 'expired'
+WHERE expiry_date <= CURDATE()
+  AND status != 'expired'
+  AND id >= (SELECT MIN(id) FROM Invite WHERE expiry_date <= CURDATE() AND status != 'expired')
+ORDER BY id
+LIMIT ?
+`
+
+func (q *Queries) BatchExpireInvites(ctx context.Context, limit int32) (int64, error) {
+	result, err := q.exec(ctx, q.batchExpireInvitesStmt, batchExpireInvites, limit)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
 const checkMemberInSlotifyGroup = `-- name: CheckMemberInSlotifyGroup :one
 SELECT COUNT(*) FROM UserToSlotifyGroup
 WHERE user_id=? AND slotify_group_id=?
@@ -91,8 +140,8 @@ func (q *Queries) CountUserByID(ctx context.Context, id uint32) (int64, error) {
 }
 
 const createInvite = `-- name: CreateInvite :execrows
-INSERT INTO Invite (slotify_group_id, from_user_id, to_user_id, message, created_at)
-VALUES(?, ?, ?, ?, ?)
+INSERT INTO Invite (slotify_group_id, from_user_id, to_user_id, message, expiry_date, created_at)
+VALUES(?, ?, ?, ?, ?, ?)
 `
 
 type CreateInviteParams struct {
@@ -100,6 +149,7 @@ type CreateInviteParams struct {
 	FromUserID     uint32    `json:"fromUserId"`
 	ToUserID       uint32    `json:"toUserId"`
 	Message        string    `json:"message"`
+	ExpiryDate     time.Time `json:"expiryDate"`
 	CreatedAt      time.Time `json:"createdAt"`
 }
 
@@ -109,6 +159,7 @@ func (q *Queries) CreateInvite(ctx context.Context, arg CreateInviteParams) (int
 		arg.FromUserID,
 		arg.ToUserID,
 		arg.Message,
+		arg.ExpiryDate,
 		arg.CreatedAt,
 	)
 	if err != nil {
@@ -312,7 +363,7 @@ func (q *Queries) GetAllSlotifyGroupMembersExcept(ctx context.Context, arg GetAl
 }
 
 const getInviteByID = `-- name: GetInviteByID :one
-SELECT id, slotify_group_id, from_user_id, to_user_id, message, status, created_at FROM Invite
+SELECT id, slotify_group_id, from_user_id, to_user_id, message, status, expiry_date, created_at FROM Invite
 WHERE id=?
 `
 
@@ -326,6 +377,7 @@ func (q *Queries) GetInviteByID(ctx context.Context, id uint32) (Invite, error) 
 		&i.ToUserID,
 		&i.Message,
 		&i.Status,
+		&i.ExpiryDate,
 		&i.CreatedAt,
 	)
 	return i, err
@@ -483,7 +535,7 @@ func (q *Queries) GetUsersSlotifyGroups(ctx context.Context, userID uint32) ([]S
 
 const listInvitesByGroup = `-- name: ListInvitesByGroup :many
 SELECT 
-   i.id AS invite_id, i.message, i.status, i.created_at, fu.email AS from_user_email, fu.first_name AS from_user_first_name, fu.last_name AS from_user_last_name, tu.email AS to_user_email, tu.first_name AS to_user_first_name, tu.last_name AS to_user_last_name FROM Invite i
+   i.id AS invite_id, i.message, i.status, i.created_at, i.expiry_date, fu.email AS from_user_email, fu.first_name AS from_user_first_name, fu.last_name AS from_user_last_name, tu.email AS to_user_email, tu.first_name AS to_user_first_name, tu.last_name AS to_user_last_name FROM Invite i
 JOIN User fu ON fu.id=i.from_user_id
 JOIN User tu ON tu.id=i.to_user_id
 WHERE i.status = ifnull(?, i.status) 
@@ -500,6 +552,7 @@ type ListInvitesByGroupRow struct {
 	Message           string       `json:"message"`
 	Status            InviteStatus `json:"status"`
 	CreatedAt         time.Time    `json:"createdAt"`
+	ExpiryDate        time.Time    `json:"expiryDate"`
 	FromUserEmail     string       `json:"fromUserEmail"`
 	FromUserFirstName string       `json:"fromUserFirstName"`
 	FromUserLastName  string       `json:"fromUserLastName"`
@@ -522,6 +575,7 @@ func (q *Queries) ListInvitesByGroup(ctx context.Context, arg ListInvitesByGroup
 			&i.Message,
 			&i.Status,
 			&i.CreatedAt,
+			&i.ExpiryDate,
 			&i.FromUserEmail,
 			&i.FromUserFirstName,
 			&i.FromUserLastName,
@@ -543,7 +597,7 @@ func (q *Queries) ListInvitesByGroup(ctx context.Context, arg ListInvitesByGroup
 }
 
 const listInvitesMe = `-- name: ListInvitesMe :many
-SELECT i.id AS invite_id, i.message, i.status,i.created_at, fu.email AS from_user_email, fu.first_name AS from_user_first_name, fu.last_name AS from_user_last_name, sg.name AS slotify_group_name FROM Invite i
+SELECT i.id AS invite_id, i.message, i.status,i.created_at, i.expiry_date, fu.email AS from_user_email, fu.first_name AS from_user_first_name, fu.last_name AS from_user_last_name, sg.name AS slotify_group_name FROM Invite i
 JOIN User fu ON fu.id=i.from_user_id
 JOIN SlotifyGroup sg ON sg.id=i.slotify_group_id
 WHERE i.status = ifnull(?, i.status) 
@@ -560,6 +614,7 @@ type ListInvitesMeRow struct {
 	Message           string       `json:"message"`
 	Status            InviteStatus `json:"status"`
 	CreatedAt         time.Time    `json:"createdAt"`
+	ExpiryDate        time.Time    `json:"expiryDate"`
 	FromUserEmail     string       `json:"fromUserEmail"`
 	FromUserFirstName string       `json:"fromUserFirstName"`
 	FromUserLastName  string       `json:"fromUserLastName"`
@@ -580,6 +635,7 @@ func (q *Queries) ListInvitesMe(ctx context.Context, arg ListInvitesMeParams) ([
 			&i.Message,
 			&i.Status,
 			&i.CreatedAt,
+			&i.ExpiryDate,
 			&i.FromUserEmail,
 			&i.FromUserFirstName,
 			&i.FromUserLastName,

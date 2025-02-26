@@ -83,6 +83,7 @@ func (pai PostAPIInvitesJSONRequestBody) MarshalLogObject(enc zapcore.ObjectEnco
 	enc.AddString("message", pai.Message)
 	enc.AddUint32("toUserID", pai.ToUserID)
 	enc.AddUint32("slotifyGroupID", pai.SlotifyGroupID)
+	enc.AddTime("expiryDate", pai.ExpiryDate.Time)
 	enc.AddTime("createdAt", pai.CreatedAt)
 	return nil
 }
