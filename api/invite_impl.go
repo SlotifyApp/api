@@ -33,6 +33,37 @@ func (s Server) PostAPIInvites(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var g database.SlotifyGroup
+	if g, err = s.DB.GetSlotifyGroupByID(ctx, invitesCreateBody.SlotifyGroupID); err != nil {
+		s.Logger.Errorf("invite api: failed to get group by id", zap.Error(err))
+		sendError(w, http.StatusBadRequest, "failed to get group by id")
+		return
+	}
+
+	var u database.User
+	if u, err = s.DB.GetUserByID(ctx, invitesCreateBody.ToUserID); err != nil {
+		s.Logger.Errorf("invite api: failed to get user by id", zap.Error(err))
+		sendError(w, http.StatusBadRequest, "failed to get user by id")
+		return
+	}
+
+	// check if fromUser is in group and check if toUser is in group
+	err = checkIfUsersInGroup(checkIfUsersInGroupParams{
+		ctx:              ctx,
+		db:               s.DB,
+		fromUserID:       userID,
+		toUserFirstName:  u.FirstName,
+		toUserLastName:   u.LastName,
+		slotifyGroupID:   invitesCreateBody.SlotifyGroupID,
+		slotifyGroupName: g.Name,
+		toUserID:         invitesCreateBody.ToUserID,
+	})
+	if err != nil {
+		s.Logger.Errorf("invite api: ", zap.Error(err))
+		sendError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
 	params := database.CreateInviteParams{
 		SlotifyGroupID: invitesCreateBody.SlotifyGroupID,
 		FromUserID:     userID,
@@ -42,23 +73,7 @@ func (s Server) PostAPIInvites(w http.ResponseWriter, r *http.Request) {
 	}
 
 	err = retry.Do(func() error {
-		var rows int64
-		rows, err = s.DB.CreateInvite(ctx, params)
-		if rows != 1 {
-			return database.WrongNumberSQLRowsError{ActualRows: rows, ExpectedRows: []int64{1}}
-		}
-		if err != nil {
-			switch {
-			case errors.Is(err, context.Canceled):
-				return fmt.Errorf("context cancelled creating invite: %w",
-					err)
-			case errors.Is(err, context.DeadlineExceeded):
-				return fmt.Errorf("deadline exceeded during creating invite: %w", err)
-			default:
-				return fmt.Errorf("failed to create invite: %w", err)
-			}
-		}
-		return nil
+		return database.CreateInvite(ctx, s.DB, params)
 	}, retry.Attempts(3), retry.Delay(time.Millisecond*500))
 	if err != nil {
 		s.Logger.Error("failed to create invite", zap.Error(err))
@@ -66,42 +81,17 @@ func (s Server) PostAPIInvites(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var g database.SlotifyGroup
-	if g, err = s.DB.GetSlotifyGroupByID(ctx, invitesCreateBody.SlotifyGroupID); err != nil {
-		s.Logger.Errorf("invite api: failed to send notification to toUser",
-			zap.Error(err))
-		SetHeaderAndWriteResponse(w, http.StatusCreated, "Successfully created invite")
-		return
-	}
-
-	// Create notification to user who has been invited
-	if err = s.NotificationService.SendNotification(ctx, s.Logger, s.DB,
-		[]uint32{invitesCreateBody.ToUserID}, database.CreateNotificationParams{
-			Message: fmt.Sprintf("You have a new invite to team %s!", g.Name),
-			Created: time.Now(),
-		}); err != nil {
-		s.Logger.Errorf("invite api: failed to send notification to toUser",
-			zap.Error(err))
-	}
-
-	var u database.User
-	if u, err = s.DB.GetUserByID(ctx, invitesCreateBody.ToUserID); err != nil {
-		s.Logger.Errorf("invite api: failed to send notification to fromUser",
-			zap.Error(err))
-		SetHeaderAndWriteResponse(w, http.StatusCreated, "Successfully created invite")
-		return
-	}
-
-	// Create notification to user who created the invite
-	if err = s.NotificationService.SendNotification(ctx, s.Logger, s.DB,
-		[]uint32{userID}, database.CreateNotificationParams{
-			Message: fmt.Sprintf(
-				"You successfully created an invite on behalf of team %s to %s %s!",
-				g.Name, u.FirstName, u.LastName), Created: time.Now(),
-		}); err != nil {
-		s.Logger.Errorf("invite api: failed to send notification to fromUser",
-			zap.Error(err))
-	}
+	sendPostInviteNotification(sendPostInviteNotificationParams{
+		ctx:             ctx,
+		toUserID:        invitesCreateBody.ToUserID,
+		fromUserID:      userID,
+		notifService:    s.NotificationService,
+		logger:          s.Logger,
+		db:              s.DB,
+		groupName:       g.Name,
+		toUserFirstName: u.FirstName,
+		toUserLastName:  u.LastName,
+	})
 
 	SetHeaderAndWriteResponse(w, http.StatusCreated, "Successfully created invite")
 }
