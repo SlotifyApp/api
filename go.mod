@@ -70,6 +70,7 @@ require (
 	github.com/gorilla/mux v1.8.1
 	github.com/microsoftgraph/msgraph-sdk-go v1.59.0
 	github.com/oapi-codegen/nethttp-middleware v1.0.2
+	github.com/robfig/cron/v3 v3.0.1
 	go.uber.org/multierr v1.10.0 // indirect
 	golang.org/x/oauth2 v0.25.0 // indirect
 	openapi.tanna.dev/go/validator v0.4.0

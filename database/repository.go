@@ -30,6 +30,15 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.addUserToSlotifyGroupStmt, err = db.PrepareContext(ctx, addUserToSlotifyGroup); err != nil {
 		return nil, fmt.Errorf("error preparing query AddUserToSlotifyGroup: %w", err)
 	}
+	if q.batchDeleteWeekOldInvitesStmt, err = db.PrepareContext(ctx, batchDeleteWeekOldInvites); err != nil {
+		return nil, fmt.Errorf("error preparing query BatchDeleteWeekOldInvites: %w", err)
+	}
+	if q.batchDeleteWeekOldNotificationsStmt, err = db.PrepareContext(ctx, batchDeleteWeekOldNotifications); err != nil {
+		return nil, fmt.Errorf("error preparing query BatchDeleteWeekOldNotifications: %w", err)
+	}
+	if q.batchExpireInvitesStmt, err = db.PrepareContext(ctx, batchExpireInvites); err != nil {
+		return nil, fmt.Errorf("error preparing query BatchExpireInvites: %w", err)
+	}
 	if q.checkMemberInSlotifyGroupStmt, err = db.PrepareContext(ctx, checkMemberInSlotifyGroup); err != nil {
 		return nil, fmt.Errorf("error preparing query CheckMemberInSlotifyGroup: %w", err)
 	}
@@ -136,6 +145,21 @@ func (q *Queries) Close() error {
 	if q.addUserToSlotifyGroupStmt != nil {
 		if cerr := q.addUserToSlotifyGroupStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing addUserToSlotifyGroupStmt: %w", cerr)
+		}
+	}
+	if q.batchDeleteWeekOldInvitesStmt != nil {
+		if cerr := q.batchDeleteWeekOldInvitesStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing batchDeleteWeekOldInvitesStmt: %w", cerr)
+		}
+	}
+	if q.batchDeleteWeekOldNotificationsStmt != nil {
+		if cerr := q.batchDeleteWeekOldNotificationsStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing batchDeleteWeekOldNotificationsStmt: %w", cerr)
+		}
+	}
+	if q.batchExpireInvitesStmt != nil {
+		if cerr := q.batchExpireInvitesStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing batchExpireInvitesStmt: %w", cerr)
 		}
 	}
 	if q.checkMemberInSlotifyGroupStmt != nil {
@@ -334,6 +358,9 @@ type Queries struct {
 	tx                                  *sql.Tx
 	addSlotifyGroupStmt                 *sql.Stmt
 	addUserToSlotifyGroupStmt           *sql.Stmt
+	batchDeleteWeekOldInvitesStmt       *sql.Stmt
+	batchDeleteWeekOldNotificationsStmt *sql.Stmt
+	batchExpireInvitesStmt              *sql.Stmt
 	checkMemberInSlotifyGroupStmt       *sql.Stmt
 	countSlotifyGroupByIDStmt           *sql.Stmt
 	countUserByEmailStmt                *sql.Stmt
@@ -373,6 +400,9 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		tx:                                  tx,
 		addSlotifyGroupStmt:                 q.addSlotifyGroupStmt,
 		addUserToSlotifyGroupStmt:           q.addUserToSlotifyGroupStmt,
+		batchDeleteWeekOldInvitesStmt:       q.batchDeleteWeekOldInvitesStmt,
+		batchDeleteWeekOldNotificationsStmt: q.batchDeleteWeekOldNotificationsStmt,
+		batchExpireInvitesStmt:              q.batchExpireInvitesStmt,
 		checkMemberInSlotifyGroupStmt:       q.checkMemberInSlotifyGroupStmt,
 		countSlotifyGroupByIDStmt:           q.countSlotifyGroupByIDStmt,
 		countUserByEmailStmt:                q.countUserByEmailStmt,

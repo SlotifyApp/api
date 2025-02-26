@@ -89,6 +89,13 @@ DELETE FROM RefreshToken WHERE user_id=?;
 -- name: CreateNotification :execlastid
 INSERT INTO Notification (message, created) VALUES(?, ?);
 
+-- name: BatchDeleteWeekOldNotifications :execrows
+DELETE FROM Notification
+WHERE created + INTERVAL 1 WEEK <= CURDATE()
+  AND id >= (SELECT MIN(id) FROM Notification WHERE created + INTERVAL 1 WEEK <= CURDATE())
+ORDER BY id
+LIMIT ?;
+
 -- name: CreateUserNotification :execrows
 INSERT INTO UserToNotification (user_id, notification_id, is_read) VALUES(?, ?, FALSE);
 
@@ -110,8 +117,8 @@ SELECT * FROM Invite
 WHERE id=?;
 
 -- name: CreateInvite :execrows
-INSERT INTO Invite (slotify_group_id, from_user_id, to_user_id, message, created_at)
-VALUES(?, ?, ?, ?, ?);
+INSERT INTO Invite (slotify_group_id, from_user_id, to_user_id, message, expiry_date, created_at)
+VALUES(?, ?, ?, ?, ?, ?);
 
 -- name: UpdateInviteStatus :execrows
 UPDATE Invite SET status=?
@@ -125,7 +132,7 @@ UPDATE Invite SET message=?
 WHERE id=? AND from_user_id=?;
 
 -- name: ListInvitesMe :many
-SELECT i.id AS invite_id, i.message, i.status,i.created_at, fu.email AS from_user_email, fu.first_name AS from_user_first_name, fu.last_name AS from_user_last_name, sg.name AS slotify_group_name FROM Invite i
+SELECT i.id AS invite_id, i.message, i.status,i.created_at, i.expiry_date, fu.email AS from_user_email, fu.first_name AS from_user_first_name, fu.last_name AS from_user_last_name, sg.name AS slotify_group_name FROM Invite i
 JOIN User fu ON fu.id=i.from_user_id
 JOIN SlotifyGroup sg ON sg.id=i.slotify_group_id
 WHERE i.status = ifnull(sqlc.arg('status'), i.status) 
@@ -133,8 +140,23 @@ AND i.to_user_id=?;
 
 -- name: ListInvitesByGroup :many
 SELECT 
-   i.id AS invite_id, i.message, i.status, i.created_at, fu.email AS from_user_email, fu.first_name AS from_user_first_name, fu.last_name AS from_user_last_name, tu.email AS to_user_email, tu.first_name AS to_user_first_name, tu.last_name AS to_user_last_name FROM Invite i
+   i.id AS invite_id, i.message, i.status, i.created_at, i.expiry_date, fu.email AS from_user_email, fu.first_name AS from_user_first_name, fu.last_name AS from_user_last_name, tu.email AS to_user_email, tu.first_name AS to_user_first_name, tu.last_name AS to_user_last_name FROM Invite i
 JOIN User fu ON fu.id=i.from_user_id
 JOIN User tu ON tu.id=i.to_user_id
 WHERE i.status = ifnull(sqlc.arg('status'), i.status) 
 AND i.slotify_group_id=?;
+
+-- name: BatchDeleteWeekOldInvites :execrows
+DELETE FROM Invite
+WHERE created_at + INTERVAL 1 WEEK <= CURDATE()
+  AND id >= (SELECT MIN(id) FROM Invite WHERE created_at + INTERVAL 1 WEEK <= CURDATE())
+ORDER BY id
+LIMIT ?;
+
+-- name: BatchExpireInvites :execrows
+UPDATE Invite SET status = 'expired'
+WHERE expiry_date <= CURDATE()
+  AND status != 'expired'
+  AND id >= (SELECT MIN(id) FROM Invite WHERE expiry_date <= CURDATE() AND status != 'expired')
+ORDER BY id
+LIMIT ?;

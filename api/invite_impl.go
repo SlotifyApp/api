@@ -69,6 +69,7 @@ func (s Server) PostAPIInvites(w http.ResponseWriter, r *http.Request) {
 		FromUserID:     userID,
 		ToUserID:       invitesCreateBody.ToUserID,
 		Message:        invitesCreateBody.Message,
+		ExpiryDate:     invitesCreateBody.ExpiryDate.Time,
 		CreatedAt:      invitesCreateBody.CreatedAt,
 	}
 
