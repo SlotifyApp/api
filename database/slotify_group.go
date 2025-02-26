@@ -6,7 +6,9 @@ import (
 	"fmt"
 )
 
-func CheckMemberIsInSlotifyGroup(ctx context.Context, db *Database, arg CheckMemberInSlotifyGroupParams) (bool, error) {
+func CheckMemberInSlotifyGroupWrapper(ctx context.Context,
+	db *Database, arg CheckMemberInSlotifyGroupParams,
+) (bool, error) {
 	// Check that the user creating the event is in the group
 	isUserInGroup, err := db.CheckMemberInSlotifyGroup(ctx, CheckMemberInSlotifyGroupParams{
 		UserID:         arg.UserID,
@@ -25,4 +27,22 @@ func CheckMemberIsInSlotifyGroup(ctx context.Context, db *Database, arg CheckMem
 	}
 
 	return isUserInGroup > 0, nil
+}
+
+func AddUserToSlotifyGroupWrapper(ctx context.Context, qtx *Queries, arg AddUserToSlotifyGroupParams) error {
+	rowsAffected, err := qtx.AddUserToSlotifyGroup(ctx, arg)
+	if err != nil {
+		return fmt.Errorf("failed to add user to group: %w", err)
+	}
+
+	if rowsAffected != 1 {
+		err = WrongNumberSQLRowsError{
+			ActualRows:   rowsAffected,
+			ExpectedRows: []int64{1},
+		}
+
+		return fmt.Errorf("failed to add user to slotifyGroup: %w", err)
+	}
+
+	return nil
 }

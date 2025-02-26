@@ -70,15 +70,6 @@ func (sg SlotifyGroup) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 	return nil
 }
 
-func (sgp GetAPISlotifyGroupsParams) MarshalLogObject(enc zapcore.ObjectEncoder) error {
-	name := ""
-	if sgp.Name != nil {
-		name = *sgp.Name
-	}
-	enc.AddString("name", name)
-	return nil
-}
-
 func (pai PostAPIInvitesJSONRequestBody) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 	enc.AddString("message", pai.Message)
 	enc.AddUint32("toUserID", pai.ToUserID)

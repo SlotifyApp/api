@@ -144,14 +144,14 @@ func (s Server) DeleteAPIInvitesInviteID(w http.ResponseWriter, r *http.Request,
 
 	var invite database.Invite
 	var err error
-	if invite, err = database.GetInviteByIDWrapper(ctx, s.DB, inviteID); err != nil {
+	if invite, err = s.DB.GetInviteByID(ctx, inviteID); err != nil {
 		s.Logger.Error("failed to get invite by id", zap.Error(err))
 		sendError(w, http.StatusBadGateway, "Failed to get invite by id")
 		return
 	}
 
 	var userIsInGroup bool
-	if userIsInGroup, err = database.CheckMemberIsInSlotifyGroup(ctx, s.DB, database.CheckMemberInSlotifyGroupParams{
+	if userIsInGroup, err = database.CheckMemberInSlotifyGroupWrapper(ctx, s.DB, database.CheckMemberInSlotifyGroupParams{
 		UserID:         userID,
 		SlotifyGroupID: invite.SlotifyGroupID,
 	}); err != nil {
@@ -199,7 +199,7 @@ func (s Server) PatchAPIInvitesInviteID(w http.ResponseWriter, r *http.Request, 
 	}
 
 	var invite database.Invite
-	if invite, err = database.GetInviteByIDWrapper(ctx, s.DB, inviteID); err != nil {
+	if invite, err = s.DB.GetInviteByID(ctx, inviteID); err != nil {
 		s.Logger.Error("failed to get invite details from invite id", zap.Error(err))
 		sendError(w, http.StatusInternalServerError, "failed to get invite details for invite id")
 		return
@@ -247,9 +247,9 @@ func (s Server) PatchAPIInvitesInviteID(w http.ResponseWriter, r *http.Request, 
 	SetHeaderAndWriteResponse(w, http.StatusOK, "Successfully updated invite message!")
 }
 
-// (PATCH /api/invites/{inviteID}/status/{newStatus} Update a new invite).
-func (s Server) PatchAPIInvitesInviteIDStatusNewStatus(w http.ResponseWriter, r *http.Request,
-	inviteID uint32, newStatus InviteStatus,
+// (PATCH /api/invites/{inviteID}/decline Decline an invite).
+func (s Server) PatchAPIInvitesInviteIDDecline(w http.ResponseWriter, r *http.Request,
+	inviteID uint32,
 ) {
 	ctx, cancel := context.WithTimeout(r.Context(), 2*database.DatabaseTimeout)
 	defer cancel()
@@ -261,61 +261,95 @@ func (s Server) PatchAPIInvitesInviteIDStatusNewStatus(w http.ResponseWriter, r 
 		return
 	}
 
+	p := validateAndUpdateInviteStatusParams{
+		ctx:       ctx,
+		qtx:       &s.DB.Queries,
+		inviteID:  inviteID,
+		l:         s.Logger,
+		userID:    userID,
+		newStatus: InviteStatusAccepted,
+	}
+
 	var err error
-	var invite database.Invite
-	if invite, err = database.GetInviteByIDWrapper(ctx, s.DB, inviteID); err != nil {
-		s.Logger.Error("failed to get invite details from invite id", zap.Error(err))
-		sendError(w, http.StatusInternalServerError, "failed to get invite details for invite id")
+	if _, err = validateAndUpdateInviteStatus(p); err != nil {
+		s.Logger.Error("failed to validate and update invite status", zap.Error(err))
+		sendError(w, http.StatusBadGateway, err.Error())
 		return
 	}
 
-	if invite.ToUserID != userID {
-		s.Logger.Error("only the user the invite is sent to can edit the status", zap.Error(err))
-		sendError(w, http.StatusUnauthorized,
-			"only the user the invite is sent to can edit the status")
+	SetHeaderAndWriteResponse(w, http.StatusCreated, "Successfully declined invite.")
+}
+
+// (PATCH /api/invites/{inviteID}/accept Accept an invite).
+func (s Server) PatchAPIInvitesInviteIDAccept(w http.ResponseWriter, r *http.Request,
+	inviteID uint32,
+) {
+	ctx, cancel := context.WithTimeout(r.Context(), 2*database.DatabaseTimeout)
+	defer cancel()
+
+	userID, ok := r.Context().Value(UserIDCtxKey{}).(uint32)
+	if !ok {
+		s.Logger.Error("failed to get userid from request context")
+		sendError(w, http.StatusUnauthorized, "Try again later.")
 		return
 	}
 
-	if ok = validateInviteStatusTransition(InviteStatus(invite.Status), newStatus); !ok {
-		s.Logger.Error("invalid invite state transition", zap.Error(err))
-		sendError(w, http.StatusBadRequest, fmt.Sprintf(
-			"invalid invite state transition, cannot go from %s to %s", invite.Status, newStatus,
-		))
-		return
-	}
-
-	err = retry.Do(func() error {
-		var rows int64
-		rows, err = s.DB.UpdateInviteStatus(ctx,
-			database.UpdateInviteStatusParams{
-				ID:     inviteID,
-				Status: database.InviteStatus(newStatus),
-			})
-
-		if rows != 1 {
-			return database.WrongNumberSQLRowsError{ActualRows: rows, ExpectedRows: []int64{1}}
-		}
-
-		if err != nil {
-			switch {
-			case errors.Is(err, context.Canceled):
-				return fmt.Errorf("context cancelled updating invite status: %w",
-					err)
-			case errors.Is(err, context.DeadlineExceeded):
-				return fmt.Errorf("deadline exceeded during updating invite status: %w", err)
-			default:
-				return fmt.Errorf("failed to update invite status: %w", err)
-			}
-		}
-		return nil
-	}, retry.Attempts(3), retry.Delay(time.Millisecond*500))
+	tx, err := s.DB.DB.Begin()
 	if err != nil {
-		s.Logger.Error("failed to update invite", zap.Error(err))
-		sendError(w, http.StatusBadGateway, "Failed to update invite")
+		s.Logger.Error("failed to start db transaction", zap.Error(err))
+		sendError(w, http.StatusInternalServerError, "callback route: failed to start db transaction")
 		return
 	}
 
-	SetHeaderAndWriteResponse(w, http.StatusOK, "Successfully updated invite status!")
+	defer func() {
+		if err = tx.Rollback(); err != nil {
+			s.Logger.Error("failed to rollback db transaction", zap.Error(err))
+		}
+	}()
+
+	qtx := s.DB.WithTx(tx)
+
+	p := validateAndUpdateInviteStatusParams{
+		ctx:       ctx,
+		qtx:       qtx,
+		inviteID:  inviteID,
+		l:         s.Logger,
+		userID:    userID,
+		newStatus: InviteStatusAccepted,
+	}
+
+	var invite database.Invite
+	if invite, err = validateAndUpdateInviteStatus(p); err != nil {
+		s.Logger.Error("failed to validate and update invite status", zap.Error(err))
+		sendError(w, http.StatusBadGateway, err.Error())
+		return
+	}
+
+	addUserParams := AddUserToSlotifyGroupParams{
+		ctx:            ctx,
+		userID:         userID,
+		slotifyGroupID: invite.SlotifyGroupID,
+		l:              s.Logger,
+		qtx:            qtx,
+		notifService:   s.NotificationService,
+	}
+
+	if err = AddUserToSlotifyGroup(addUserParams); err != nil {
+		s.Logger.Error("failed to add user to slotify group", zap.Error(err),
+			zap.Uint32("slotifyGroupID", invite.SlotifyGroupID),
+			zap.Uint32("userID", userID),
+		)
+		sendError(w, http.StatusBadGateway, "failed to add you to the group, maybe you are already a member?")
+		return
+	}
+
+	if err = tx.Commit(); err != nil {
+		s.Logger.Error("failed to commit db transaction", zap.Error(err))
+		sendError(w, http.StatusInternalServerError, "failed to accept invite")
+		return
+	}
+
+	SetHeaderAndWriteResponse(w, http.StatusCreated, "Successfully accepted invite!")
 }
 
 // (GET /api/slotify-groups/{slotifyGroupID}/invites Get all invites for a slotify group).
@@ -374,9 +408,23 @@ func (s Server) OptionsAPIInvitesInviteID(w http.ResponseWriter, _ *http.Request
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// (OPTIONS /api/invites/{inviteID}/status/{newStatus}Satisfy CORS preflight for creating invites.)
-func (s Server) OptionsAPIInvitesInviteIDStatusNewStatus(w http.ResponseWriter,
-	_ *http.Request, _ uint32, _ InviteStatus,
+// (OPTIONS /api/invites/{inviteID}/decline Satisfy CORS preflight for declining invites.)
+func (s Server) OptionsAPIInvitesInviteIDDecline(w http.ResponseWriter,
+	_ *http.Request, _ uint32,
+) {
+	// Set CORS headers
+	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")        // Your frontend's origin
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, OPTIONS")   // Allowed methods
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization") // Allowed headers
+	w.Header().Set("Access-Control-Allow-Credentials", "true")                    // Allow credentials (cookies, etc.)
+
+	// Send a 204 No Content response to indicate that the preflight request was successful
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// (OPTIONS /api/invites/{inviteID}/accept Satisfy CORS preflight for declining invites.)
+func (s Server) OptionsAPIInvitesInviteIDAccept(w http.ResponseWriter,
+	_ *http.Request, _ uint32,
 ) {
 	// Set CORS headers
 	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")        // Your frontend's origin

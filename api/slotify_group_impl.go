@@ -7,47 +7,10 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"time"
 
 	"github.com/SlotifyApp/slotify-backend/database"
 	"go.uber.org/zap"
 )
-
-// (GET /api/slotify-groups/joinable/me).
-func (s Server) GetAPISlotifyGroupsJoinableMe(w http.ResponseWriter, r *http.Request) {
-	userID, ok := r.Context().Value(UserIDCtxKey{}).(uint32)
-	if !ok {
-		s.Logger.Error("failed to get userid from request context")
-		sendError(w, http.StatusUnauthorized, "Try again later.")
-		return
-	}
-
-	ctx, cancel := context.WithTimeout(r.Context(), database.DatabaseTimeout)
-	defer cancel()
-
-	slotifyGroups, err := s.DB.GetJoinableSlotifyGroups(ctx, userID)
-	if err != nil {
-		switch {
-		case errors.Is(err, context.Canceled):
-			s.Logger.Error("getting users joinable slotifyGroups failed: context was cancelled",
-				zap.Uint32("userID", userID))
-			sendError(w, http.StatusUnauthorized, "Try again later.")
-			return
-		case errors.Is(err, context.DeadlineExceeded):
-			s.Logger.Error("getting users joinable slotifyGroups: query timed out",
-				zap.Uint32("userID", userID))
-			sendError(w, http.StatusUnauthorized, "Try again later.")
-			return
-		default:
-			s.Logger.Error("failed to get users slotifyGroups", zap.Uint32("userID", userID))
-			sendError(w, http.StatusInternalServerError,
-				fmt.Sprintf("Sorry, failed to get user id(%d)'s joinable slotifyGroups", userID))
-			return
-		}
-	}
-
-	SetHeaderAndWriteResponse(w, http.StatusOK, slotifyGroups)
-}
 
 // (GET /api/slotify-groups/me).
 func (s Server) GetAPISlotifyGroupsMe(w http.ResponseWriter, r *http.Request) {
@@ -83,21 +46,6 @@ func (s Server) GetAPISlotifyGroupsMe(w http.ResponseWriter, r *http.Request) {
 	SetHeaderAndWriteResponse(w, http.StatusOK, slotifyGroups)
 }
 
-// (GET /api/slotify-groups).
-func (s Server) GetAPISlotifyGroups(w http.ResponseWriter, r *http.Request, params GetAPISlotifyGroupsParams) {
-	ctx, cancel := context.WithTimeout(r.Context(), database.DatabaseTimeout)
-	defer cancel()
-
-	slotifyGroups, err := s.DB.ListSlotifyGroups(ctx, params.Name)
-	if err != nil {
-		s.Logger.Error(zap.Object("params", params), zap.Error(err))
-		sendError(w, http.StatusBadRequest, "slotifyGroup api: failed to get slotifyGroups")
-		return
-	}
-
-	SetHeaderAndWriteResponse(w, http.StatusOK, slotifyGroups)
-}
-
 // (POST /api/slotify-groups).
 func (s Server) PostAPISlotifyGroups(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 4*database.DatabaseTimeout)
@@ -118,20 +66,25 @@ func (s Server) PostAPISlotifyGroups(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	tx, err := s.DB.DB.Begin()
+	if err != nil {
+		s.Logger.Error("failed to start db transaction", zap.Error(err))
+		sendError(w, http.StatusInternalServerError, "callback route: failed to start db transaction")
+		return
+	}
+
+	defer func() {
+		if err = tx.Rollback(); err != nil {
+			s.Logger.Error("failed to rollback db transaction", zap.Error(err))
+		}
+	}()
+
+	qtx := s.DB.WithTx(tx)
+
 	var slotifyGroupID int64
-	slotifyGroupID, err = s.DB.AddSlotifyGroup(ctx, slotifyGroupBody.Name)
+	slotifyGroupID, err = qtx.AddSlotifyGroup(ctx, slotifyGroupBody.Name)
 	if err != nil {
 		switch {
-		case errors.Is(err, context.Canceled):
-			s.Logger.Error("slotifyGroup api: add slotifyGroup query context cancelled",
-				zap.Object("req_body", slotifyGroupBody), zap.Error(err))
-			sendError(w, http.StatusInternalServerError, "something went wrong")
-			return
-		case errors.Is(err, context.DeadlineExceeded):
-			s.Logger.Error("slotifyGroup api: add slotifyGroup query timed out",
-				zap.Object("req_body", slotifyGroupBody), zap.Error(err))
-			sendError(w, http.StatusInternalServerError, "add slotifyGroup query timed out")
-			return
 		case database.IsDuplicateEntrySQLError(err):
 			s.Logger.Error("slotifyGroup api: slotifyGroup already exists",
 				zap.Object("req_body", slotifyGroupBody), zap.Error(err))
@@ -145,26 +98,33 @@ func (s Server) PostAPISlotifyGroups(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	slotifyGroup := SlotifyGroup{
+	p := AddUserToSlotifyGroupParams{
+		ctx:    ctx,
+		userID: userID,
 		//nolint: gosec // id is unsigned 32 bit int
-		Id:   uint32(slotifyGroupID),
-		Name: slotifyGroupBody.Name,
+		slotifyGroupID: uint32(slotifyGroupID),
+		l:              s.Logger,
+		qtx:            qtx,
+		notifService:   s.NotificationService,
 	}
 
-	notifParams := database.CreateNotificationParams{
-		Message: fmt.Sprintf("You successfully created SlotifyGroup %s!", slotifyGroup.Name),
-		Created: time.Now(),
-	}
-
-	if err = s.NotificationService.SendNotification(ctx, s.Logger, s.DB, []uint32{userID}, notifParams); err != nil {
-		s.Logger.Errorf("slotifyGroup api: failed to send notification",
+	if err = AddUserToSlotifyGroup(p); err != nil {
+		s.Logger.Error("creating group was successful, but adding user to the group was not",
+			zap.Uint32("userID", userID),
+			zap.Int64("slotifyGroupID", slotifyGroupID),
 			zap.Error(err))
+		sendError(w, http.StatusInternalServerError, "failed to create a group and add you to it")
+		return
 	}
 
-	// TODO: Actually have a db transaction here containing both creating the slotifyGroup
-	// or joining the slotifyGroup fails
-	// Add user who made the slotifyGroup to the slotifyGroup itself
-	s.PostAPISlotifyGroupsSlotifyGroupIDUsersMe(w, r, slotifyGroup.Id)
+	if err = tx.Commit(); err != nil {
+		s.Logger.Error("failed to commit db transaction", zap.Error(err))
+		sendError(w, http.StatusInternalServerError, "failed to create a group and add you to it")
+		return
+	}
+
+	SetHeaderAndWriteResponse(w, http.StatusCreated, fmt.Sprintf(
+		"slotifyGroup api: created group %s successfully", slotifyGroupBody.Name))
 }
 
 // (DELETE /api/slotify-groups/{slotifyGroupID}).
@@ -246,23 +206,13 @@ func (s Server) GetAPISlotifyGroupsSlotifyGroupIDUsers(w http.ResponseWriter, r 
 
 	count, err := s.DB.CountSlotifyGroupByID(ctx, slotifyGroupID)
 	if err != nil {
-		switch {
-		case errors.Is(err, context.Canceled):
-			s.Logger.Error("slotifyGroup api: context cancelled", zap.Uint32("slotifyGroupID",
-				slotifyGroupID))
-			sendError(w, http.StatusInternalServerError, "sorry try again")
-			return
-		case errors.Is(err, context.DeadlineExceeded):
-			s.Logger.Error("slotifyGroup api: get all slotifyGroup members query timed out",
-				zap.Uint32("slotifyGroupID", slotifyGroupID))
-			sendError(w, http.StatusInternalServerError, "get all slotifyGroup members query timed out")
-			return
-		default:
-			s.Logger.Error("slotifyGroup api: failed to count slotifyGroup members by id",
-				zap.Uint32("slotifyGroupID", slotifyGroupID), zap.Error(err))
-			sendError(w, http.StatusInternalServerError, "get all slotifyGroup members query timed out")
-			return
-		}
+		s.Logger.Error("slotifyGroup api: failed to get users of a group: failed to get count of group by id",
+			zap.Uint32("slotifyGroupID",
+				slotifyGroupID),
+			zap.Error(err),
+		)
+		sendError(w, http.StatusInternalServerError, "sorry try again")
+		return
 	}
 
 	if count == 0 {
@@ -275,161 +225,16 @@ func (s Server) GetAPISlotifyGroupsSlotifyGroupIDUsers(w http.ResponseWriter, r 
 
 	users, err := s.DB.GetAllSlotifyGroupMembers(ctx, slotifyGroupID)
 	if err != nil {
-		switch {
-		case errors.Is(err, context.Canceled):
-			s.Logger.Error("slotifyGroup api: context cancelled", zap.Uint32("slotifyGroupID", slotifyGroupID))
-			sendError(w, http.StatusInternalServerError, "context cancelled")
-			return
-		case errors.Is(err, context.DeadlineExceeded):
-			s.Logger.Error("slotifyGroup api: get all slotifyGroup members query timed out",
-				zap.Uint32("slotifyGroupID", slotifyGroupID))
-			sendError(w, http.StatusInternalServerError, "get all slotifyGroup members query timed out")
-			return
-		default:
-			s.Logger.Errorf("slotifyGroup api: failed to get all slotifyGroup members: %w", err)
-			sendError(w, http.StatusInternalServerError,
-				fmt.Sprintf(
-					"slotifyGroup api: failed to get slotifyGroup members for slotifyGroup with id %d",
-					slotifyGroupID))
-			return
-		}
+		s.Logger.Error("slotifyGroup api: failed to get users of a group",
+			zap.Uint32("slotifyGroupID",
+				slotifyGroupID),
+			zap.Error(err),
+		)
+		sendError(w, http.StatusInternalServerError, "failed to get all slotify group members")
+		return
 	}
 
 	SetHeaderAndWriteResponse(w, http.StatusOK, users)
-}
-
-// (POST /api/slotify-groups/{slotifyGroupID}/users/me).
-func (s Server) PostAPISlotifyGroupsSlotifyGroupIDUsersMe(w http.ResponseWriter,
-	r *http.Request, slotifyGroupID uint32,
-) {
-	userID, ok := r.Context().Value(UserIDCtxKey{}).(uint32)
-	if !ok {
-		s.Logger.Error("failed to get userid from request context")
-		sendError(w, http.StatusUnauthorized, "Try again later.")
-		return
-	}
-
-	s.PostAPISlotifyGroupsSlotifyGroupIDUsersUserID(w, r, slotifyGroupID, userID)
-}
-
-// (POST /api/slotify-groups/{slotifyGroupID}/users/{userID})
-// nolint: funlen // TODO: Refactor this
-func (s Server) PostAPISlotifyGroupsSlotifyGroupIDUsersUserID(w http.ResponseWriter,
-	r *http.Request, slotifyGroupID uint32, userID uint32,
-) {
-	ctx, cancel := context.WithTimeout(r.Context(), 10*database.DatabaseTimeout)
-	defer cancel()
-
-	rowsAffected, err := s.DB.AddUserToSlotifyGroup(ctx, database.AddUserToSlotifyGroupParams{
-		UserID:         userID,
-		SlotifyGroupID: slotifyGroupID,
-	})
-	if err != nil {
-		switch {
-		case errors.Is(err, context.Canceled):
-			s.Logger.Error("slotifyGroup api: context cancelled",
-				zap.Uint32("userID", userID), zap.Uint32("slotifyGroupID", slotifyGroupID), zap.Error(err))
-			sendError(w, http.StatusInternalServerError, "slotifyGroup api: context cancelled")
-			return
-		case errors.Is(err, context.DeadlineExceeded):
-			s.Logger.Error("slotifyGroup api: add user to slotifyGroup query timed out",
-				zap.Uint32("userID", userID), zap.Uint32("slotifyGroupID", slotifyGroupID), zap.Error(err))
-			sendError(w, http.StatusInternalServerError, "slotifyGroup api: add slotifyGroup query timed out")
-			return
-		case database.IsRowDoesNotExistSQLError(err):
-			s.Logger.Errorf("slotifyGroup api: user id or slotifyGroup id invalid fk: %w", err)
-			sendError(w, http.StatusForbidden,
-				fmt.Sprintf("slotifyGroup api: slotifyGroup id(%d) or user id(%d) was invalid", slotifyGroupID, userID))
-			return
-		default:
-			s.Logger.Errorf("slotifyGroup api: failed to add user to slotifyGroup: %w", err)
-			sendError(w, http.StatusInternalServerError, "slotifyGroup api: failed to add user to slotifyGroup")
-			return
-		}
-	}
-
-	if rowsAffected != 1 {
-		err = database.WrongNumberSQLRowsError{
-			ActualRows:   rowsAffected,
-			ExpectedRows: []int64{1},
-		}
-		s.Logger.Error(zap.Uint32("userID", userID),
-			zap.Uint32("slotifyGroupID", slotifyGroupID), zap.Error(err))
-		sendError(w, http.StatusBadRequest, "user api: failed to add member to slotifyGroup")
-		return
-	}
-
-	t, err := s.DB.GetSlotifyGroupByID(ctx, slotifyGroupID)
-	if err != nil {
-		switch {
-		case errors.Is(err, context.Canceled):
-			s.Logger.Error("slotifyGroup api: add user to slotifyGroup: get slotifyGroup by id: context cancelled",
-				zap.Uint32("userID", userID), zap.Uint32("slotifyGroupID", slotifyGroupID), zap.Error(err))
-			sendError(w, http.StatusInternalServerError, "slotifyGroup api: context cancelled")
-			return
-		case errors.Is(err, context.DeadlineExceeded):
-			s.Logger.Error("slotifyGroup api: add user to slotifyGroup: get slotifyGroup by id query timed out",
-				zap.Uint32("userID", userID), zap.Uint32("slotifyGroupID", slotifyGroupID), zap.Error(err))
-			sendError(w, http.StatusInternalServerError, "slotifyGroup api: add slotifyGroup query timed out")
-			return
-		default:
-			s.Logger.Errorf("slotifyGroup api: add user to slotifyGroup: get slotifyGroup by id query timed out",
-				zap.Error(err))
-			sendError(w, http.StatusInternalServerError,
-				"slotifyGroup api: added slotifyGroup but failed to get slotifyGroup by id")
-			return
-		}
-	}
-
-	dbParams := database.GetAllSlotifyGroupMembersExceptParams{
-		SlotifyGroupID: slotifyGroupID,
-		UserID:         userID,
-	}
-	members, err := s.DB.GetAllSlotifyGroupMembersExcept(ctx, dbParams)
-	if err != nil {
-		s.Logger.Errorf(
-			"slotifyGroup api: failed to get slotifyGroup members except new for PostAPISlotifyGroupsSlotifyGroupIDUsersUserID",
-			zap.Uint32("exceptUserID", userID),
-			zap.Error(err))
-		// Still return ok because the actual endpoint worked, its just notifications that didnt
-		SetHeaderAndWriteResponse(w, http.StatusOK, t)
-		return
-	}
-
-	u, err := s.DB.GetUserByID(ctx, userID)
-	if err != nil {
-		s.Logger.Errorf("slotifyGroup api: failed to get user details for PostAPISlotifyGroupsSlotifyGroupIDUsersUserID",
-			zap.Error(err))
-		// Still return ok because the actual endpoint worked, its just notifications that didnt
-		SetHeaderAndWriteResponse(w, http.StatusCreated, t)
-		return
-	}
-	allMemberNotif := database.CreateNotificationParams{
-		Message: fmt.Sprintf("Say hi to %s, he just joined SlotifyGroup %s", u.FirstName+" "+u.LastName, t.Name),
-		Created: time.Now(),
-	}
-
-	newMemberNotif := database.CreateNotificationParams{
-		Message: fmt.Sprintf("You were added to SlotifyGroup %s!", t.Name),
-		Created: time.Now(),
-	}
-
-	err = s.NotificationService.SendNotification(ctx, s.Logger, s.DB, members, allMemberNotif)
-	if err != nil {
-		// Don't return error, attempt to send individual notification too
-		s.Logger.Errorf(
-			"slotifyGroup api: failed to send notification to all existing users of slotifyGroup, adding slotifyGroup member",
-			zap.Error(err))
-	}
-
-	err = s.NotificationService.SendNotification(ctx, s.Logger, s.DB, []uint32{userID}, newMemberNotif)
-	if err != nil {
-		s.Logger.Errorf(
-			"slotifyGroup api: failed to send notification to user that just joined slotifyGroup",
-			zap.Error(err))
-	}
-
-	SetHeaderAndWriteResponse(w, http.StatusCreated, t)
 }
 
 // (OPTIONS /api/slotify-groups).

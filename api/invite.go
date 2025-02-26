@@ -2,12 +2,14 @@ package api
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/SlotifyApp/slotify-backend/database"
 	"github.com/SlotifyApp/slotify-backend/logger"
 	"github.com/SlotifyApp/slotify-backend/notification"
+	"github.com/avast/retry-go"
 	"go.uber.org/zap"
 )
 
@@ -48,7 +50,7 @@ type checkIfUsersInGroupParams struct {
 func checkIfUsersInGroup(p checkIfUsersInGroupParams) error {
 	var fromUserInGroup bool
 	var err error // check if user creating the invite is in the group
-	if fromUserInGroup, err = database.CheckMemberIsInSlotifyGroup(p.ctx, p.db,
+	if fromUserInGroup, err = database.CheckMemberInSlotifyGroupWrapper(p.ctx, p.db,
 		database.CheckMemberInSlotifyGroupParams{
 			UserID:         p.fromUserID,
 			SlotifyGroupID: p.slotifyGroupID,
@@ -62,7 +64,7 @@ func checkIfUsersInGroup(p checkIfUsersInGroupParams) error {
 
 	var toUserInGroup bool
 	// check if user creating the invite is in the group
-	if toUserInGroup, err = database.CheckMemberIsInSlotifyGroup(p.ctx, p.db,
+	if toUserInGroup, err = database.CheckMemberInSlotifyGroupWrapper(p.ctx, p.db,
 		database.CheckMemberInSlotifyGroupParams{
 			UserID:         p.toUserID,
 			SlotifyGroupID: p.slotifyGroupID,
@@ -110,4 +112,65 @@ func sendPostInviteNotification(p sendPostInviteNotificationParams) {
 		p.logger.Errorf("invite api: failed to send notification to fromUser",
 			zap.Error(err))
 	}
+}
+
+type validateAndUpdateInviteStatusParams struct {
+	ctx       context.Context
+	qtx       *database.Queries
+	inviteID  uint32
+	l         *logger.Logger
+	userID    uint32
+	newStatus InviteStatus
+}
+
+// validateAndUpdateInviteStatus is used for declining/updating an invite, returns the invite and an error.
+func validateAndUpdateInviteStatus(p validateAndUpdateInviteStatusParams) (database.Invite, error) {
+	var err error
+	var invite database.Invite
+
+	if invite, err = p.qtx.GetInviteByID(p.ctx, p.inviteID); err != nil {
+		return database.Invite{}, fmt.Errorf("failed to get invite details from invite id: %w", err)
+	}
+
+	if invite.ToUserID != p.userID {
+		return database.Invite{}, errors.New("only the user the invite is sent to can edit the status")
+	}
+
+	if ok := validateInviteStatusTransition(InviteStatus(invite.Status), InviteStatusAccepted); !ok {
+		return database.Invite{}, fmt.Errorf(
+			"invalid invite state transition, cannot go from %s to %s", invite.Status, p.newStatus,
+		)
+	}
+
+	err = retry.Do(func() error {
+		var rows int64
+		rows, err = p.qtx.UpdateInviteStatus(p.ctx,
+			database.UpdateInviteStatusParams{
+				ID:     p.inviteID,
+				Status: database.InviteStatus(InviteStatusAccepted),
+			})
+
+		if rows != 1 {
+			return database.WrongNumberSQLRowsError{ActualRows: rows, ExpectedRows: []int64{1}}
+		}
+
+		if err != nil {
+			switch {
+			case errors.Is(err, context.Canceled):
+				return fmt.Errorf("context cancelled updating invite status: %w",
+					err)
+			case errors.Is(err, context.DeadlineExceeded):
+				return fmt.Errorf("deadline exceeded during updating invite status: %w", err)
+			default:
+				return fmt.Errorf("failed to update invite status: %w", err)
+			}
+		}
+		return nil
+	}, retry.Attempts(3), retry.Delay(time.Millisecond*500))
+	if err != nil {
+		p.l.Error("failed to update invite status", zap.Error(err))
+		return database.Invite{}, fmt.Errorf("failed to set invite status to %s", p.newStatus)
+	}
+
+	return invite, nil
 }
