@@ -82,3 +82,66 @@ func AddUserToSlotifyGroup(p AddUserToSlotifyGroupParams) error {
 
 	return nil
 }
+
+type sendLeaverNotificationsParams struct {
+	ctx            context.Context
+	slotifyGroupID uint32
+	userID         uint32
+	l              *logger.Logger
+	db             *database.Database
+	notifService   notification.Service
+}
+
+func sendLeaverNotifications(p sendLeaverNotificationsParams) error {
+	slotifyGroupID := p.slotifyGroupID
+	userID := p.userID
+
+	var err error
+	var members []uint32
+	if members, err = p.db.GetAllSlotifyGroupMembersExcept(p.ctx, database.GetAllSlotifyGroupMembersExceptParams{
+		SlotifyGroupID: slotifyGroupID,
+		UserID:         userID,
+	}); err != nil {
+		p.l.Error("failed to get slotify group members except new member", zap.Error(err),
+			zap.Uint32("userID", userID),
+			zap.Uint32("slotifyGroupID", slotifyGroupID),
+		)
+
+		return fmt.Errorf("failed to get slotify group members except new member: %w", err)
+	}
+
+	var u database.User
+	if u, err = p.db.GetUserByID(p.ctx, userID); err != nil {
+		p.l.Error("left group but failed to get user by id", zap.Error(err),
+			zap.Uint32("userID", userID),
+			zap.Uint32("slotifyGroupID", slotifyGroupID),
+		)
+
+		return fmt.Errorf("failed to get user by id: %w", err)
+	}
+	var sg database.SlotifyGroup
+	if sg, err = p.db.GetSlotifyGroupByID(p.ctx, slotifyGroupID); err != nil {
+		p.l.Error("left team but failed to send notification, failed to get group by id", zap.Error(err),
+			zap.Uint32("userID", userID),
+			zap.Uint32("slotifyGroupID", slotifyGroupID),
+		)
+
+		return fmt.Errorf("failed to get group by id: %w", err)
+	}
+
+	allMemberNotif := database.CreateNotificationParams{
+		Message: fmt.Sprintf("%s %s just left group %s", u.FirstName, u.LastName, sg.Name),
+		Created: time.Now(),
+	}
+
+	if err = p.notifService.SendNotification(p.ctx, p.l, p.db, members, allMemberNotif); err != nil {
+		// Don't return error, attempt to send individual notification too
+		p.l.Errorf(
+			"slotifyGroup api: failed to send notification to all existing users of slotifyGroup",
+			zap.Error(err))
+
+		return fmt.Errorf("failed to send real-time leaver notification to members: %w", err)
+	}
+
+	return nil
+}

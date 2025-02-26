@@ -12,6 +12,108 @@ import (
 	"go.uber.org/zap"
 )
 
+// (DELETE /api/slotify-groups/{slotifyGroupID}/leave/me)  Have a member leave from a slotify group.
+func (s Server) DeleteSlotifyGroupsSlotifyGroupIDLeaveMe(w http.ResponseWriter,
+	r *http.Request, slotifyGroupID uint32,
+) {
+	ctx, cancel := context.WithTimeout(r.Context(), 2*database.DatabaseTimeout)
+	defer cancel()
+
+	userID, ok := r.Context().Value(UserIDCtxKey{}).(uint32)
+	if !ok {
+		s.Logger.Error("failed to get userid from request context")
+		sendError(w, http.StatusUnauthorized, "Try again later.")
+		return
+	}
+
+	var count int64
+	var err error
+	if count, err = s.DB.CheckMemberInSlotifyGroup(ctx, database.CheckMemberInSlotifyGroupParams{
+		UserID:         userID,
+		SlotifyGroupID: slotifyGroupID,
+	}); err != nil {
+		s.Logger.Error("failed to get count of member in slotify group", zap.Error(err))
+		sendError(w, http.StatusInternalServerError, "Failed to check if member is in slotify group")
+		return
+	}
+
+	// User not a member of the group
+	if count == 0 {
+		s.Logger.Error("user was not a member of the group, so can't leave", zap.Error(err),
+			zap.Uint32("userID", userID),
+			zap.Uint32("slotifyGroupID", slotifyGroupID),
+		)
+		sendError(w, http.StatusUnauthorized, "You are not a member of the group, so you can't leave")
+		return
+	}
+
+	var memberCount int64
+	if memberCount, err = s.DB.CountSlotifyGroupMembers(ctx, slotifyGroupID); err != nil {
+		s.Logger.Error("failed to get member count", zap.Error(err),
+			zap.Uint32("userID", userID),
+			zap.Uint32("slotifyGroupID", slotifyGroupID),
+		)
+		sendError(w, http.StatusInternalServerError, "Failed to leave slotify group")
+		return
+	}
+
+	// This user is the only member of the group, so also delete the group
+	if memberCount == 1 {
+		var rowsAffected int64
+		if rowsAffected, err = s.DB.DeleteSlotifyGroupByID(ctx, slotifyGroupID); err != nil {
+			s.Logger.Error("failed to delete slotify group", zap.Error(err),
+				zap.Uint32("userID", userID),
+				zap.Uint32("slotifyGroupID", slotifyGroupID),
+			)
+			sendError(w, http.StatusInternalServerError, "Failed to leave slotify group")
+			return
+		}
+
+		var expectedRows int64 = 2
+		if rowsAffected != expectedRows {
+			err = database.WrongNumberSQLRowsError{ActualRows: rowsAffected, ExpectedRows: []int64{expectedRows}}
+			s.Logger.Error("failed to delete slotify group", zap.Error(err),
+				zap.Uint32("userID", userID),
+				zap.Uint32("slotifyGroupID", slotifyGroupID),
+			)
+			sendError(w, http.StatusInternalServerError, "Failed to leave slotify group")
+			return
+		}
+	} else {
+		var rowsAffected int64
+		if rowsAffected, err = s.DB.RemoveSlotifyGroupMember(ctx, database.RemoveSlotifyGroupMemberParams{
+			UserID:         userID,
+			SlotifyGroupID: slotifyGroupID,
+		}); err != nil {
+			err = database.WrongNumberSQLRowsError{ActualRows: rowsAffected, ExpectedRows: []int64{1}}
+			s.Logger.Error("failed to remove slotify member", zap.Error(err),
+				zap.Uint32("userID", userID),
+				zap.Uint32("slotifyGroupID", slotifyGroupID),
+			)
+			sendError(w, http.StatusInternalServerError, "Failed to leave slotify group")
+			return
+		}
+	}
+
+	p := sendLeaverNotificationsParams{
+		ctx:            ctx,
+		slotifyGroupID: slotifyGroupID,
+		userID:         userID,
+		l:              s.Logger,
+		db:             s.DB,
+		notifService:   s.NotificationService,
+	}
+	// Still successful, just notifications failed
+	if err = sendLeaverNotifications(p); err != nil {
+		s.Logger.Error("failed to send leaver notifications", zap.Error(err),
+			zap.Uint32("userID", userID),
+			zap.Uint32("slotifyGroupID", slotifyGroupID),
+		)
+	}
+
+	SetHeaderAndWriteResponse(w, http.StatusOK, "Successfully left the group.")
+}
+
 // (GET /api/slotify-groups/me).
 func (s Server) GetAPISlotifyGroupsMe(w http.ResponseWriter, r *http.Request) {
 	userID, ok := r.Context().Value(UserIDCtxKey{}).(uint32)
@@ -123,8 +225,11 @@ func (s Server) PostAPISlotifyGroups(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	SetHeaderAndWriteResponse(w, http.StatusCreated, fmt.Sprintf(
-		"slotifyGroup api: created group %s successfully", slotifyGroupBody.Name))
+	SetHeaderAndWriteResponse(w, http.StatusCreated, SlotifyGroup{
+		//nolint: gosec // id is unsigned 32 bit int
+		Id:   uint32(slotifyGroupID),
+		Name: slotifyGroupBody.Name,
+	})
 }
 
 // (DELETE /api/slotify-groups/{slotifyGroupID}).

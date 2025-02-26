@@ -117,6 +117,20 @@ func (q *Queries) CountSlotifyGroupByID(ctx context.Context, id uint32) (int64, 
 	return count, err
 }
 
+const countSlotifyGroupMembers = `-- name: CountSlotifyGroupMembers :one
+SELECT COUNT(*) FROM SlotifyGroup sg
+JOIN UserToSlotifyGroup utsg ON sg.id=utsg.slotify_group_id
+JOIN User u ON u.id=utsg.user_id 
+WHERE sg.id=?
+`
+
+func (q *Queries) CountSlotifyGroupMembers(ctx context.Context, id uint32) (int64, error) {
+	row := q.queryRow(ctx, q.countSlotifyGroupMembersStmt, countSlotifyGroupMembers, id)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const countUserByEmail = `-- name: CountUserByEmail :one
 SELECT COUNT(*) FROM User WHERE email=?
 `
@@ -381,36 +395,6 @@ func (q *Queries) GetInviteByID(ctx context.Context, id uint32) (Invite, error) 
 		&i.CreatedAt,
 	)
 	return i, err
-}
-
-const getJoinableSlotifyGroups = `-- name: GetJoinableSlotifyGroups :many
-SELECT sg.id, sg.name FROM SlotifyGroup sg
-LEFT JOIN UserToSlotifyGroup utsg ON
-     sg.id = utsg.slotify_group_id AND utsg.user_id = ? 
-WHERE utsg.user_id IS NULL
-`
-
-func (q *Queries) GetJoinableSlotifyGroups(ctx context.Context, userID uint32) ([]SlotifyGroup, error) {
-	rows, err := q.query(ctx, q.getJoinableSlotifyGroupsStmt, getJoinableSlotifyGroups, userID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []SlotifyGroup{}
-	for rows.Next() {
-		var i SlotifyGroup
-		if err := rows.Scan(&i.ID, &i.Name); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
 }
 
 const getRefreshTokenByUserID = `-- name: GetRefreshTokenByUserID :one
@@ -742,6 +726,37 @@ type MarkNotificationAsReadParams struct {
 
 func (q *Queries) MarkNotificationAsRead(ctx context.Context, arg MarkNotificationAsReadParams) (int64, error) {
 	result, err := q.exec(ctx, q.markNotificationAsReadStmt, markNotificationAsRead, arg.UserID, arg.NotificationID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const removeSlotifyGroup = `-- name: RemoveSlotifyGroup :execrows
+DELETE FROM SlotifyGroup
+WHERE id=?
+`
+
+func (q *Queries) RemoveSlotifyGroup(ctx context.Context, id uint32) (int64, error) {
+	result, err := q.exec(ctx, q.removeSlotifyGroupStmt, removeSlotifyGroup, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const removeSlotifyGroupMember = `-- name: RemoveSlotifyGroupMember :execrows
+DELETE FROM UserToSlotifyGroup
+WHERE user_id=? AND slotify_group_id=?
+`
+
+type RemoveSlotifyGroupMemberParams struct {
+	UserID         uint32 `json:"userId"`
+	SlotifyGroupID uint32 `json:"slotifyGroupId"`
+}
+
+func (q *Queries) RemoveSlotifyGroupMember(ctx context.Context, arg RemoveSlotifyGroupMemberParams) (int64, error) {
+	result, err := q.exec(ctx, q.removeSlotifyGroupMemberStmt, removeSlotifyGroupMember, arg.UserID, arg.SlotifyGroupID)
 	if err != nil {
 		return 0, err
 	}
