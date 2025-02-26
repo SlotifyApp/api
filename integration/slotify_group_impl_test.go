@@ -56,10 +56,7 @@ func TestSlotifyGroup_PostSlotifyGroups(t *testing.T) {
 			slotifyGroupBody: api.SlotifyGroupCreate{
 				Name: newSlotifyGroupName,
 			},
-			expectedRespBody: fmt.Sprintf(
-				"slotifyGroup api: created group %s successfully", newSlotifyGroupName),
-
-			testMsg: "correctly created slotify group",
+			testMsg: "created group successfully",
 		},
 		"slotifyGroup already exists": {
 			httpStatus: http.StatusBadRequest,
@@ -86,11 +83,20 @@ func TestSlotifyGroup_PostSlotifyGroups(t *testing.T) {
 
 			server.PostAPISlotifyGroups(rr, req)
 
-			var respBody string
-			require.Equal(t, tt.httpStatus, rr.Result().StatusCode)
-			err = json.NewDecoder(rr.Result().Body).Decode(&respBody)
-			require.NoError(t, err, "response cannot be decoded into string")
-			require.Equal(t, tt.expectedRespBody, respBody, tt.testMsg)
+			if tt.httpStatus == http.StatusCreated {
+				var slotifyGroup api.SlotifyGroup
+				require.Equal(t, tt.httpStatus, rr.Result().StatusCode)
+				err = json.NewDecoder(rr.Result().Body).Decode(&slotifyGroup)
+				require.NoError(t, err, "response cannot be decoded into SlotifyGroup struct")
+
+				require.Equal(t, tt.slotifyGroupName, slotifyGroup.Name, tt.testMsg)
+			} else {
+				var errMsg string
+				require.Equal(t, tt.httpStatus, rr.Result().StatusCode)
+				err = json.NewDecoder(rr.Result().Body).Decode(&errMsg)
+				require.NoError(t, err, "response cannot be decoded into string")
+				require.Equal(t, tt.expectedRespBody, errMsg, tt.testMsg)
+			}
 
 			req.Body = io.NopCloser(bytes.NewBuffer(body))
 			testutil.OpenAPIValidateTest(t, rr, req)

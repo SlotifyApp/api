@@ -45,17 +45,17 @@ JOIN UserToSlotifyGroup utsg ON sg.id=utsg.slotify_group_id
 JOIN User u ON u.id=utsg.user_id 
 WHERE sg.id=?;
 
+-- name: CountSlotifyGroupMembers :one
+SELECT COUNT(*) FROM SlotifyGroup sg
+JOIN UserToSlotifyGroup utsg ON sg.id=utsg.slotify_group_id
+JOIN User u ON u.id=utsg.user_id 
+WHERE sg.id=?;
+
 -- name: GetAllSlotifyGroupMembersExcept :many
 SELECT u.id FROM SlotifyGroup sg
 JOIN UserToSlotifyGroup utsg ON sg.id=utsg.slotify_group_id
 JOIN User u ON u.id=utsg.user_id 
 WHERE sg.id=sqlc.arg('slotifyGroupID') AND u.id!=sqlc.arg('userID');
-
--- name: GetJoinableSlotifyGroups :many
-SELECT sg.* FROM SlotifyGroup sg
-LEFT JOIN UserToSlotifyGroup utsg ON
-     sg.id = utsg.slotify_group_id AND utsg.user_id = ? 
-WHERE utsg.user_id IS NULL;
 
 -- name: GetSlotifyGroupByID :one
 SELECT * FROM SlotifyGroup WHERE id=?;
@@ -69,6 +69,14 @@ WHERE name = ifnull(sqlc.arg('name'), name);
 
 -- name: AddSlotifyGroup :execlastid
 INSERT INTO SlotifyGroup (name) VALUES (?);
+
+-- name: RemoveSlotifyGroupMember :execrows
+DELETE FROM UserToSlotifyGroup
+WHERE user_id=? AND slotify_group_id=?;
+
+-- name: RemoveSlotifyGroup :execrows
+DELETE FROM SlotifyGroup
+WHERE id=?;
 
 -- name: CheckMemberInSlotifyGroup :one
 SELECT COUNT(*) FROM UserToSlotifyGroup

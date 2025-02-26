@@ -45,6 +45,9 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.countSlotifyGroupByIDStmt, err = db.PrepareContext(ctx, countSlotifyGroupByID); err != nil {
 		return nil, fmt.Errorf("error preparing query CountSlotifyGroupByID: %w", err)
 	}
+	if q.countSlotifyGroupMembersStmt, err = db.PrepareContext(ctx, countSlotifyGroupMembers); err != nil {
+		return nil, fmt.Errorf("error preparing query CountSlotifyGroupMembers: %w", err)
+	}
 	if q.countUserByEmailStmt, err = db.PrepareContext(ctx, countUserByEmail); err != nil {
 		return nil, fmt.Errorf("error preparing query CountUserByEmail: %w", err)
 	}
@@ -87,9 +90,6 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.getInviteByIDStmt, err = db.PrepareContext(ctx, getInviteByID); err != nil {
 		return nil, fmt.Errorf("error preparing query GetInviteByID: %w", err)
 	}
-	if q.getJoinableSlotifyGroupsStmt, err = db.PrepareContext(ctx, getJoinableSlotifyGroups); err != nil {
-		return nil, fmt.Errorf("error preparing query GetJoinableSlotifyGroups: %w", err)
-	}
 	if q.getRefreshTokenByUserIDStmt, err = db.PrepareContext(ctx, getRefreshTokenByUserID); err != nil {
 		return nil, fmt.Errorf("error preparing query GetRefreshTokenByUserID: %w", err)
 	}
@@ -122,6 +122,12 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	}
 	if q.markNotificationAsReadStmt, err = db.PrepareContext(ctx, markNotificationAsRead); err != nil {
 		return nil, fmt.Errorf("error preparing query MarkNotificationAsRead: %w", err)
+	}
+	if q.removeSlotifyGroupStmt, err = db.PrepareContext(ctx, removeSlotifyGroup); err != nil {
+		return nil, fmt.Errorf("error preparing query RemoveSlotifyGroup: %w", err)
+	}
+	if q.removeSlotifyGroupMemberStmt, err = db.PrepareContext(ctx, removeSlotifyGroupMember); err != nil {
+		return nil, fmt.Errorf("error preparing query RemoveSlotifyGroupMember: %w", err)
 	}
 	if q.updateInviteMessageStmt, err = db.PrepareContext(ctx, updateInviteMessage); err != nil {
 		return nil, fmt.Errorf("error preparing query UpdateInviteMessage: %w", err)
@@ -170,6 +176,11 @@ func (q *Queries) Close() error {
 	if q.countSlotifyGroupByIDStmt != nil {
 		if cerr := q.countSlotifyGroupByIDStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing countSlotifyGroupByIDStmt: %w", cerr)
+		}
+	}
+	if q.countSlotifyGroupMembersStmt != nil {
+		if cerr := q.countSlotifyGroupMembersStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing countSlotifyGroupMembersStmt: %w", cerr)
 		}
 	}
 	if q.countUserByEmailStmt != nil {
@@ -242,11 +253,6 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing getInviteByIDStmt: %w", cerr)
 		}
 	}
-	if q.getJoinableSlotifyGroupsStmt != nil {
-		if cerr := q.getJoinableSlotifyGroupsStmt.Close(); cerr != nil {
-			err = fmt.Errorf("error closing getJoinableSlotifyGroupsStmt: %w", cerr)
-		}
-	}
 	if q.getRefreshTokenByUserIDStmt != nil {
 		if cerr := q.getRefreshTokenByUserIDStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing getRefreshTokenByUserIDStmt: %w", cerr)
@@ -300,6 +306,16 @@ func (q *Queries) Close() error {
 	if q.markNotificationAsReadStmt != nil {
 		if cerr := q.markNotificationAsReadStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing markNotificationAsReadStmt: %w", cerr)
+		}
+	}
+	if q.removeSlotifyGroupStmt != nil {
+		if cerr := q.removeSlotifyGroupStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing removeSlotifyGroupStmt: %w", cerr)
+		}
+	}
+	if q.removeSlotifyGroupMemberStmt != nil {
+		if cerr := q.removeSlotifyGroupMemberStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing removeSlotifyGroupMemberStmt: %w", cerr)
 		}
 	}
 	if q.updateInviteMessageStmt != nil {
@@ -363,6 +379,7 @@ type Queries struct {
 	batchExpireInvitesStmt              *sql.Stmt
 	checkMemberInSlotifyGroupStmt       *sql.Stmt
 	countSlotifyGroupByIDStmt           *sql.Stmt
+	countSlotifyGroupMembersStmt        *sql.Stmt
 	countUserByEmailStmt                *sql.Stmt
 	countUserByIDStmt                   *sql.Stmt
 	createInviteStmt                    *sql.Stmt
@@ -377,7 +394,6 @@ type Queries struct {
 	getAllSlotifyGroupMembersStmt       *sql.Stmt
 	getAllSlotifyGroupMembersExceptStmt *sql.Stmt
 	getInviteByIDStmt                   *sql.Stmt
-	getJoinableSlotifyGroupsStmt        *sql.Stmt
 	getRefreshTokenByUserIDStmt         *sql.Stmt
 	getSlotifyGroupByIDStmt             *sql.Stmt
 	getUnreadUserNotificationsStmt      *sql.Stmt
@@ -389,6 +405,8 @@ type Queries struct {
 	listSlotifyGroupsStmt               *sql.Stmt
 	listUsersStmt                       *sql.Stmt
 	markNotificationAsReadStmt          *sql.Stmt
+	removeSlotifyGroupStmt              *sql.Stmt
+	removeSlotifyGroupMemberStmt        *sql.Stmt
 	updateInviteMessageStmt             *sql.Stmt
 	updateInviteStatusStmt              *sql.Stmt
 	updateUserHomeAccountIDStmt         *sql.Stmt
@@ -405,6 +423,7 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		batchExpireInvitesStmt:              q.batchExpireInvitesStmt,
 		checkMemberInSlotifyGroupStmt:       q.checkMemberInSlotifyGroupStmt,
 		countSlotifyGroupByIDStmt:           q.countSlotifyGroupByIDStmt,
+		countSlotifyGroupMembersStmt:        q.countSlotifyGroupMembersStmt,
 		countUserByEmailStmt:                q.countUserByEmailStmt,
 		countUserByIDStmt:                   q.countUserByIDStmt,
 		createInviteStmt:                    q.createInviteStmt,
@@ -419,7 +438,6 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		getAllSlotifyGroupMembersStmt:       q.getAllSlotifyGroupMembersStmt,
 		getAllSlotifyGroupMembersExceptStmt: q.getAllSlotifyGroupMembersExceptStmt,
 		getInviteByIDStmt:                   q.getInviteByIDStmt,
-		getJoinableSlotifyGroupsStmt:        q.getJoinableSlotifyGroupsStmt,
 		getRefreshTokenByUserIDStmt:         q.getRefreshTokenByUserIDStmt,
 		getSlotifyGroupByIDStmt:             q.getSlotifyGroupByIDStmt,
 		getUnreadUserNotificationsStmt:      q.getUnreadUserNotificationsStmt,
@@ -431,6 +449,8 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		listSlotifyGroupsStmt:               q.listSlotifyGroupsStmt,
 		listUsersStmt:                       q.listUsersStmt,
 		markNotificationAsReadStmt:          q.markNotificationAsReadStmt,
+		removeSlotifyGroupStmt:              q.removeSlotifyGroupStmt,
+		removeSlotifyGroupMemberStmt:        q.removeSlotifyGroupMemberStmt,
 		updateInviteMessageStmt:             q.updateInviteMessageStmt,
 		updateInviteStatusStmt:              q.updateInviteStatusStmt,
 		updateUserHomeAccountIDStmt:         q.updateUserHomeAccountIDStmt,
