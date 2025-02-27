@@ -668,16 +668,7 @@ func (q *Queries) ListSlotifyGroups(ctx context.Context, name interface{}) ([]Sl
 
 const listUsers = `-- name: ListUsers :many
 SELECT id, email, first_name, last_name FROM User
-WHERE email = ifnull(?, email)
-   AND first_name = ifnull(?, first_name)
-   AND last_name = ifnull(?, last_name)
 `
-
-type ListUsersParams struct {
-	Email     interface{} `json:"email"`
-	FirstName interface{} `json:"firstName"`
-	LastName  interface{} `json:"lastName"`
-}
 
 type ListUsersRow struct {
 	ID        uint32 `json:"id"`
@@ -686,8 +677,8 @@ type ListUsersRow struct {
 	LastName  string `json:"lastName"`
 }
 
-func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]ListUsersRow, error) {
-	rows, err := q.query(ctx, q.listUsersStmt, listUsers, arg.Email, arg.FirstName, arg.LastName)
+func (q *Queries) ListUsers(ctx context.Context) ([]ListUsersRow, error) {
+	rows, err := q.query(ctx, q.listUsersStmt, listUsers)
 	if err != nil {
 		return nil, err
 	}
@@ -761,6 +752,98 @@ func (q *Queries) RemoveSlotifyGroupMember(ctx context.Context, arg RemoveSlotif
 		return 0, err
 	}
 	return result.RowsAffected()
+}
+
+const searchUsersByEmail = `-- name: SearchUsersByEmail :many
+SELECT id, email, first_name, last_name FROM User
+WHERE LOWER(email) LIKE LOWER(CONCAT('%', ?, '%'))
+LIMIT ?
+`
+
+type SearchUsersByEmailParams struct {
+	Email interface{} `json:"email"`
+	Limit int32       `json:"limit"`
+}
+
+type SearchUsersByEmailRow struct {
+	ID        uint32 `json:"id"`
+	Email     string `json:"email"`
+	FirstName string `json:"firstName"`
+	LastName  string `json:"lastName"`
+}
+
+func (q *Queries) SearchUsersByEmail(ctx context.Context, arg SearchUsersByEmailParams) ([]SearchUsersByEmailRow, error) {
+	rows, err := q.query(ctx, q.searchUsersByEmailStmt, searchUsersByEmail, arg.Email, arg.Limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []SearchUsersByEmailRow{}
+	for rows.Next() {
+		var i SearchUsersByEmailRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Email,
+			&i.FirstName,
+			&i.LastName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const searchUsersByName = `-- name: SearchUsersByName :many
+SELECT id, email, first_name, last_name FROM User
+WHERE LOWER(CONCAT(first_name, ' ', last_name)) LIKE LOWER(CONCAT('%', ?, '%'))
+LIMIT ?
+`
+
+type SearchUsersByNameParams struct {
+	Name  interface{} `json:"name"`
+	Limit int32       `json:"limit"`
+}
+
+type SearchUsersByNameRow struct {
+	ID        uint32 `json:"id"`
+	Email     string `json:"email"`
+	FirstName string `json:"firstName"`
+	LastName  string `json:"lastName"`
+}
+
+func (q *Queries) SearchUsersByName(ctx context.Context, arg SearchUsersByNameParams) ([]SearchUsersByNameRow, error) {
+	rows, err := q.query(ctx, q.searchUsersByNameStmt, searchUsersByName, arg.Name, arg.Limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []SearchUsersByNameRow{}
+	for rows.Next() {
+		var i SearchUsersByNameRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Email,
+			&i.FirstName,
+			&i.LastName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const updateInviteMessage = `-- name: UpdateInviteMessage :execrows
