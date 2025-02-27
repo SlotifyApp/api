@@ -263,3 +263,49 @@ func (s Server) PostAPIUsersMeLogout(w http.ResponseWriter, r *http.Request) {
 	RemoveCookies(w)
 	SetHeaderAndWriteResponse(w, http.StatusOK, "Logging out")
 }
+
+// (GET /api/msft-users/).
+func (s Server) GetAPIMSFTUsers(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), database.DatabaseTimeout)
+	defer cancel()
+
+	// Get userID from request
+	userID, ok := r.Context().Value(UserIDCtxKey{}).(uint32)
+	if !ok {
+		s.Logger.Error("failed to get userid from request context")
+		sendError(w, http.StatusUnauthorized, "Try again later.")
+		return
+	}
+
+	graph, err := CreateMSFTGraphClient(ctx, s.MSALClient, s.DB, userID)
+	if err != nil {
+		s.Logger.Error("failed to create msgraph client", zap.Error(err))
+		sendError(w, http.StatusBadGateway, "Failed to connect to microsoft graph API")
+		return
+	}
+
+	groupable, err := graph.Users().Get(context.Background(), nil)
+	if err != nil {
+		s.Logger.Error("failed to get users from microsoft")
+		sendError(w, http.StatusNotFound, "Failed to find group")
+		return
+	}
+
+	var users []MSFTGroupUser
+
+	if groupable.GetValue() != nil {
+		for _, usr := range groupable.GetValue() {
+			var user MSFTGroupUser
+			user, err = UserableToMSFTGroupUser(usr)
+			if err != nil {
+				s.Logger.Error("failed to convert userable to user")
+				sendError(w, http.StatusInternalServerError, "Failed to convert userable to user")
+				return
+			}
+			users = append(users, user)
+		}
+	}
+	// no error 204 since we got an array
+
+	SetHeaderAndWriteResponse(w, http.StatusOK, users)
+}
