@@ -195,7 +195,7 @@ func TestUser_GetUsers(t *testing.T) {
 			testMsg:      "successfully got users by first name",
 			route:        fmt.Sprintf("?firstName=%s", url.QueryEscape(insertedUser.FirstName)),
 			params: api.GetAPIUsersParams{
-				FirstName: &insertedUser.FirstName,
+				Name: &insertedUser.FirstName,
 			},
 		},
 		"get existing user by last name": {
@@ -204,7 +204,7 @@ func TestUser_GetUsers(t *testing.T) {
 			testMsg:      "successfully got users by last name",
 			route:        fmt.Sprintf("?lastName=%s", url.QueryEscape(insertedUser.LastName)),
 			params: api.GetAPIUsersParams{
-				LastName: &insertedUser.LastName,
+				Name: &insertedUser.LastName,
 			},
 		},
 		"get users by non-existent query params": {
@@ -213,7 +213,7 @@ func TestUser_GetUsers(t *testing.T) {
 			testMsg:      "successfully got empty array of users when users don't exist by query params",
 			route:        fmt.Sprintf("?lastName=%s", url.QueryEscape(fakeLastName)),
 			params: api.GetAPIUsersParams{
-				LastName: &fakeLastName,
+				Name: &fakeLastName,
 			},
 		},
 	}

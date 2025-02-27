@@ -13,33 +13,49 @@ import (
 	"go.uber.org/zap"
 )
 
+const (
+	SEARCHUSERLIM = 10
+)
+
 // (GET /users) Get a user by query params.
 func (s Server) GetAPIUsers(w http.ResponseWriter, r *http.Request, params GetAPIUsersParams) {
 	ctx, cancel := context.WithTimeout(r.Context(), database.DatabaseTimeout)
 	defer cancel()
 
-	users, err := s.DB.ListUsers(ctx, database.ListUsersParams{
-		Email:     params.Email,
-		FirstName: params.FirstName,
-		LastName:  params.LastName,
-	})
-	if err != nil {
-		switch {
-		case errors.Is(err, context.Canceled):
-			s.Logger.Error("user api: failed to get users: context cancelled")
-			sendError(w, http.StatusInternalServerError, "user api: failed to get users")
-			return
-		case errors.Is(err, context.DeadlineExceeded):
-			s.Logger.Error("user api: failed to get users: query timed out")
-			sendError(w, http.StatusInternalServerError, "user api: failed to get users")
-			return
-		default:
-			s.Logger.Error("user api: failed to get users")
-			sendError(w, http.StatusInternalServerError, "user api: failed to get users")
+	// search users by name
+	if params.Name != nil {
+		users, err := s.DB.SearchUsersByName(ctx,
+			database.SearchUsersByNameParams{Name: *params.Name, Limit: SEARCHUSERLIM})
+		if err != nil {
+			s.Logger.Error("failed to search user by name", zap.Error(err),
+				zap.String("name", *params.Name))
+			sendError(w, http.StatusInternalServerError, "failed to search users by name")
 			return
 		}
+		SetHeaderAndWriteResponse(w, http.StatusOK, users)
+		return
+	}
+	// search users by email
+	if params.Email != nil {
+		users, err := s.DB.SearchUsersByEmail(ctx,
+			database.SearchUsersByEmailParams{Email: string(*params.Email), Limit: SEARCHUSERLIM})
+		if err != nil {
+			s.Logger.Error("failed to search user by email", zap.Error(err),
+				zap.String("email", string(*params.Email)))
+			sendError(w, http.StatusInternalServerError, "failed to search users by email")
+			return
+		}
+		SetHeaderAndWriteResponse(w, http.StatusOK, users)
+		return
 	}
 
+	// Default, just list all users
+	users, err := s.DB.ListUsers(ctx)
+	if err != nil {
+		s.Logger.Error("failed to list all users", zap.Error(err))
+		sendError(w, http.StatusInternalServerError, "failed to list all users")
+		return
+	}
 	SetHeaderAndWriteResponse(w, http.StatusOK, users)
 }
 

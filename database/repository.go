@@ -129,6 +129,12 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.removeSlotifyGroupMemberStmt, err = db.PrepareContext(ctx, removeSlotifyGroupMember); err != nil {
 		return nil, fmt.Errorf("error preparing query RemoveSlotifyGroupMember: %w", err)
 	}
+	if q.searchUsersByEmailStmt, err = db.PrepareContext(ctx, searchUsersByEmail); err != nil {
+		return nil, fmt.Errorf("error preparing query SearchUsersByEmail: %w", err)
+	}
+	if q.searchUsersByNameStmt, err = db.PrepareContext(ctx, searchUsersByName); err != nil {
+		return nil, fmt.Errorf("error preparing query SearchUsersByName: %w", err)
+	}
 	if q.updateInviteMessageStmt, err = db.PrepareContext(ctx, updateInviteMessage); err != nil {
 		return nil, fmt.Errorf("error preparing query UpdateInviteMessage: %w", err)
 	}
@@ -318,6 +324,16 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing removeSlotifyGroupMemberStmt: %w", cerr)
 		}
 	}
+	if q.searchUsersByEmailStmt != nil {
+		if cerr := q.searchUsersByEmailStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing searchUsersByEmailStmt: %w", cerr)
+		}
+	}
+	if q.searchUsersByNameStmt != nil {
+		if cerr := q.searchUsersByNameStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing searchUsersByNameStmt: %w", cerr)
+		}
+	}
 	if q.updateInviteMessageStmt != nil {
 		if cerr := q.updateInviteMessageStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing updateInviteMessageStmt: %w", cerr)
@@ -407,6 +423,8 @@ type Queries struct {
 	markNotificationAsReadStmt          *sql.Stmt
 	removeSlotifyGroupStmt              *sql.Stmt
 	removeSlotifyGroupMemberStmt        *sql.Stmt
+	searchUsersByEmailStmt              *sql.Stmt
+	searchUsersByNameStmt               *sql.Stmt
 	updateInviteMessageStmt             *sql.Stmt
 	updateInviteStatusStmt              *sql.Stmt
 	updateUserHomeAccountIDStmt         *sql.Stmt
@@ -451,6 +469,8 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		markNotificationAsReadStmt:          q.markNotificationAsReadStmt,
 		removeSlotifyGroupStmt:              q.removeSlotifyGroupStmt,
 		removeSlotifyGroupMemberStmt:        q.removeSlotifyGroupMemberStmt,
+		searchUsersByEmailStmt:              q.searchUsersByEmailStmt,
+		searchUsersByNameStmt:               q.searchUsersByNameStmt,
 		updateInviteMessageStmt:             q.updateInviteMessageStmt,
 		updateInviteStatusStmt:              q.updateInviteStatusStmt,
 		updateUserHomeAccountIDStmt:         q.updateUserHomeAccountIDStmt,

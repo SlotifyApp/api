@@ -24,11 +24,19 @@ SELECT sg.* FROM UserToSlotifyGroup utsg
 JOIN SlotifyGroup sg ON utsg.slotify_group_id=sg.id 
 WHERE utsg.user_id=?;
 
--- name: ListUsers :many
+-- name: SearchUsersByName :many
 SELECT id, email, first_name, last_name FROM User
-WHERE email = ifnull(sqlc.arg('email'), email)
-   AND first_name = ifnull(sqlc.arg('firstName'), first_name)
-   AND last_name = ifnull(sqlc.arg('lastName'), last_name);
+WHERE LOWER(CONCAT(first_name, ' ', last_name)) LIKE LOWER(CONCAT('%', sqlc.arg('name'), '%'))
+LIMIT ?;
+
+-- name: SearchUsersByEmail :many
+SELECT id, email, first_name, last_name FROM User
+WHERE LOWER(email) LIKE LOWER(CONCAT('%', sqlc.arg('email'), '%'))
+LIMIT ?;
+
+-- name: ListUsers :many
+SELECT id, email, first_name, last_name FROM User;
+
 
 
 
