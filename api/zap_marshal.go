@@ -7,8 +7,8 @@ import (
 )
 
 type (
-	Users []User
-	Teams []Team
+	Users         []User
+	SlotifyGroups []SlotifyGroup
 )
 
 // MarshalLogArray implements the zapcore.ArrayMarshaler interface.
@@ -44,38 +44,43 @@ func (u User) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 }
 
 // MarshalLogObject implements zapcore.ObjectMarshaler.
-func (t TeamCreate) MarshalLogObject(enc zapcore.ObjectEncoder) error {
-	enc.AddString("name", t.Name)
+func (sgc SlotifyGroupCreate) MarshalLogObject(enc zapcore.ObjectEncoder) error {
+	enc.AddString("name", sgc.Name)
 	return nil
 }
 
 // MarshalLogArray implements the zapcore.ArrayMarshaler interface.
-func (t Teams) MarshalLogArray(arr zapcore.ArrayEncoder) error {
-	for _, team := range t {
-		if err := arr.AppendObject(team); err != nil {
+func (sgs SlotifyGroups) MarshalLogArray(arr zapcore.ArrayEncoder) error {
+	for _, slotifyGroup := range sgs {
+		if err := arr.AppendObject(slotifyGroup); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (t Team) MarshalLogObject(enc zapcore.ObjectEncoder) error {
-	teamCreate := TeamCreate{
-		Name: t.Name,
+func (sg SlotifyGroup) MarshalLogObject(enc zapcore.ObjectEncoder) error {
+	slotifyGroupCreate := SlotifyGroupCreate{
+		Name: sg.Name,
 	}
-	if err := teamCreate.MarshalLogObject(enc); err != nil {
-		return fmt.Errorf("failed to marshal Team obj: %v", err.Error())
+	if err := slotifyGroupCreate.MarshalLogObject(enc); err != nil {
+		return fmt.Errorf("failed to marshal SlotifyGroup obj: %v", err.Error())
 	}
-	enc.AddUint32("id", t.Id)
+	enc.AddUint32("id", sg.Id)
 	return nil
 }
 
-func (tp GetAPITeamsParams) MarshalLogObject(enc zapcore.ObjectEncoder) error {
-	name := ""
-	if tp.Name != nil {
-		name = *tp.Name
-	}
-	enc.AddString("name", name)
+func (pai PostAPIInvitesJSONRequestBody) MarshalLogObject(enc zapcore.ObjectEncoder) error {
+	enc.AddString("message", pai.Message)
+	enc.AddUint32("toUserID", pai.ToUserID)
+	enc.AddUint32("slotifyGroupID", pai.SlotifyGroupID)
+	enc.AddTime("expiryDate", pai.ExpiryDate.Time)
+	enc.AddTime("createdAt", pai.CreatedAt)
+	return nil
+}
+
+func (paiBody PatchAPIInvitesInviteIDJSONRequestBody) MarshalLogObject(enc zapcore.ObjectEncoder) error {
+	enc.AddString("message", paiBody.Message)
 	return nil
 }
 

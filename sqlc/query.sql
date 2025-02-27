@@ -19,10 +19,10 @@ SELECT * FROM User WHERE email=?;
 -- name: UpdateUserHomeAccountID :execrows
 UPDATE User SET msft_home_account_id=? WHERE id=?;
 
--- name: GetUsersTeams :many
-SELECT t.* FROM UserToTeam utt
-JOIN Team t ON utt.team_id=t.id 
-WHERE utt.user_id=?;
+-- name: GetUsersSlotifyGroups :many
+SELECT sg.* FROM UserToSlotifyGroup utsg
+JOIN SlotifyGroup sg ON utsg.slotify_group_id=sg.id 
+WHERE utsg.user_id=?;
 
 -- name: ListUsers :many
 SELECT id, email, first_name, last_name FROM User
@@ -33,42 +33,54 @@ WHERE email = ifnull(sqlc.arg('email'), email)
 
 
 
--- name: AddUserToTeam :execrows
-INSERT INTO UserToTeam (user_id, team_id) VALUES (?, ?);
+-- name: AddUserToSlotifyGroup :execrows
+INSERT INTO UserToSlotifyGroup (user_id, slotify_group_id) VALUES (?, ?);
 
--- name: CountTeamByID :one
-SELECT COUNT(*) FROM Team WHERE id=?;
+-- name: CountSlotifyGroupByID :one
+SELECT COUNT(*) FROM SlotifyGroup WHERE id=?;
 
--- name: GetAllTeamMembers :many
-SELECT u.id, u.email, u.first_name, u.last_name FROM Team t
-JOIN UserToTeam utt ON t.id=utt.team_id
-JOIN User u ON u.id=utt.user_id 
-WHERE t.id=?;
+-- name: GetAllSlotifyGroupMembers :many
+SELECT u.id, u.email, u.first_name, u.last_name FROM SlotifyGroup sg
+JOIN UserToSlotifyGroup utsg ON sg.id=utsg.slotify_group_id
+JOIN User u ON u.id=utsg.user_id 
+WHERE sg.id=?;
 
--- name: GetAllTeamMembersExcept :many
-SELECT u.id FROM Team t
-JOIN UserToTeam utt ON t.id=utt.team_id
-JOIN User u ON u.id=utt.user_id 
-WHERE t.id=sqlc.arg('teamID') AND u.id!=sqlc.arg('userID');
+-- name: CountSlotifyGroupMembers :one
+SELECT COUNT(*) FROM SlotifyGroup sg
+JOIN UserToSlotifyGroup utsg ON sg.id=utsg.slotify_group_id
+JOIN User u ON u.id=utsg.user_id 
+WHERE sg.id=?;
 
--- name: GetJoinableTeams :many
-SELECT t.* FROM Team t
-LEFT JOIN UserToTeam utt ON
-     t.id = utt.team_id AND utt.user_id = ? 
-WHERE utt.user_id IS NULL;
+-- name: GetAllSlotifyGroupMembersExcept :many
+SELECT u.id FROM SlotifyGroup sg
+JOIN UserToSlotifyGroup utsg ON sg.id=utsg.slotify_group_id
+JOIN User u ON u.id=utsg.user_id 
+WHERE sg.id=sqlc.arg('slotifyGroupID') AND u.id!=sqlc.arg('userID');
 
--- name: GetTeamByID :one
-SELECT * FROM Team WHERE id=?;
+-- name: GetSlotifyGroupByID :one
+SELECT * FROM SlotifyGroup WHERE id=?;
 
--- name: DeleteTeamByID :execrows
-DELETE FROM Team WHERE id=?;
+-- name: DeleteSlotifyGroupByID :execrows
+DELETE FROM SlotifyGroup WHERE id=?;
 
--- name: ListTeams :many
-SELECT * FROM Team
+-- name: ListSlotifyGroups :many
+SELECT * FROM SlotifyGroup
 WHERE name = ifnull(sqlc.arg('name'), name);
 
--- name: AddTeam :execlastid
-INSERT INTO Team (name) VALUES (?);
+-- name: AddSlotifyGroup :execlastid
+INSERT INTO SlotifyGroup (name) VALUES (?);
+
+-- name: RemoveSlotifyGroupMember :execrows
+DELETE FROM UserToSlotifyGroup
+WHERE user_id=? AND slotify_group_id=?;
+
+-- name: RemoveSlotifyGroup :execrows
+DELETE FROM SlotifyGroup
+WHERE id=?;
+
+-- name: CheckMemberInSlotifyGroup :one
+SELECT COUNT(*) FROM UserToSlotifyGroup
+WHERE user_id=? AND slotify_group_id=?;
 
 
 
@@ -85,6 +97,13 @@ DELETE FROM RefreshToken WHERE user_id=?;
 -- name: CreateNotification :execlastid
 INSERT INTO Notification (message, created) VALUES(?, ?);
 
+-- name: BatchDeleteWeekOldNotifications :execrows
+DELETE FROM Notification
+WHERE created + INTERVAL 1 WEEK <= CURDATE()
+  AND id >= (SELECT MIN(id) FROM Notification WHERE created + INTERVAL 1 WEEK <= CURDATE())
+ORDER BY id
+LIMIT ?;
+
 -- name: CreateUserNotification :execrows
 INSERT INTO UserToNotification (user_id, notification_id, is_read) VALUES(?, ?, FALSE);
 
@@ -97,3 +116,55 @@ ORDER BY n.created DESC;
 -- name: MarkNotificationAsRead :execrows
 UPDATE UserToNotification SET is_read=TRUE
 WHERE user_id=? AND notification_id=?;
+
+
+
+
+-- name: GetInviteByID :one
+SELECT * FROM Invite
+WHERE id=?;
+
+-- name: CreateInvite :execrows
+INSERT INTO Invite (slotify_group_id, from_user_id, to_user_id, message, expiry_date, created_at)
+VALUES(?, ?, ?, ?, ?, ?);
+
+-- name: UpdateInviteStatus :execrows
+UPDATE Invite SET status=?
+WHERE id=?;
+
+-- name: DeleteInviteByID :execrows
+DELETE FROM Invite WHERE id=?;
+
+-- name: UpdateInviteMessage :execrows
+UPDATE Invite SET message=?
+WHERE id=? AND from_user_id=?;
+
+-- name: ListInvitesMe :many
+SELECT i.id AS invite_id, i.message, i.status,i.created_at, i.expiry_date, fu.email AS from_user_email, fu.first_name AS from_user_first_name, fu.last_name AS from_user_last_name, sg.name AS slotify_group_name FROM Invite i
+JOIN User fu ON fu.id=i.from_user_id
+JOIN SlotifyGroup sg ON sg.id=i.slotify_group_id
+WHERE i.status = ifnull(sqlc.arg('status'), i.status) 
+AND i.to_user_id=?;
+
+-- name: ListInvitesByGroup :many
+SELECT 
+   i.id AS invite_id, i.message, i.status, i.created_at, i.expiry_date, fu.email AS from_user_email, fu.first_name AS from_user_first_name, fu.last_name AS from_user_last_name, tu.email AS to_user_email, tu.first_name AS to_user_first_name, tu.last_name AS to_user_last_name FROM Invite i
+JOIN User fu ON fu.id=i.from_user_id
+JOIN User tu ON tu.id=i.to_user_id
+WHERE i.status = ifnull(sqlc.arg('status'), i.status) 
+AND i.slotify_group_id=?;
+
+-- name: BatchDeleteWeekOldInvites :execrows
+DELETE FROM Invite
+WHERE created_at + INTERVAL 1 WEEK <= CURDATE()
+  AND id >= (SELECT MIN(id) FROM Invite WHERE created_at + INTERVAL 1 WEEK <= CURDATE())
+ORDER BY id
+LIMIT ?;
+
+-- name: BatchExpireInvites :execrows
+UPDATE Invite SET status = 'expired'
+WHERE expiry_date <= CURDATE()
+  AND status != 'expired'
+  AND id >= (SELECT MIN(id) FROM Invite WHERE expiry_date <= CURDATE() AND status != 'expired')
+ORDER BY id
+LIMIT ?;

@@ -15,7 +15,7 @@ sql:
         output_db_file_name: "repository.go"
         rename:
           refreshtoken: RefreshToken
-          usertoteam: UserToTeam
+          slotifygroup: SlotifyGroup
         overrides:
           - db_type: int unsigned
             go_type: uint32

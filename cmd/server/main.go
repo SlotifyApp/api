@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/SlotifyApp/slotify-backend/api"
+	"github.com/SlotifyApp/slotify-backend/cron"
 	"github.com/SlotifyApp/slotify-backend/database"
 	"github.com/gorilla/mux"
 )
@@ -61,6 +62,10 @@ func main() {
 	})
 
 	server.Logger.Info("http server starting up")
+
+	if err = cron.RegisterDBCronJobs(ctx, server.DB, server.Logger); err != nil {
+		log.Fatalf("failed to register db cron jobs: %s", err.Error())
+	}
 
 	log.Fatal(s.ListenAndServe())
 }

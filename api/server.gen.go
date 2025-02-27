@@ -22,12 +22,12 @@ import (
 
 // Defines values for AttendeeResponseStatus.
 const (
-	Accepted           AttendeeResponseStatus = "accepted"
-	Declined           AttendeeResponseStatus = "declined"
-	EntativelyAccepted AttendeeResponseStatus = "entativelyAccepted"
-	None               AttendeeResponseStatus = "none"
-	NotResponded       AttendeeResponseStatus = "notResponded"
-	Organizer          AttendeeResponseStatus = "organizer"
+	AttendeeResponseStatusAccepted           AttendeeResponseStatus = "accepted"
+	AttendeeResponseStatusDeclined           AttendeeResponseStatus = "declined"
+	AttendeeResponseStatusEntativelyAccepted AttendeeResponseStatus = "entativelyAccepted"
+	AttendeeResponseStatusNone               AttendeeResponseStatus = "none"
+	AttendeeResponseStatusNotResponded       AttendeeResponseStatus = "notResponded"
+	AttendeeResponseStatusOrganizer          AttendeeResponseStatus = "organizer"
 )
 
 // Defines values for AttendeeType.
@@ -35,6 +35,33 @@ const (
 	Optional AttendeeType = "optional"
 	Required AttendeeType = "required"
 	Resource AttendeeType = "resource"
+)
+
+// Defines values for EmptySuggestionsReason.
+const (
+	EmptySuggestionsReasonAttendeesUnavailable          EmptySuggestionsReason = "attendeesUnavailable"
+	EmptySuggestionsReasonAttendeesUnavailableOrUnknown EmptySuggestionsReason = "attendeesUnavailableOrUnknown"
+	EmptySuggestionsReasonLocationsUnavailable          EmptySuggestionsReason = "locationsUnavailable"
+	EmptySuggestionsReasonOrganizerUnavailable          EmptySuggestionsReason = "organizerUnavailable"
+	EmptySuggestionsReasonUnknown                       EmptySuggestionsReason = "unknown"
+)
+
+// Defines values for FreeBusyStatus.
+const (
+	FreeBusyStatusBusy             FreeBusyStatus = "busy"
+	FreeBusyStatusFree             FreeBusyStatus = "free"
+	FreeBusyStatusOof              FreeBusyStatus = "oof"
+	FreeBusyStatusTentative        FreeBusyStatus = "tentative"
+	FreeBusyStatusUnknown          FreeBusyStatus = "unknown"
+	FreeBusyStatusWorkingElsewhere FreeBusyStatus = "workingElsewhere"
+)
+
+// Defines values for InviteStatus.
+const (
+	InviteStatusAccepted InviteStatus = "accepted"
+	InviteStatusDeclined InviteStatus = "declined"
+	InviteStatusExpired  InviteStatus = "expired"
+	InviteStatusPending  InviteStatus = "pending"
 )
 
 // Defines values for LocationRoomType.
@@ -62,6 +89,24 @@ type Attendee struct {
 // AttendeeResponseStatus defines model for Attendee.ResponseStatus.
 type AttendeeResponseStatus string
 
+// AttendeeAvailability Maps roughly to [MSFT attendeeAvailability](https://learn.microsoft.com/en-us/graph/api/resources/attendeeavailability?view=graph-rest-1.0)
+type AttendeeAvailability struct {
+	// Attendee directly maps to [MSFT attendeeBase](https://learn.microsoft.com/en-us/graph/api/resources/attendeebase?view=graph-rest-1.0)
+	Attendee AttendeeBase `json:"attendee"`
+
+	// Availability Maps directly to [MSFT freebusyStatus](https://learn.microsoft.com/en-us/graph/api/resources/attendeeavailability?view=graph-rest-1.0)
+	Availability FreeBusyStatus `json:"availability"`
+}
+
+// AttendeeBase directly maps to [MSFT attendeeBase](https://learn.microsoft.com/en-us/graph/api/resources/attendeebase?view=graph-rest-1.0)
+type AttendeeBase struct {
+	// AttendeeType Maps directly to [MSFT Attendee->type](https://learn.microsoft.com/en-us/graph/api/resources/attendee?view=graph-rest-1.0)
+	AttendeeType AttendeeType `json:"attendeeType"`
+
+	// EmailAddress directly maps to MSFT Email Address, see info here:[MSFT EmailAddress Struct Docs](https://learn.microsoft.com/en-us/graph/api/resources/emailaddress?view=graph-rest-1.0)
+	EmailAddress EmailAddress `json:"emailAddress"`
+}
+
 // AttendeeType Maps directly to [MSFT Attendee->type](https://learn.microsoft.com/en-us/graph/api/resources/attendee?view=graph-rest-1.0)
 type AttendeeType string
 
@@ -85,6 +130,18 @@ type CalendarEvent struct {
 	WebLink   *string              `json:"webLink,omitempty"`
 }
 
+// EmailAddress directly maps to MSFT Email Address, see info here:[MSFT EmailAddress Struct Docs](https://learn.microsoft.com/en-us/graph/api/resources/emailaddress?view=graph-rest-1.0)
+type EmailAddress struct {
+	Address openapi_types.Email `json:"address"`
+	Name    string              `json:"name"`
+}
+
+// EmptySuggestionsReason Maps directly to [MSFT emptySuggestionsReason](https://learn.microsoft.com/en-us/graph/api/resources/meetingtimesuggestionsresult?view=graph-rest-1.0)
+type EmptySuggestionsReason string
+
+// FreeBusyStatus Maps directly to [MSFT freebusyStatus](https://learn.microsoft.com/en-us/graph/api/resources/attendeeavailability?view=graph-rest-1.0)
+type FreeBusyStatus string
+
 // Group defines model for Group.
 type Group struct {
 	Id   uint32 `json:"id"`
@@ -98,6 +155,60 @@ type GroupUser struct {
 	LastName  string              `json:"lastName"`
 }
 
+// InviteCreate Invite create request body
+type InviteCreate struct {
+	CreatedAt      time.Time          `json:"createdAt"`
+	ExpiryDate     openapi_types.Date `json:"expiryDate"`
+	Message        string             `json:"message"`
+	SlotifyGroupID uint32             `json:"slotifyGroupID"`
+	ToUserID       uint32             `json:"toUserID"`
+}
+
+// InviteStatus Invite status
+type InviteStatus string
+
+// InvitesGroup References a Slotify Invite For a Group
+type InvitesGroup struct {
+	CreatedAt         time.Time           `json:"createdAt"`
+	ExpiryDate        openapi_types.Date  `json:"expiryDate"`
+	FromUserEmail     openapi_types.Email `json:"fromUserEmail"`
+	FromUserFirstName string              `json:"fromUserFirstName"`
+	FromUserLastName  string              `json:"fromUserLastName"`
+	InviteID          uint32              `json:"inviteID"`
+	Message           string              `json:"message"`
+
+	// Status Invite status
+	Status          InviteStatus        `json:"status"`
+	ToUserEmail     openapi_types.Email `json:"toUserEmail"`
+	ToUserFirstName string              `json:"toUserFirstName"`
+	ToUserLastName  string              `json:"toUserLastName"`
+}
+
+// InvitesMe References a Slotify Invite
+type InvitesMe struct {
+	CreatedAt  time.Time          `json:"createdAt"`
+	ExpiryDate openapi_types.Date `json:"expiryDate"`
+
+	// FromUserEmail from user email
+	FromUserEmail openapi_types.Email `json:"fromUserEmail"`
+
+	// FromUserFirstName from user first name
+	FromUserFirstName string `json:"fromUserFirstName"`
+
+	// FromUserLastName from user last name
+	FromUserLastName string `json:"fromUserLastName"`
+	InviteID         uint32 `json:"inviteID"`
+
+	// Message invite message
+	Message string `json:"message"`
+
+	// SlotifyGroupName slotify group name
+	SlotifyGroupName string `json:"slotifyGroupName"`
+
+	// Status Invite status
+	Status InviteStatus `json:"status"`
+}
+
 // Location Maps roughly to [MSFT Location](https://learn.microsoft.com/en-us/graph/api/resources/location?view=graph-rest-1.0)
 type Location struct {
 	Id       *string           `json:"id,omitempty"`
@@ -109,6 +220,41 @@ type Location struct {
 // LocationRoomType defines model for Location.RoomType.
 type LocationRoomType string
 
+// LocationConstraint Maps directly to [MSFT locationConstraint](https://learn.microsoft.com/en-us/graph/api/resources/locationconstraint?view=graph-rest-1.0)
+type LocationConstraint struct {
+	IsRequired      *bool                     `json:"isRequired,omitempty"`
+	Locations       *[]LocationConstraintItem `json:"locations,omitempty"`
+	SuggestLocation *bool                     `json:"suggestLocation,omitempty"`
+}
+
+// LocationConstraintItem Maps roughly to [MSFT locationConstraintItem](https://learn.microsoft.com/en-us/graph/api/resources/locationconstraintitem?view=graph-rest-1.0)
+type LocationConstraintItem struct {
+	// Address Maps directly to [MSFT physicalAddress](https://learn.microsoft.com/en-us/graph/api/resources/locationconstraintitem?view=graph-rest-1.0)
+	Address              PhysicalAddress `json:"address"`
+	DisplayName          string          `json:"displayName"`
+	LocationEmailAddress *string         `json:"locationEmailAddress,omitempty"`
+	ResolveAvailability  bool            `json:"resolveAvailability"`
+}
+
+// MeetingTimeSlot Maps directly to [MSFT meetingTimeSlot](https://learn.microsoft.com/en-us/graph/api/resources/timeslot?view=graph-rest-1.0)
+type MeetingTimeSlot struct {
+	End   time.Time `json:"end"`
+	Start time.Time `json:"start"`
+}
+
+// MeetingTimeSuggestion Maps roughly to [MSFT meetingTimeSuggestion](https://learn.microsoft.com/en-us/graph/api/resources/meetingtimesuggestion?view=graph-rest-1.0)
+type MeetingTimeSuggestion struct {
+	AttendeeAvailability *[]AttendeeAvailability `json:"attendeeAvailability,omitempty"`
+	Confidence           *float64                `json:"confidence,omitempty"`
+	Locations            *[]Location             `json:"locations,omitempty"`
+
+	// MeetingTimeSlot Maps directly to [MSFT meetingTimeSlot](https://learn.microsoft.com/en-us/graph/api/resources/timeslot?view=graph-rest-1.0)
+	MeetingTimeSlot       *MeetingTimeSlot `json:"meetingTimeSlot,omitempty"`
+	Order                 *int32           `json:"order,omitempty"`
+	OrganizerAvailability *string          `json:"organizerAvailability,omitempty"`
+	SuggestionReason      *string          `json:"suggestionReason,omitempty"`
+}
+
 // Notification defines model for Notification.
 type Notification struct {
 	Created time.Time `json:"created"`
@@ -116,15 +262,69 @@ type Notification struct {
 	Message string    `json:"message"`
 }
 
-// Team defines model for Team.
-type Team struct {
+// PhysicalAddress Maps directly to [MSFT physicalAddress](https://learn.microsoft.com/en-us/graph/api/resources/locationconstraintitem?view=graph-rest-1.0)
+type PhysicalAddress struct {
+	// City The city.
+	City *string `json:"city,omitempty"`
+
+	// CountryOrRegion The country or region. It's a free-format string value, for example, "United States".
+	CountryOrRegion *string `json:"countryOrRegion,omitempty"`
+
+	// PostalCode The postal code.
+	PostalCode *string `json:"postalCode,omitempty"`
+
+	// State The state.
+	State *string `json:"state,omitempty"`
+
+	// Street The street.
+	Street *string `json:"street,omitempty"`
+}
+
+// SchedulingSlotsBodySchema Roughly maps to [MSFT Find Meeting Schema](https://learn.microsoft.com/en-us/graph/api/user-findmeetingtimes?view=graph-rest-1.0&tabs=http#request-body)
+type SchedulingSlotsBodySchema struct {
+	Attendees           []AttendeeBase `json:"attendees"`
+	IsOrganizerOptional bool           `json:"isOrganizerOptional"`
+
+	// LocationConstraint Maps directly to [MSFT locationConstraint](https://learn.microsoft.com/en-us/graph/api/resources/locationconstraint?view=graph-rest-1.0)
+	LocationConstraint LocationConstraint `json:"locationConstraint"`
+	MaxCandidates      *int32             `json:"maxCandidates,omitempty"`
+
+	// MeetingDuration The length of the meeting, denoted in **ISO 8601** format. - Example:
+	//   - **1 hour** → `'PT1H'`
+	//   - **2 hours, 30 minutes** → `'PT2H30M'`
+	// - `'P'` is the duration designator. - `'T'` separates date and time components. - `'H'` (hours) and `'M'` (minutes) specify the time duration. - If omitted, the default duration is **30 minutes** (`'PT30M'`).
+	MeetingDuration string `json:"meetingDuration"`
+
+	// MeetingName custom field, this is used for the AI model
+	MeetingName               string   `json:"meetingName"`
+	MinimumAttendeePercentage *float64 `json:"minimumAttendeePercentage,omitempty"`
+
+	// TimeConstraint Maps directly to [MSFT timeConstraint](https://learn.microsoft.com/en-us/graph/api/resources/timeconstraint?view=graph-rest-1.0)
+	TimeConstraint TimeConstraint `json:"timeConstraint"`
+}
+
+// SchedulingSlotsSuccessResponseBody Maps roughly to [MSFT meetingTimeSuggestionsResult](https://learn.microsoft.com/en-us/graph/api/resources/meetingtimesuggestionsresult?view=graph-rest-1.0)
+type SchedulingSlotsSuccessResponseBody struct {
+	// EmptySuggestionsReason Maps directly to [MSFT emptySuggestionsReason](https://learn.microsoft.com/en-us/graph/api/resources/meetingtimesuggestionsresult?view=graph-rest-1.0)
+	EmptySuggestionsReason *EmptySuggestionsReason  `json:"emptySuggestionsReason,omitempty"`
+	MeetingTimeSuggestions *[]MeetingTimeSuggestion `json:"meetingTimeSuggestions,omitempty"`
+}
+
+// SlotifyGroup defines model for SlotifyGroup.
+type SlotifyGroup struct {
 	Id   uint32 `json:"id"`
 	Name string `json:"name"`
 }
 
-// TeamCreate defines model for TeamCreate.
-type TeamCreate struct {
+// SlotifyGroupCreate defines model for SlotifyGroupCreate.
+type SlotifyGroupCreate struct {
 	Name string `json:"name"`
+}
+
+// TimeConstraint Maps directly to [MSFT timeConstraint](https://learn.microsoft.com/en-us/graph/api/resources/timeconstraint?view=graph-rest-1.0)
+type TimeConstraint struct {
+	ActivityDomain *string           `json:"activityDomain,omitempty"`
+	TimeSlots      []MeetingTimeSlot `json:"timeSlots"`
 }
 
 // User defines model for User.
@@ -141,6 +341,9 @@ type UserCreate struct {
 	FirstName string              `json:"firstName"`
 	LastName  string              `json:"lastName"`
 }
+
+// SchedulingSlotsSuccessResponse Maps roughly to [MSFT meetingTimeSuggestionsResult](https://learn.microsoft.com/en-us/graph/api/resources/meetingtimesuggestionsresult?view=graph-rest-1.0)
+type SchedulingSlotsSuccessResponse = SchedulingSlotsSuccessResponseBody
 
 // GetAPIAuthCallbackParams defines parameters for GetAPIAuthCallback.
 type GetAPIAuthCallbackParams struct {
@@ -160,10 +363,21 @@ type GetAPIGroupsParams struct {
 	Name *string `form:"name,omitempty" json:"name,omitempty"`
 }
 
-// GetAPITeamsParams defines parameters for GetAPITeams.
-type GetAPITeamsParams struct {
-	// Name Team name
-	Name *string `form:"name,omitempty" json:"name,omitempty"`
+// GetAPIInvitesMeParams defines parameters for GetAPIInvitesMe.
+type GetAPIInvitesMeParams struct {
+	// Status Invite status
+	Status *InviteStatus `form:"status,omitempty" json:"status,omitempty"`
+}
+
+// PatchAPIInvitesInviteIDJSONBody defines parameters for PatchAPIInvitesInviteID.
+type PatchAPIInvitesInviteIDJSONBody struct {
+	Message string `json:"message"`
+}
+
+// GetAPISlotifyGroupsSlotifyGroupIDInvitesParams defines parameters for GetAPISlotifyGroupsSlotifyGroupIDInvites.
+type GetAPISlotifyGroupsSlotifyGroupIDInvitesParams struct {
+	// Status Invite status
+	Status *InviteStatus `form:"status,omitempty" json:"status,omitempty"`
 }
 
 // GetAPIUsersParams defines parameters for GetAPIUsers.
@@ -181,8 +395,17 @@ type GetAPIUsersParams struct {
 // PostAPICalendarMeJSONRequestBody defines body for PostAPICalendarMe for application/json ContentType.
 type PostAPICalendarMeJSONRequestBody = CalendarEvent
 
-// PostAPITeamsJSONRequestBody defines body for PostAPITeams for application/json ContentType.
-type PostAPITeamsJSONRequestBody = TeamCreate
+// PostAPIInvitesJSONRequestBody defines body for PostAPIInvites for application/json ContentType.
+type PostAPIInvitesJSONRequestBody = InviteCreate
+
+// PatchAPIInvitesInviteIDJSONRequestBody defines body for PatchAPIInvitesInviteID for application/json ContentType.
+type PatchAPIInvitesInviteIDJSONRequestBody PatchAPIInvitesInviteIDJSONBody
+
+// PostAPISchedulingFreeJSONRequestBody defines body for PostAPISchedulingFree for application/json ContentType.
+type PostAPISchedulingFreeJSONRequestBody = SchedulingSlotsBodySchema
+
+// PostAPISlotifyGroupsJSONRequestBody defines body for PostAPISlotifyGroups for application/json ContentType.
+type PostAPISlotifyGroupsJSONRequestBody = SlotifyGroupCreate
 
 // PostAPIUsersJSONRequestBody defines body for PostAPIUsers for application/json ContentType.
 type PostAPIUsersJSONRequestBody = UserCreate
@@ -219,6 +442,36 @@ type ServerInterface interface {
 	// Healthcheck route.
 	// (GET /api/healthcheck)
 	GetAPIHealthcheck(w http.ResponseWriter, r *http.Request)
+	// Satisfy CORS preflight for creating invites.
+	// (OPTIONS /api/invites)
+	OptionsAPIInvites(w http.ResponseWriter, r *http.Request)
+	// Create a new invite
+	// (POST /api/invites)
+	PostAPIInvites(w http.ResponseWriter, r *http.Request)
+	// Get all invites for logged in user.
+	// (GET /api/invites/me)
+	GetAPIInvitesMe(w http.ResponseWriter, r *http.Request, params GetAPIInvitesMeParams)
+	// Delete an invite
+	// (DELETE /api/invites/{inviteID})
+	DeleteAPIInvitesInviteID(w http.ResponseWriter, r *http.Request, inviteID uint32)
+	// Satisfy CORS preflight for invites.
+	// (OPTIONS /api/invites/{inviteID})
+	OptionsAPIInvitesInviteID(w http.ResponseWriter, r *http.Request, inviteID uint32)
+	// Update an invite with a new message
+	// (PATCH /api/invites/{inviteID})
+	PatchAPIInvitesInviteID(w http.ResponseWriter, r *http.Request, inviteID uint32)
+	// Satisfy CORS preflight for accepting invites.
+	// (OPTIONS /api/invites/{inviteID}/accept)
+	OptionsAPIInvitesInviteIDAccept(w http.ResponseWriter, r *http.Request, inviteID uint32)
+	// Accept a new group invite and add member to slotify group.
+	// (PATCH /api/invites/{inviteID}/accept)
+	PatchAPIInvitesInviteIDAccept(w http.ResponseWriter, r *http.Request, inviteID uint32)
+	// Satisfy CORS preflight for declining invites.
+	// (OPTIONS /api/invites/{inviteID}/decline)
+	OptionsAPIInvitesInviteIDDecline(w http.ResponseWriter, r *http.Request, inviteID uint32)
+	// Decline an invite
+	// (PATCH /api/invites/{inviteID}/decline)
+	PatchAPIInvitesInviteIDDecline(w http.ResponseWriter, r *http.Request, inviteID uint32)
 	// Satisfy CORS preflight for marking a notification as read.
 	// (OPTIONS /api/notifications/{notificationID}/read)
 	OptionsAPINotificationsNotificationIDRead(w http.ResponseWriter, r *http.Request, notificationID uint32)
@@ -228,36 +481,30 @@ type ServerInterface interface {
 	// Refresh Slotify access token and refresh token.
 	// (POST /api/refresh)
 	PostAPIRefresh(w http.ResponseWriter, r *http.Request)
-	// Get a team by query params.
-	// (GET /api/teams)
-	GetAPITeams(w http.ResponseWriter, r *http.Request, params GetAPITeamsParams)
-	// Satisfy CORS preflight for creatingteams.
-	// (OPTIONS /api/teams)
-	OptionsAPITeams(w http.ResponseWriter, r *http.Request)
-	// Create a new team.
-	// (POST /api/teams)
-	PostAPITeams(w http.ResponseWriter, r *http.Request)
-	// Get all joinable teams for a user excluding teams they are already a part of.
-	// (GET /api/teams/joinable/me)
-	GetAPITeamsJoinableMe(w http.ResponseWriter, r *http.Request)
-	// Get all teams for current user.
-	// (GET /api/teams/me)
-	GetAPITeamsMe(w http.ResponseWriter, r *http.Request)
-	// Delete a team by id.
-	// (DELETE /api/teams/{teamID})
-	DeleteAPITeamsTeamID(w http.ResponseWriter, r *http.Request, teamID uint32)
-	// Get a team by id.
-	// (GET /api/teams/{teamID})
-	GetAPITeamsTeamID(w http.ResponseWriter, r *http.Request, teamID uint32)
-	// Get all members of a team.
-	// (GET /api/teams/{teamID}/users)
-	GetAPITeamsTeamIDUsers(w http.ResponseWriter, r *http.Request, teamID uint32)
-	// Add current user to a team.
-	// (POST /api/teams/{teamID}/users/me)
-	PostAPITeamsTeamIDUsersMe(w http.ResponseWriter, r *http.Request, teamID uint32)
-	// Add a user to a team.
-	// (POST /api/teams/{teamID}/users/{userID})
-	PostAPITeamsTeamIDUsersUserID(w http.ResponseWriter, r *http.Request, teamID uint32, userID uint32)
+	// Idempotent route, just returns appropriate time slots along with their respective ratings.
+	// (POST /api/scheduling/slots)
+	PostAPISchedulingFree(w http.ResponseWriter, r *http.Request)
+	// Create a new slotifyGroup.
+	// (POST /api/slotify-groups)
+	PostAPISlotifyGroups(w http.ResponseWriter, r *http.Request)
+	// Get all slotify-groups for current user.
+	// (GET /api/slotify-groups/me)
+	GetAPISlotifyGroupsMe(w http.ResponseWriter, r *http.Request)
+	// Delete a slotifyGroup by id.
+	// (DELETE /api/slotify-groups/{slotifyGroupID})
+	DeleteAPISlotifyGroupsSlotifyGroupID(w http.ResponseWriter, r *http.Request, slotifyGroupID uint32)
+	// Get a slotifyGroup by id.
+	// (GET /api/slotify-groups/{slotifyGroupID})
+	GetAPISlotifyGroupsSlotifyGroupID(w http.ResponseWriter, r *http.Request, slotifyGroupID uint32)
+	// Get all invites for a slotify group
+	// (GET /api/slotify-groups/{slotifyGroupID}/invites)
+	GetAPISlotifyGroupsSlotifyGroupIDInvites(w http.ResponseWriter, r *http.Request, slotifyGroupID uint32, params GetAPISlotifyGroupsSlotifyGroupIDInvitesParams)
+	// Have a member leave from a slotify group
+	// (DELETE /api/slotify-groups/{slotifyGroupID}/leave/me)
+	DeleteSlotifyGroupsSlotifyGroupIDLeaveMe(w http.ResponseWriter, r *http.Request, slotifyGroupID uint32)
+	// Get all members of a slotifyGroup.
+	// (GET /api/slotify-groups/{slotifyGroupID}/users)
+	GetAPISlotifyGroupsSlotifyGroupIDUsers(w http.ResponseWriter, r *http.Request, slotifyGroupID uint32)
 	// Get users by query params.
 	// (GET /api/users)
 	GetAPIUsers(w http.ResponseWriter, r *http.Request, params GetAPIUsersParams)
@@ -535,6 +782,236 @@ func (siw *ServerInterfaceWrapper) GetAPIHealthcheck(w http.ResponseWriter, r *h
 	handler.ServeHTTP(w, r)
 }
 
+// OptionsAPIInvites operation middleware
+func (siw *ServerInterfaceWrapper) OptionsAPIInvites(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.OptionsAPIInvites(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PostAPIInvites operation middleware
+func (siw *ServerInterfaceWrapper) PostAPIInvites(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PostAPIInvites(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAPIInvitesMe operation middleware
+func (siw *ServerInterfaceWrapper) GetAPIInvitesMe(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetAPIInvitesMeParams
+
+	// ------------- Optional query parameter "status" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "status", r.URL.Query(), &params.Status)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "status", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAPIInvitesMe(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteAPIInvitesInviteID operation middleware
+func (siw *ServerInterfaceWrapper) DeleteAPIInvitesInviteID(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "inviteID" -------------
+	var inviteID uint32
+
+	err = runtime.BindStyledParameterWithOptions("simple", "inviteID", mux.Vars(r)["inviteID"], &inviteID, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "inviteID", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteAPIInvitesInviteID(w, r, inviteID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// OptionsAPIInvitesInviteID operation middleware
+func (siw *ServerInterfaceWrapper) OptionsAPIInvitesInviteID(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "inviteID" -------------
+	var inviteID uint32
+
+	err = runtime.BindStyledParameterWithOptions("simple", "inviteID", mux.Vars(r)["inviteID"], &inviteID, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "inviteID", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.OptionsAPIInvitesInviteID(w, r, inviteID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PatchAPIInvitesInviteID operation middleware
+func (siw *ServerInterfaceWrapper) PatchAPIInvitesInviteID(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "inviteID" -------------
+	var inviteID uint32
+
+	err = runtime.BindStyledParameterWithOptions("simple", "inviteID", mux.Vars(r)["inviteID"], &inviteID, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "inviteID", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PatchAPIInvitesInviteID(w, r, inviteID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// OptionsAPIInvitesInviteIDAccept operation middleware
+func (siw *ServerInterfaceWrapper) OptionsAPIInvitesInviteIDAccept(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "inviteID" -------------
+	var inviteID uint32
+
+	err = runtime.BindStyledParameterWithOptions("simple", "inviteID", mux.Vars(r)["inviteID"], &inviteID, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "inviteID", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.OptionsAPIInvitesInviteIDAccept(w, r, inviteID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PatchAPIInvitesInviteIDAccept operation middleware
+func (siw *ServerInterfaceWrapper) PatchAPIInvitesInviteIDAccept(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "inviteID" -------------
+	var inviteID uint32
+
+	err = runtime.BindStyledParameterWithOptions("simple", "inviteID", mux.Vars(r)["inviteID"], &inviteID, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "inviteID", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PatchAPIInvitesInviteIDAccept(w, r, inviteID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// OptionsAPIInvitesInviteIDDecline operation middleware
+func (siw *ServerInterfaceWrapper) OptionsAPIInvitesInviteIDDecline(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "inviteID" -------------
+	var inviteID uint32
+
+	err = runtime.BindStyledParameterWithOptions("simple", "inviteID", mux.Vars(r)["inviteID"], &inviteID, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "inviteID", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.OptionsAPIInvitesInviteIDDecline(w, r, inviteID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PatchAPIInvitesInviteIDDecline operation middleware
+func (siw *ServerInterfaceWrapper) PatchAPIInvitesInviteIDDecline(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "inviteID" -------------
+	var inviteID uint32
+
+	err = runtime.BindStyledParameterWithOptions("simple", "inviteID", mux.Vars(r)["inviteID"], &inviteID, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "inviteID", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PatchAPIInvitesInviteIDDecline(w, r, inviteID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // OptionsAPINotificationsNotificationIDRead operation middleware
 func (siw *ServerInterfaceWrapper) OptionsAPINotificationsNotificationIDRead(w http.ResponseWriter, r *http.Request) {
 
@@ -599,24 +1076,125 @@ func (siw *ServerInterfaceWrapper) PostAPIRefresh(w http.ResponseWriter, r *http
 	handler.ServeHTTP(w, r)
 }
 
-// GetAPITeams operation middleware
-func (siw *ServerInterfaceWrapper) GetAPITeams(w http.ResponseWriter, r *http.Request) {
+// PostAPISchedulingFree operation middleware
+func (siw *ServerInterfaceWrapper) PostAPISchedulingFree(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PostAPISchedulingFree(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PostAPISlotifyGroups operation middleware
+func (siw *ServerInterfaceWrapper) PostAPISlotifyGroups(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PostAPISlotifyGroups(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAPISlotifyGroupsMe operation middleware
+func (siw *ServerInterfaceWrapper) GetAPISlotifyGroupsMe(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAPISlotifyGroupsMe(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteAPISlotifyGroupsSlotifyGroupID operation middleware
+func (siw *ServerInterfaceWrapper) DeleteAPISlotifyGroupsSlotifyGroupID(w http.ResponseWriter, r *http.Request) {
 
 	var err error
+
+	// ------------- Path parameter "slotifyGroupID" -------------
+	var slotifyGroupID uint32
+
+	err = runtime.BindStyledParameterWithOptions("simple", "slotifyGroupID", mux.Vars(r)["slotifyGroupID"], &slotifyGroupID, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "slotifyGroupID", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteAPISlotifyGroupsSlotifyGroupID(w, r, slotifyGroupID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAPISlotifyGroupsSlotifyGroupID operation middleware
+func (siw *ServerInterfaceWrapper) GetAPISlotifyGroupsSlotifyGroupID(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "slotifyGroupID" -------------
+	var slotifyGroupID uint32
+
+	err = runtime.BindStyledParameterWithOptions("simple", "slotifyGroupID", mux.Vars(r)["slotifyGroupID"], &slotifyGroupID, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "slotifyGroupID", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAPISlotifyGroupsSlotifyGroupID(w, r, slotifyGroupID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAPISlotifyGroupsSlotifyGroupIDInvites operation middleware
+func (siw *ServerInterfaceWrapper) GetAPISlotifyGroupsSlotifyGroupIDInvites(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "slotifyGroupID" -------------
+	var slotifyGroupID uint32
+
+	err = runtime.BindStyledParameterWithOptions("simple", "slotifyGroupID", mux.Vars(r)["slotifyGroupID"], &slotifyGroupID, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "slotifyGroupID", Err: err})
+		return
+	}
 
 	// Parameter object where we will unmarshal all parameters from the context
-	var params GetAPITeamsParams
+	var params GetAPISlotifyGroupsSlotifyGroupIDInvitesParams
 
-	// ------------- Optional query parameter "name" -------------
+	// ------------- Optional query parameter "status" -------------
 
-	err = runtime.BindQueryParameter("form", true, false, "name", r.URL.Query(), &params.Name)
+	err = runtime.BindQueryParameter("form", true, false, "status", r.URL.Query(), &params.Status)
 	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "name", Err: err})
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "status", Err: err})
 		return
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetAPITeams(w, r, params)
+		siw.Handler.GetAPISlotifyGroupsSlotifyGroupIDInvites(w, r, slotifyGroupID, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -626,78 +1204,22 @@ func (siw *ServerInterfaceWrapper) GetAPITeams(w http.ResponseWriter, r *http.Re
 	handler.ServeHTTP(w, r)
 }
 
-// OptionsAPITeams operation middleware
-func (siw *ServerInterfaceWrapper) OptionsAPITeams(w http.ResponseWriter, r *http.Request) {
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.OptionsAPITeams(w, r)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// PostAPITeams operation middleware
-func (siw *ServerInterfaceWrapper) PostAPITeams(w http.ResponseWriter, r *http.Request) {
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.PostAPITeams(w, r)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// GetAPITeamsJoinableMe operation middleware
-func (siw *ServerInterfaceWrapper) GetAPITeamsJoinableMe(w http.ResponseWriter, r *http.Request) {
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetAPITeamsJoinableMe(w, r)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// GetAPITeamsMe operation middleware
-func (siw *ServerInterfaceWrapper) GetAPITeamsMe(w http.ResponseWriter, r *http.Request) {
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetAPITeamsMe(w, r)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// DeleteAPITeamsTeamID operation middleware
-func (siw *ServerInterfaceWrapper) DeleteAPITeamsTeamID(w http.ResponseWriter, r *http.Request) {
+// DeleteSlotifyGroupsSlotifyGroupIDLeaveMe operation middleware
+func (siw *ServerInterfaceWrapper) DeleteSlotifyGroupsSlotifyGroupIDLeaveMe(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 
-	// ------------- Path parameter "teamID" -------------
-	var teamID uint32
+	// ------------- Path parameter "slotifyGroupID" -------------
+	var slotifyGroupID uint32
 
-	err = runtime.BindStyledParameterWithOptions("simple", "teamID", mux.Vars(r)["teamID"], &teamID, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	err = runtime.BindStyledParameterWithOptions("simple", "slotifyGroupID", mux.Vars(r)["slotifyGroupID"], &slotifyGroupID, runtime.BindStyledParameterOptions{Explode: false, Required: true})
 	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "teamID", Err: err})
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "slotifyGroupID", Err: err})
 		return
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.DeleteAPITeamsTeamID(w, r, teamID)
+		siw.Handler.DeleteSlotifyGroupsSlotifyGroupIDLeaveMe(w, r, slotifyGroupID)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -707,106 +1229,22 @@ func (siw *ServerInterfaceWrapper) DeleteAPITeamsTeamID(w http.ResponseWriter, r
 	handler.ServeHTTP(w, r)
 }
 
-// GetAPITeamsTeamID operation middleware
-func (siw *ServerInterfaceWrapper) GetAPITeamsTeamID(w http.ResponseWriter, r *http.Request) {
+// GetAPISlotifyGroupsSlotifyGroupIDUsers operation middleware
+func (siw *ServerInterfaceWrapper) GetAPISlotifyGroupsSlotifyGroupIDUsers(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 
-	// ------------- Path parameter "teamID" -------------
-	var teamID uint32
+	// ------------- Path parameter "slotifyGroupID" -------------
+	var slotifyGroupID uint32
 
-	err = runtime.BindStyledParameterWithOptions("simple", "teamID", mux.Vars(r)["teamID"], &teamID, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	err = runtime.BindStyledParameterWithOptions("simple", "slotifyGroupID", mux.Vars(r)["slotifyGroupID"], &slotifyGroupID, runtime.BindStyledParameterOptions{Explode: false, Required: true})
 	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "teamID", Err: err})
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "slotifyGroupID", Err: err})
 		return
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetAPITeamsTeamID(w, r, teamID)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// GetAPITeamsTeamIDUsers operation middleware
-func (siw *ServerInterfaceWrapper) GetAPITeamsTeamIDUsers(w http.ResponseWriter, r *http.Request) {
-
-	var err error
-
-	// ------------- Path parameter "teamID" -------------
-	var teamID uint32
-
-	err = runtime.BindStyledParameterWithOptions("simple", "teamID", mux.Vars(r)["teamID"], &teamID, runtime.BindStyledParameterOptions{Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "teamID", Err: err})
-		return
-	}
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetAPITeamsTeamIDUsers(w, r, teamID)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// PostAPITeamsTeamIDUsersMe operation middleware
-func (siw *ServerInterfaceWrapper) PostAPITeamsTeamIDUsersMe(w http.ResponseWriter, r *http.Request) {
-
-	var err error
-
-	// ------------- Path parameter "teamID" -------------
-	var teamID uint32
-
-	err = runtime.BindStyledParameterWithOptions("simple", "teamID", mux.Vars(r)["teamID"], &teamID, runtime.BindStyledParameterOptions{Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "teamID", Err: err})
-		return
-	}
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.PostAPITeamsTeamIDUsersMe(w, r, teamID)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// PostAPITeamsTeamIDUsersUserID operation middleware
-func (siw *ServerInterfaceWrapper) PostAPITeamsTeamIDUsersUserID(w http.ResponseWriter, r *http.Request) {
-
-	var err error
-
-	// ------------- Path parameter "teamID" -------------
-	var teamID uint32
-
-	err = runtime.BindStyledParameterWithOptions("simple", "teamID", mux.Vars(r)["teamID"], &teamID, runtime.BindStyledParameterOptions{Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "teamID", Err: err})
-		return
-	}
-
-	// ------------- Path parameter "userID" -------------
-	var userID uint32
-
-	err = runtime.BindStyledParameterWithOptions("simple", "userID", mux.Vars(r)["userID"], &userID, runtime.BindStyledParameterOptions{Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "userID", Err: err})
-		return
-	}
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.PostAPITeamsTeamIDUsersUserID(w, r, teamID, userID)
+		siw.Handler.GetAPISlotifyGroupsSlotifyGroupIDUsers(w, r, slotifyGroupID)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1098,31 +1536,47 @@ func HandlerWithOptions(si ServerInterface, options GorillaServerOptions) http.H
 
 	r.HandleFunc(options.BaseURL+"/api/healthcheck", wrapper.GetAPIHealthcheck).Methods("GET")
 
+	r.HandleFunc(options.BaseURL+"/api/invites", wrapper.OptionsAPIInvites).Methods("OPTIONS")
+
+	r.HandleFunc(options.BaseURL+"/api/invites", wrapper.PostAPIInvites).Methods("POST")
+
+	r.HandleFunc(options.BaseURL+"/api/invites/me", wrapper.GetAPIInvitesMe).Methods("GET")
+
+	r.HandleFunc(options.BaseURL+"/api/invites/{inviteID}", wrapper.DeleteAPIInvitesInviteID).Methods("DELETE")
+
+	r.HandleFunc(options.BaseURL+"/api/invites/{inviteID}", wrapper.OptionsAPIInvitesInviteID).Methods("OPTIONS")
+
+	r.HandleFunc(options.BaseURL+"/api/invites/{inviteID}", wrapper.PatchAPIInvitesInviteID).Methods("PATCH")
+
+	r.HandleFunc(options.BaseURL+"/api/invites/{inviteID}/accept", wrapper.OptionsAPIInvitesInviteIDAccept).Methods("OPTIONS")
+
+	r.HandleFunc(options.BaseURL+"/api/invites/{inviteID}/accept", wrapper.PatchAPIInvitesInviteIDAccept).Methods("PATCH")
+
+	r.HandleFunc(options.BaseURL+"/api/invites/{inviteID}/decline", wrapper.OptionsAPIInvitesInviteIDDecline).Methods("OPTIONS")
+
+	r.HandleFunc(options.BaseURL+"/api/invites/{inviteID}/decline", wrapper.PatchAPIInvitesInviteIDDecline).Methods("PATCH")
+
 	r.HandleFunc(options.BaseURL+"/api/notifications/{notificationID}/read", wrapper.OptionsAPINotificationsNotificationIDRead).Methods("OPTIONS")
 
 	r.HandleFunc(options.BaseURL+"/api/notifications/{notificationID}/read", wrapper.PatchAPINotificationsNotificationIDRead).Methods("PATCH")
 
 	r.HandleFunc(options.BaseURL+"/api/refresh", wrapper.PostAPIRefresh).Methods("POST")
 
-	r.HandleFunc(options.BaseURL+"/api/teams", wrapper.GetAPITeams).Methods("GET")
+	r.HandleFunc(options.BaseURL+"/api/scheduling/slots", wrapper.PostAPISchedulingFree).Methods("POST")
 
-	r.HandleFunc(options.BaseURL+"/api/teams", wrapper.OptionsAPITeams).Methods("OPTIONS")
+	r.HandleFunc(options.BaseURL+"/api/slotify-groups", wrapper.PostAPISlotifyGroups).Methods("POST")
 
-	r.HandleFunc(options.BaseURL+"/api/teams", wrapper.PostAPITeams).Methods("POST")
+	r.HandleFunc(options.BaseURL+"/api/slotify-groups/me", wrapper.GetAPISlotifyGroupsMe).Methods("GET")
 
-	r.HandleFunc(options.BaseURL+"/api/teams/joinable/me", wrapper.GetAPITeamsJoinableMe).Methods("GET")
+	r.HandleFunc(options.BaseURL+"/api/slotify-groups/{slotifyGroupID}", wrapper.DeleteAPISlotifyGroupsSlotifyGroupID).Methods("DELETE")
 
-	r.HandleFunc(options.BaseURL+"/api/teams/me", wrapper.GetAPITeamsMe).Methods("GET")
+	r.HandleFunc(options.BaseURL+"/api/slotify-groups/{slotifyGroupID}", wrapper.GetAPISlotifyGroupsSlotifyGroupID).Methods("GET")
 
-	r.HandleFunc(options.BaseURL+"/api/teams/{teamID}", wrapper.DeleteAPITeamsTeamID).Methods("DELETE")
+	r.HandleFunc(options.BaseURL+"/api/slotify-groups/{slotifyGroupID}/invites", wrapper.GetAPISlotifyGroupsSlotifyGroupIDInvites).Methods("GET")
 
-	r.HandleFunc(options.BaseURL+"/api/teams/{teamID}", wrapper.GetAPITeamsTeamID).Methods("GET")
+	r.HandleFunc(options.BaseURL+"/api/slotify-groups/{slotifyGroupID}/leave/me", wrapper.DeleteSlotifyGroupsSlotifyGroupIDLeaveMe).Methods("DELETE")
 
-	r.HandleFunc(options.BaseURL+"/api/teams/{teamID}/users", wrapper.GetAPITeamsTeamIDUsers).Methods("GET")
-
-	r.HandleFunc(options.BaseURL+"/api/teams/{teamID}/users/me", wrapper.PostAPITeamsTeamIDUsersMe).Methods("POST")
-
-	r.HandleFunc(options.BaseURL+"/api/teams/{teamID}/users/{userID}", wrapper.PostAPITeamsTeamIDUsersUserID).Methods("POST")
+	r.HandleFunc(options.BaseURL+"/api/slotify-groups/{slotifyGroupID}/users", wrapper.GetAPISlotifyGroupsSlotifyGroupIDUsers).Methods("GET")
 
 	r.HandleFunc(options.BaseURL+"/api/users", wrapper.GetAPIUsers).Methods("GET")
 
@@ -1144,56 +1598,87 @@ func HandlerWithOptions(si ServerInterface, options GorillaServerOptions) http.H
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"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",
+	"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",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file

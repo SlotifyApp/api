@@ -11,41 +11,121 @@ import (
 	"time"
 )
 
-const addTeam = `-- name: AddTeam :execlastid
-INSERT INTO Team (name) VALUES (?)
+const addSlotifyGroup = `-- name: AddSlotifyGroup :execlastid
+INSERT INTO SlotifyGroup (name) VALUES (?)
 `
 
-func (q *Queries) AddTeam(ctx context.Context, name string) (int64, error) {
-	result, err := q.exec(ctx, q.addTeamStmt, addTeam, name)
+func (q *Queries) AddSlotifyGroup(ctx context.Context, name string) (int64, error) {
+	result, err := q.exec(ctx, q.addSlotifyGroupStmt, addSlotifyGroup, name)
 	if err != nil {
 		return 0, err
 	}
 	return result.LastInsertId()
 }
 
-const addUserToTeam = `-- name: AddUserToTeam :execrows
-INSERT INTO UserToTeam (user_id, team_id) VALUES (?, ?)
+const addUserToSlotifyGroup = `-- name: AddUserToSlotifyGroup :execrows
+INSERT INTO UserToSlotifyGroup (user_id, slotify_group_id) VALUES (?, ?)
 `
 
-type AddUserToTeamParams struct {
-	UserID uint32 `json:"userId"`
-	TeamID uint32 `json:"teamId"`
+type AddUserToSlotifyGroupParams struct {
+	UserID         uint32 `json:"userId"`
+	SlotifyGroupID uint32 `json:"slotifyGroupId"`
 }
 
-func (q *Queries) AddUserToTeam(ctx context.Context, arg AddUserToTeamParams) (int64, error) {
-	result, err := q.exec(ctx, q.addUserToTeamStmt, addUserToTeam, arg.UserID, arg.TeamID)
+func (q *Queries) AddUserToSlotifyGroup(ctx context.Context, arg AddUserToSlotifyGroupParams) (int64, error) {
+	result, err := q.exec(ctx, q.addUserToSlotifyGroupStmt, addUserToSlotifyGroup, arg.UserID, arg.SlotifyGroupID)
 	if err != nil {
 		return 0, err
 	}
 	return result.RowsAffected()
 }
 
-const countTeamByID = `-- name: CountTeamByID :one
-SELECT COUNT(*) FROM Team WHERE id=?
+const batchDeleteWeekOldInvites = `-- name: BatchDeleteWeekOldInvites :execrows
+DELETE FROM Invite
+WHERE created_at + INTERVAL 1 WEEK <= CURDATE()
+  AND id >= (SELECT MIN(id) FROM Invite WHERE created_at + INTERVAL 1 WEEK <= CURDATE())
+ORDER BY id
+LIMIT ?
 `
 
-func (q *Queries) CountTeamByID(ctx context.Context, id uint32) (int64, error) {
-	row := q.queryRow(ctx, q.countTeamByIDStmt, countTeamByID, id)
+func (q *Queries) BatchDeleteWeekOldInvites(ctx context.Context, limit int32) (int64, error) {
+	result, err := q.exec(ctx, q.batchDeleteWeekOldInvitesStmt, batchDeleteWeekOldInvites, limit)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const batchDeleteWeekOldNotifications = `-- name: BatchDeleteWeekOldNotifications :execrows
+DELETE FROM Notification
+WHERE created + INTERVAL 1 WEEK <= CURDATE()
+  AND id >= (SELECT MIN(id) FROM Notification WHERE created + INTERVAL 1 WEEK <= CURDATE())
+ORDER BY id
+LIMIT ?
+`
+
+func (q *Queries) BatchDeleteWeekOldNotifications(ctx context.Context, limit int32) (int64, error) {
+	result, err := q.exec(ctx, q.batchDeleteWeekOldNotificationsStmt, batchDeleteWeekOldNotifications, limit)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const batchExpireInvites = `-- name: BatchExpireInvites :execrows
+UPDATE Invite SET status = 'expired'
+WHERE expiry_date <= CURDATE()
+  AND status != 'expired'
+  AND id >= (SELECT MIN(id) FROM Invite WHERE expiry_date <= CURDATE() AND status != 'expired')
+ORDER BY id
+LIMIT ?
+`
+
+func (q *Queries) BatchExpireInvites(ctx context.Context, limit int32) (int64, error) {
+	result, err := q.exec(ctx, q.batchExpireInvitesStmt, batchExpireInvites, limit)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const checkMemberInSlotifyGroup = `-- name: CheckMemberInSlotifyGroup :one
+SELECT COUNT(*) FROM UserToSlotifyGroup
+WHERE user_id=? AND slotify_group_id=?
+`
+
+type CheckMemberInSlotifyGroupParams struct {
+	UserID         uint32 `json:"userId"`
+	SlotifyGroupID uint32 `json:"slotifyGroupId"`
+}
+
+func (q *Queries) CheckMemberInSlotifyGroup(ctx context.Context, arg CheckMemberInSlotifyGroupParams) (int64, error) {
+	row := q.queryRow(ctx, q.checkMemberInSlotifyGroupStmt, checkMemberInSlotifyGroup, arg.UserID, arg.SlotifyGroupID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const countSlotifyGroupByID = `-- name: CountSlotifyGroupByID :one
+SELECT COUNT(*) FROM SlotifyGroup WHERE id=?
+`
+
+func (q *Queries) CountSlotifyGroupByID(ctx context.Context, id uint32) (int64, error) {
+	row := q.queryRow(ctx, q.countSlotifyGroupByIDStmt, countSlotifyGroupByID, id)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const countSlotifyGroupMembers = `-- name: CountSlotifyGroupMembers :one
+SELECT COUNT(*) FROM SlotifyGroup sg
+JOIN UserToSlotifyGroup utsg ON sg.id=utsg.slotify_group_id
+JOIN User u ON u.id=utsg.user_id 
+WHERE sg.id=?
+`
+
+func (q *Queries) CountSlotifyGroupMembers(ctx context.Context, id uint32) (int64, error) {
+	row := q.queryRow(ctx, q.countSlotifyGroupMembersStmt, countSlotifyGroupMembers, id)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -71,6 +151,35 @@ func (q *Queries) CountUserByID(ctx context.Context, id uint32) (int64, error) {
 	var count int64
 	err := row.Scan(&count)
 	return count, err
+}
+
+const createInvite = `-- name: CreateInvite :execrows
+INSERT INTO Invite (slotify_group_id, from_user_id, to_user_id, message, expiry_date, created_at)
+VALUES(?, ?, ?, ?, ?, ?)
+`
+
+type CreateInviteParams struct {
+	SlotifyGroupID uint32    `json:"slotifyGroupId"`
+	FromUserID     uint32    `json:"fromUserId"`
+	ToUserID       uint32    `json:"toUserId"`
+	Message        string    `json:"message"`
+	ExpiryDate     time.Time `json:"expiryDate"`
+	CreatedAt      time.Time `json:"createdAt"`
+}
+
+func (q *Queries) CreateInvite(ctx context.Context, arg CreateInviteParams) (int64, error) {
+	result, err := q.exec(ctx, q.createInviteStmt, createInvite,
+		arg.SlotifyGroupID,
+		arg.FromUserID,
+		arg.ToUserID,
+		arg.Message,
+		arg.ExpiryDate,
+		arg.CreatedAt,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 const createNotification = `-- name: CreateNotification :execlastid
@@ -142,6 +251,18 @@ func (q *Queries) CreateUserNotification(ctx context.Context, arg CreateUserNoti
 	return result.RowsAffected()
 }
 
+const deleteInviteByID = `-- name: DeleteInviteByID :execrows
+DELETE FROM Invite WHERE id=?
+`
+
+func (q *Queries) DeleteInviteByID(ctx context.Context, id uint32) (int64, error) {
+	result, err := q.exec(ctx, q.deleteInviteByIDStmt, deleteInviteByID, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
 const deleteRefreshTokenByUserID = `-- name: DeleteRefreshTokenByUserID :execrows
 DELETE FROM RefreshToken WHERE user_id=?
 `
@@ -154,12 +275,12 @@ func (q *Queries) DeleteRefreshTokenByUserID(ctx context.Context, userID uint32)
 	return result.RowsAffected()
 }
 
-const deleteTeamByID = `-- name: DeleteTeamByID :execrows
-DELETE FROM Team WHERE id=?
+const deleteSlotifyGroupByID = `-- name: DeleteSlotifyGroupByID :execrows
+DELETE FROM SlotifyGroup WHERE id=?
 `
 
-func (q *Queries) DeleteTeamByID(ctx context.Context, id uint32) (int64, error) {
-	result, err := q.exec(ctx, q.deleteTeamByIDStmt, deleteTeamByID, id)
+func (q *Queries) DeleteSlotifyGroupByID(ctx context.Context, id uint32) (int64, error) {
+	result, err := q.exec(ctx, q.deleteSlotifyGroupByIDStmt, deleteSlotifyGroupByID, id)
 	if err != nil {
 		return 0, err
 	}
@@ -178,29 +299,29 @@ func (q *Queries) DeleteUserByID(ctx context.Context, id uint32) (int64, error) 
 	return result.RowsAffected()
 }
 
-const getAllTeamMembers = `-- name: GetAllTeamMembers :many
-SELECT u.id, u.email, u.first_name, u.last_name FROM Team t
-JOIN UserToTeam utt ON t.id=utt.team_id
-JOIN User u ON u.id=utt.user_id 
-WHERE t.id=?
+const getAllSlotifyGroupMembers = `-- name: GetAllSlotifyGroupMembers :many
+SELECT u.id, u.email, u.first_name, u.last_name FROM SlotifyGroup sg
+JOIN UserToSlotifyGroup utsg ON sg.id=utsg.slotify_group_id
+JOIN User u ON u.id=utsg.user_id 
+WHERE sg.id=?
 `
 
-type GetAllTeamMembersRow struct {
+type GetAllSlotifyGroupMembersRow struct {
 	ID        uint32 `json:"id"`
 	Email     string `json:"email"`
 	FirstName string `json:"firstName"`
 	LastName  string `json:"lastName"`
 }
 
-func (q *Queries) GetAllTeamMembers(ctx context.Context, id uint32) ([]GetAllTeamMembersRow, error) {
-	rows, err := q.query(ctx, q.getAllTeamMembersStmt, getAllTeamMembers, id)
+func (q *Queries) GetAllSlotifyGroupMembers(ctx context.Context, id uint32) ([]GetAllSlotifyGroupMembersRow, error) {
+	rows, err := q.query(ctx, q.getAllSlotifyGroupMembersStmt, getAllSlotifyGroupMembers, id)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []GetAllTeamMembersRow{}
+	items := []GetAllSlotifyGroupMembersRow{}
 	for rows.Next() {
-		var i GetAllTeamMembersRow
+		var i GetAllSlotifyGroupMembersRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.Email,
@@ -220,20 +341,20 @@ func (q *Queries) GetAllTeamMembers(ctx context.Context, id uint32) ([]GetAllTea
 	return items, nil
 }
 
-const getAllTeamMembersExcept = `-- name: GetAllTeamMembersExcept :many
-SELECT u.id FROM Team t
-JOIN UserToTeam utt ON t.id=utt.team_id
-JOIN User u ON u.id=utt.user_id 
-WHERE t.id=? AND u.id!=?
+const getAllSlotifyGroupMembersExcept = `-- name: GetAllSlotifyGroupMembersExcept :many
+SELECT u.id FROM SlotifyGroup sg
+JOIN UserToSlotifyGroup utsg ON sg.id=utsg.slotify_group_id
+JOIN User u ON u.id=utsg.user_id 
+WHERE sg.id=? AND u.id!=?
 `
 
-type GetAllTeamMembersExceptParams struct {
-	TeamID uint32 `json:"teamID"`
-	UserID uint32 `json:"userID"`
+type GetAllSlotifyGroupMembersExceptParams struct {
+	SlotifyGroupID uint32 `json:"slotifyGroupID"`
+	UserID         uint32 `json:"userID"`
 }
 
-func (q *Queries) GetAllTeamMembersExcept(ctx context.Context, arg GetAllTeamMembersExceptParams) ([]uint32, error) {
-	rows, err := q.query(ctx, q.getAllTeamMembersExceptStmt, getAllTeamMembersExcept, arg.TeamID, arg.UserID)
+func (q *Queries) GetAllSlotifyGroupMembersExcept(ctx context.Context, arg GetAllSlotifyGroupMembersExceptParams) ([]uint32, error) {
+	rows, err := q.query(ctx, q.getAllSlotifyGroupMembersExceptStmt, getAllSlotifyGroupMembersExcept, arg.SlotifyGroupID, arg.UserID)
 	if err != nil {
 		return nil, err
 	}
@@ -255,34 +376,25 @@ func (q *Queries) GetAllTeamMembersExcept(ctx context.Context, arg GetAllTeamMem
 	return items, nil
 }
 
-const getJoinableTeams = `-- name: GetJoinableTeams :many
-SELECT t.id, t.name FROM Team t
-LEFT JOIN UserToTeam utt ON
-     t.id = utt.team_id AND utt.user_id = ? 
-WHERE utt.user_id IS NULL
+const getInviteByID = `-- name: GetInviteByID :one
+SELECT id, slotify_group_id, from_user_id, to_user_id, message, status, expiry_date, created_at FROM Invite
+WHERE id=?
 `
 
-func (q *Queries) GetJoinableTeams(ctx context.Context, userID uint32) ([]Team, error) {
-	rows, err := q.query(ctx, q.getJoinableTeamsStmt, getJoinableTeams, userID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []Team{}
-	for rows.Next() {
-		var i Team
-		if err := rows.Scan(&i.ID, &i.Name); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
+func (q *Queries) GetInviteByID(ctx context.Context, id uint32) (Invite, error) {
+	row := q.queryRow(ctx, q.getInviteByIDStmt, getInviteByID, id)
+	var i Invite
+	err := row.Scan(
+		&i.ID,
+		&i.SlotifyGroupID,
+		&i.FromUserID,
+		&i.ToUserID,
+		&i.Message,
+		&i.Status,
+		&i.ExpiryDate,
+		&i.CreatedAt,
+	)
+	return i, err
 }
 
 const getRefreshTokenByUserID = `-- name: GetRefreshTokenByUserID :one
@@ -301,13 +413,13 @@ func (q *Queries) GetRefreshTokenByUserID(ctx context.Context, userID uint32) (R
 	return i, err
 }
 
-const getTeamByID = `-- name: GetTeamByID :one
-SELECT id, name FROM Team WHERE id=?
+const getSlotifyGroupByID = `-- name: GetSlotifyGroupByID :one
+SELECT id, name FROM SlotifyGroup WHERE id=?
 `
 
-func (q *Queries) GetTeamByID(ctx context.Context, id uint32) (Team, error) {
-	row := q.queryRow(ctx, q.getTeamByIDStmt, getTeamByID, id)
-	var i Team
+func (q *Queries) GetSlotifyGroupByID(ctx context.Context, id uint32) (SlotifyGroup, error) {
+	row := q.queryRow(ctx, q.getSlotifyGroupByIDStmt, getSlotifyGroupByID, id)
+	var i SlotifyGroup
 	err := row.Scan(&i.ID, &i.Name)
 	return i, err
 }
@@ -376,21 +488,21 @@ func (q *Queries) GetUserByID(ctx context.Context, id uint32) (User, error) {
 	return i, err
 }
 
-const getUsersTeams = `-- name: GetUsersTeams :many
-SELECT t.id, t.name FROM UserToTeam utt
-JOIN Team t ON utt.team_id=t.id 
-WHERE utt.user_id=?
+const getUsersSlotifyGroups = `-- name: GetUsersSlotifyGroups :many
+SELECT sg.id, sg.name FROM UserToSlotifyGroup utsg
+JOIN SlotifyGroup sg ON utsg.slotify_group_id=sg.id 
+WHERE utsg.user_id=?
 `
 
-func (q *Queries) GetUsersTeams(ctx context.Context, userID uint32) ([]Team, error) {
-	rows, err := q.query(ctx, q.getUsersTeamsStmt, getUsersTeams, userID)
+func (q *Queries) GetUsersSlotifyGroups(ctx context.Context, userID uint32) ([]SlotifyGroup, error) {
+	rows, err := q.query(ctx, q.getUsersSlotifyGroupsStmt, getUsersSlotifyGroups, userID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []Team{}
+	items := []SlotifyGroup{}
 	for rows.Next() {
-		var i Team
+		var i SlotifyGroup
 		if err := rows.Scan(&i.ID, &i.Name); err != nil {
 			return nil, err
 		}
@@ -405,20 +517,141 @@ func (q *Queries) GetUsersTeams(ctx context.Context, userID uint32) ([]Team, err
 	return items, nil
 }
 
-const listTeams = `-- name: ListTeams :many
-SELECT id, name FROM Team
-WHERE name = ifnull(?, name)
+const listInvitesByGroup = `-- name: ListInvitesByGroup :many
+SELECT 
+   i.id AS invite_id, i.message, i.status, i.created_at, i.expiry_date, fu.email AS from_user_email, fu.first_name AS from_user_first_name, fu.last_name AS from_user_last_name, tu.email AS to_user_email, tu.first_name AS to_user_first_name, tu.last_name AS to_user_last_name FROM Invite i
+JOIN User fu ON fu.id=i.from_user_id
+JOIN User tu ON tu.id=i.to_user_id
+WHERE i.status = ifnull(?, i.status) 
+AND i.slotify_group_id=?
 `
 
-func (q *Queries) ListTeams(ctx context.Context, name interface{}) ([]Team, error) {
-	rows, err := q.query(ctx, q.listTeamsStmt, listTeams, name)
+type ListInvitesByGroupParams struct {
+	Status         interface{} `json:"status"`
+	SlotifyGroupID uint32      `json:"slotifyGroupId"`
+}
+
+type ListInvitesByGroupRow struct {
+	InviteID          uint32       `json:"inviteId"`
+	Message           string       `json:"message"`
+	Status            InviteStatus `json:"status"`
+	CreatedAt         time.Time    `json:"createdAt"`
+	ExpiryDate        time.Time    `json:"expiryDate"`
+	FromUserEmail     string       `json:"fromUserEmail"`
+	FromUserFirstName string       `json:"fromUserFirstName"`
+	FromUserLastName  string       `json:"fromUserLastName"`
+	ToUserEmail       string       `json:"toUserEmail"`
+	ToUserFirstName   string       `json:"toUserFirstName"`
+	ToUserLastName    string       `json:"toUserLastName"`
+}
+
+func (q *Queries) ListInvitesByGroup(ctx context.Context, arg ListInvitesByGroupParams) ([]ListInvitesByGroupRow, error) {
+	rows, err := q.query(ctx, q.listInvitesByGroupStmt, listInvitesByGroup, arg.Status, arg.SlotifyGroupID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []Team{}
+	items := []ListInvitesByGroupRow{}
 	for rows.Next() {
-		var i Team
+		var i ListInvitesByGroupRow
+		if err := rows.Scan(
+			&i.InviteID,
+			&i.Message,
+			&i.Status,
+			&i.CreatedAt,
+			&i.ExpiryDate,
+			&i.FromUserEmail,
+			&i.FromUserFirstName,
+			&i.FromUserLastName,
+			&i.ToUserEmail,
+			&i.ToUserFirstName,
+			&i.ToUserLastName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listInvitesMe = `-- name: ListInvitesMe :many
+SELECT i.id AS invite_id, i.message, i.status,i.created_at, i.expiry_date, fu.email AS from_user_email, fu.first_name AS from_user_first_name, fu.last_name AS from_user_last_name, sg.name AS slotify_group_name FROM Invite i
+JOIN User fu ON fu.id=i.from_user_id
+JOIN SlotifyGroup sg ON sg.id=i.slotify_group_id
+WHERE i.status = ifnull(?, i.status) 
+AND i.to_user_id=?
+`
+
+type ListInvitesMeParams struct {
+	Status   interface{} `json:"status"`
+	ToUserID uint32      `json:"toUserId"`
+}
+
+type ListInvitesMeRow struct {
+	InviteID          uint32       `json:"inviteId"`
+	Message           string       `json:"message"`
+	Status            InviteStatus `json:"status"`
+	CreatedAt         time.Time    `json:"createdAt"`
+	ExpiryDate        time.Time    `json:"expiryDate"`
+	FromUserEmail     string       `json:"fromUserEmail"`
+	FromUserFirstName string       `json:"fromUserFirstName"`
+	FromUserLastName  string       `json:"fromUserLastName"`
+	SlotifyGroupName  string       `json:"slotifyGroupName"`
+}
+
+func (q *Queries) ListInvitesMe(ctx context.Context, arg ListInvitesMeParams) ([]ListInvitesMeRow, error) {
+	rows, err := q.query(ctx, q.listInvitesMeStmt, listInvitesMe, arg.Status, arg.ToUserID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListInvitesMeRow{}
+	for rows.Next() {
+		var i ListInvitesMeRow
+		if err := rows.Scan(
+			&i.InviteID,
+			&i.Message,
+			&i.Status,
+			&i.CreatedAt,
+			&i.ExpiryDate,
+			&i.FromUserEmail,
+			&i.FromUserFirstName,
+			&i.FromUserLastName,
+			&i.SlotifyGroupName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listSlotifyGroups = `-- name: ListSlotifyGroups :many
+SELECT id, name FROM SlotifyGroup
+WHERE name = ifnull(?, name)
+`
+
+func (q *Queries) ListSlotifyGroups(ctx context.Context, name interface{}) ([]SlotifyGroup, error) {
+	rows, err := q.query(ctx, q.listSlotifyGroupsStmt, listSlotifyGroups, name)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []SlotifyGroup{}
+	for rows.Next() {
+		var i SlotifyGroup
 		if err := rows.Scan(&i.ID, &i.Name); err != nil {
 			return nil, err
 		}
@@ -493,6 +726,74 @@ type MarkNotificationAsReadParams struct {
 
 func (q *Queries) MarkNotificationAsRead(ctx context.Context, arg MarkNotificationAsReadParams) (int64, error) {
 	result, err := q.exec(ctx, q.markNotificationAsReadStmt, markNotificationAsRead, arg.UserID, arg.NotificationID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const removeSlotifyGroup = `-- name: RemoveSlotifyGroup :execrows
+DELETE FROM SlotifyGroup
+WHERE id=?
+`
+
+func (q *Queries) RemoveSlotifyGroup(ctx context.Context, id uint32) (int64, error) {
+	result, err := q.exec(ctx, q.removeSlotifyGroupStmt, removeSlotifyGroup, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const removeSlotifyGroupMember = `-- name: RemoveSlotifyGroupMember :execrows
+DELETE FROM UserToSlotifyGroup
+WHERE user_id=? AND slotify_group_id=?
+`
+
+type RemoveSlotifyGroupMemberParams struct {
+	UserID         uint32 `json:"userId"`
+	SlotifyGroupID uint32 `json:"slotifyGroupId"`
+}
+
+func (q *Queries) RemoveSlotifyGroupMember(ctx context.Context, arg RemoveSlotifyGroupMemberParams) (int64, error) {
+	result, err := q.exec(ctx, q.removeSlotifyGroupMemberStmt, removeSlotifyGroupMember, arg.UserID, arg.SlotifyGroupID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const updateInviteMessage = `-- name: UpdateInviteMessage :execrows
+UPDATE Invite SET message=?
+WHERE id=? AND from_user_id=?
+`
+
+type UpdateInviteMessageParams struct {
+	Message    string `json:"message"`
+	ID         uint32 `json:"id"`
+	FromUserID uint32 `json:"fromUserId"`
+}
+
+func (q *Queries) UpdateInviteMessage(ctx context.Context, arg UpdateInviteMessageParams) (int64, error) {
+	result, err := q.exec(ctx, q.updateInviteMessageStmt, updateInviteMessage, arg.Message, arg.ID, arg.FromUserID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const updateInviteStatus = `-- name: UpdateInviteStatus :execrows
+UPDATE Invite SET status=?
+WHERE id=?
+`
+
+type UpdateInviteStatusParams struct {
+	Status InviteStatus `json:"status"`
+	ID     uint32       `json:"id"`
+}
+
+func (q *Queries) UpdateInviteStatus(ctx context.Context, arg UpdateInviteStatusParams) (int64, error) {
+	result, err := q.exec(ctx, q.updateInviteStatusStmt, updateInviteStatus, arg.Status, arg.ID)
 	if err != nil {
 		return 0, err
 	}

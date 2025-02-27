@@ -35,27 +35,27 @@ func GetCount(t *testing.T, db *sql.DB, table string) int {
 	return count
 }
 
-// GetTeamRows.
-func GetTeamRows(t *testing.T, db *sql.DB) api.Teams {
-	rows, err := db.Query("SELECT * FROM Team")
+// GetSlotifyGroupRows.
+func GetSlotifyGroupRows(t *testing.T, db *sql.DB) api.SlotifyGroups {
+	rows, err := db.Query("SELECT * FROM SlotifyGroup")
 	require.NoError(t, err, "unable to form query")
 	defer func() {
 		err = rows.Close()
 		require.NoError(t, err, "unable to close rows")
 	}()
 
-	var teams api.Teams
+	var slotifyGroups api.SlotifyGroups
 	for rows.Next() {
-		var team api.Team
-		err = rows.Scan(&team.Id, &team.Name)
+		var slotifyGroup api.SlotifyGroup
+		err = rows.Scan(&slotifyGroup.Id, &slotifyGroup.Name)
 		require.NoError(t, err, "unable to scan rows")
-		teams = append(teams, team)
+		slotifyGroups = append(slotifyGroups, slotifyGroup)
 	}
 
 	err = rows.Err()
 	require.NoError(t, err, "sql rows error")
 
-	return teams
+	return slotifyGroups
 }
 
 // GetNextAutoIncrementValue gets the next auto increment value for a table,
@@ -75,9 +75,9 @@ func GetNextAutoIncrementValue(t *testing.T, db *sql.DB, tableName string) int {
 	return nextAutoIncrement
 }
 
-func AddUserToTeam(t *testing.T, db *sql.DB, userID uint32, teamID uint32) {
-	res, err := db.Exec("INSERT INTO UserToTeam (user_id, team_id) VALUES (?, ?)", userID, teamID)
-	require.NoError(t, err, "failed to execute sql query to add user to team")
+func AddUserToSlotifyGroup(t *testing.T, db *sql.DB, userID uint32, slotifyGroupID uint32) {
+	res, err := db.Exec("INSERT INTO UserToSlotifyGroup (user_id, slotify_group_id) VALUES (?, ?)", userID, slotifyGroupID)
+	require.NoError(t, err, "failed to execute sql query to add user to slotifyGroup")
 
 	rows, err := res.RowsAffected()
 	require.NoError(t, err, "failed to get the number of rows affected")
@@ -85,11 +85,11 @@ func AddUserToTeam(t *testing.T, db *sql.DB, userID uint32, teamID uint32) {
 	require.Equal(t, int64(1), rows, "rows returned is not correct")
 }
 
-func InsertTeam(t *testing.T, db *sql.DB) api.Team {
+func InsertSlotifyGroup(t *testing.T, db *sql.DB) api.SlotifyGroup {
 	name := gofakeit.ProductName()
 
-	res, err := db.Exec("INSERT INTO Team (name) VALUES (?)", name)
-	require.NoError(t, err, "db insert team failed")
+	res, err := db.Exec("INSERT INTO SlotifyGroup (name) VALUES (?)", name)
+	require.NoError(t, err, "db insert slotifyGroup failed")
 
 	rows, err := res.RowsAffected()
 	require.Equal(t, int64(1), rows, "rows affected after insert is 1")
@@ -98,7 +98,7 @@ func InsertTeam(t *testing.T, db *sql.DB) api.Team {
 	id, err := res.LastInsertId()
 	require.NoError(t, err, "failed to get last insert id")
 
-	return api.Team{
+	return api.SlotifyGroup{
 		//nolint: gosec // id is unsigned 32 bit int
 		Id:   uint32(id),
 		Name: name,
