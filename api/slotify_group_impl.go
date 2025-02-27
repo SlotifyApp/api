@@ -323,7 +323,7 @@ func (s Server) GetAPISlotifyGroupsSlotifyGroupIDUsers(w http.ResponseWriter, r 
 	if count == 0 {
 		s.Logger.Error("slotifyGroup api: slotifyGroup members of non-existent slotifyGroup requested",
 			zap.Uint32("slotifyGroupID", slotifyGroupID), zap.Error(err))
-		sendError(w, http.StatusForbidden,
+		sendError(w, http.StatusNotFound,
 			fmt.Sprintf("slotifyGroup api: slotifyGroup with id(%d) does not exist", slotifyGroupID))
 		return
 	}

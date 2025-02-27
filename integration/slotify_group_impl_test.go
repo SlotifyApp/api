@@ -240,7 +240,7 @@ func TestSlotifyGroup_GetSlotifyGroupsSlotifyGroupIDUsers(t *testing.T) {
 	}{
 		"get members of a non-existing slotifyGroup": {
 			expectedRespBody: "slotifyGroup api: slotifyGroup with id(10000) does not exist",
-			httpStatus:       http.StatusForbidden,
+			httpStatus:       http.StatusNotFound,
 			slotifyGroupID:   10000,
 			testMsg:          "correct error returns when slotifyGroup doesn't exist",
 		},

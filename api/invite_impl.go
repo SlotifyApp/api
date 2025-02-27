@@ -201,7 +201,7 @@ func (s Server) PatchAPIInvitesInviteID(w http.ResponseWriter, r *http.Request, 
 	var invite database.Invite
 	if invite, err = s.DB.GetInviteByID(ctx, inviteID); err != nil {
 		s.Logger.Error("failed to get invite details from invite id", zap.Error(err))
-		sendError(w, http.StatusInternalServerError, "failed to get invite details for invite id")
+		sendError(w, http.StatusInternalServerError, "failed to get invite details from invite id")
 		return
 	}
 

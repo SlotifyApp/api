@@ -153,7 +153,7 @@ func (s Server) GetAPIUsersUserID(w http.ResponseWriter, r *http.Request, userID
 		case errors.Is(err, sql.ErrNoRows):
 			errMsg := fmt.Sprintf("user api: user with id(%d) doesn't exist", userID)
 			s.Logger.Error(errMsg, zap.Uint32("userID", userID), zap.Error(err))
-			sendError(w, http.StatusForbidden, errMsg)
+			sendError(w, http.StatusNotFound, errMsg)
 
 		default:
 			errMsg := fmt.Sprintf("user api: failed to get user with id(%d)", userID)
