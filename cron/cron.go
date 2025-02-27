@@ -1,4 +1,4 @@
-package api
+package cron
 
 import (
 	"context"
@@ -78,6 +78,7 @@ func removeWeekOldInvites(ctx context.Context, db *database.Database, l *logger.
 		}, retry.Attempts(5), retry.Delay(time.Second))
 		if err != nil {
 			l.Error("failed to batch delete week old invites AFTER 5 retries", zap.Error(err))
+			return
 		}
 
 		if err = tx.Commit(); err != nil {
@@ -119,6 +120,7 @@ func removeWeekOldNotifications(ctx context.Context, db *database.Database, l *l
 		}, retry.Attempts(5), retry.Delay(time.Second))
 		if err != nil {
 			l.Error("failed to batch delete week old notifications AFTER 5 retries", zap.Error(err))
+			return
 		}
 
 		if err = tx.Commit(); err != nil {
@@ -157,6 +159,7 @@ func expireInvites(ctx context.Context, db *database.Database, l *logger.Logger)
 		}, retry.Attempts(5), retry.Delay(time.Second))
 		if err != nil {
 			l.Error("failed to batch expire invites AFTER 5 retries", zap.Error(err))
+			return
 		}
 
 		if err = tx.Commit(); err != nil {
