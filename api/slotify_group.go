@@ -58,7 +58,7 @@ func AddUserToSlotifyGroup(p AddUserToSlotifyGroupParams) error {
 	}
 
 	allMemberNotif := database.CreateNotificationParams{
-		Message: fmt.Sprintf("Say hi to %s, he just joined SlotifyGroup %s", u.FirstName+" "+u.LastName, sg.Name),
+		Message: fmt.Sprintf("Say hi to %s, they just joined SlotifyGroup %s", u.FirstName+" "+u.LastName, sg.Name),
 		Created: time.Now(),
 	}
 
@@ -107,7 +107,7 @@ func sendLeaverNotifications(p sendLeaverNotificationsParams) error {
 			zap.Uint32("slotifyGroupID", slotifyGroupID),
 		)
 
-		return fmt.Errorf("failed to get slotify group members except new member: %w", err)
+		return fmt.Errorf("failed to get slotify group members except the leaving member: %w", err)
 	}
 
 	var u database.User

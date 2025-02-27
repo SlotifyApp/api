@@ -136,7 +136,7 @@ func validateAndUpdateInviteStatus(p validateAndUpdateInviteStatusParams) (datab
 		return database.Invite{}, errors.New("only the user the invite is sent to can edit the status")
 	}
 
-	if ok := validateInviteStatusTransition(InviteStatus(invite.Status), InviteStatusAccepted); !ok {
+	if ok := validateInviteStatusTransition(InviteStatus(invite.Status), p.newStatus); !ok {
 		return database.Invite{}, fmt.Errorf(
 			"invalid invite state transition, cannot go from %s to %s", invite.Status, p.newStatus,
 		)
@@ -147,7 +147,7 @@ func validateAndUpdateInviteStatus(p validateAndUpdateInviteStatusParams) (datab
 		rows, err = p.qtx.UpdateInviteStatus(p.ctx,
 			database.UpdateInviteStatusParams{
 				ID:     p.inviteID,
-				Status: database.InviteStatus(InviteStatusAccepted),
+				Status: database.InviteStatus(p.newStatus),
 			})
 
 		if rows != 1 {
