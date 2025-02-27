@@ -142,19 +142,6 @@ type EmptySuggestionsReason string
 // FreeBusyStatus Maps directly to [MSFT freebusyStatus](https://learn.microsoft.com/en-us/graph/api/resources/attendeeavailability?view=graph-rest-1.0)
 type FreeBusyStatus string
 
-// Group defines model for Group.
-type Group struct {
-	Id   uint32 `json:"id"`
-	Name string `json:"name"`
-}
-
-// GroupUser defines model for GroupUser.
-type GroupUser struct {
-	Email     openapi_types.Email `json:"email"`
-	FirstName string              `json:"firstName"`
-	LastName  string              `json:"lastName"`
-}
-
 // InviteCreate Invite create request body
 type InviteCreate struct {
 	CreatedAt      time.Time          `json:"createdAt"`
@@ -234,6 +221,19 @@ type LocationConstraintItem struct {
 	DisplayName          string          `json:"displayName"`
 	LocationEmailAddress *string         `json:"locationEmailAddress,omitempty"`
 	ResolveAvailability  bool            `json:"resolveAvailability"`
+}
+
+// MSFTGroup defines model for MSFTGroup.
+type MSFTGroup struct {
+	Id   uint32 `json:"id"`
+	Name string `json:"name"`
+}
+
+// MSFTGroupUser defines model for MSFTGroupUser.
+type MSFTGroupUser struct {
+	Email     openapi_types.Email `json:"email"`
+	FirstName string              `json:"firstName"`
+	LastName  string              `json:"lastName"`
 }
 
 // MeetingTimeSlot Maps directly to [MSFT meetingTimeSlot](https://learn.microsoft.com/en-us/graph/api/resources/timeslot?view=graph-rest-1.0)
@@ -357,12 +357,6 @@ type GetAPICalendarMeParams struct {
 	End   time.Time `form:"end" json:"end"`
 }
 
-// GetAPIGroupsParams defines parameters for GetAPIGroups.
-type GetAPIGroupsParams struct {
-	// Name Group name
-	Name *string `form:"name,omitempty" json:"name,omitempty"`
-}
-
 // GetAPIInvitesMeParams defines parameters for GetAPIInvitesMe.
 type GetAPIInvitesMeParams struct {
 	// Status Invite status
@@ -372,6 +366,12 @@ type GetAPIInvitesMeParams struct {
 // PatchAPIInvitesInviteIDJSONBody defines parameters for PatchAPIInvitesInviteID.
 type PatchAPIInvitesInviteIDJSONBody struct {
 	Message string `json:"message"`
+}
+
+// GetAPIMSFTGroupsParams defines parameters for GetAPIMSFTGroups.
+type GetAPIMSFTGroupsParams struct {
+	// Name Microsoft group name
+	Name *string `form:"name,omitempty" json:"name,omitempty"`
 }
 
 // GetAPISlotifyGroupsSlotifyGroupIDInvitesParams defines parameters for GetAPISlotifyGroupsSlotifyGroupIDInvites.
@@ -427,18 +427,6 @@ type ServerInterface interface {
 	// Subscribe to notifications eventstream.
 	// (GET /api/events)
 	RenderEvent(w http.ResponseWriter, r *http.Request)
-	// Get a group by query params.
-	// (GET /api/groups)
-	GetAPIGroups(w http.ResponseWriter, r *http.Request, params GetAPIGroupsParams)
-	// Get all groups for current user.
-	// (GET /api/groups/me)
-	GetAPIGroupsMe(w http.ResponseWriter, r *http.Request)
-	// Get a group by id.
-	// (GET /api/groups/{groupID})
-	GetAPIGroupsGroupID(w http.ResponseWriter, r *http.Request, groupID uint32)
-	// Get all members of a group.
-	// (GET /api/groups/{groupID}/users)
-	GetAPIGroupsGroupIDUsers(w http.ResponseWriter, r *http.Request, groupID uint32)
 	// Healthcheck route.
 	// (GET /api/healthcheck)
 	GetAPIHealthcheck(w http.ResponseWriter, r *http.Request)
@@ -472,6 +460,18 @@ type ServerInterface interface {
 	// Decline an invite
 	// (PATCH /api/invites/{inviteID}/decline)
 	PatchAPIInvitesInviteIDDecline(w http.ResponseWriter, r *http.Request, inviteID uint32)
+	// Get a Microsoft group by query params.
+	// (GET /api/msft-groups)
+	GetAPIMSFTGroups(w http.ResponseWriter, r *http.Request, params GetAPIMSFTGroupsParams)
+	// Get all Microsoft groups for current user.
+	// (GET /api/msft-groups/me)
+	GetAPIMSFTGroupsMe(w http.ResponseWriter, r *http.Request)
+	// Get a Microsoft group by id.
+	// (GET /api/msft-groups/{groupID})
+	GetAPIMSFTGroupsGroupID(w http.ResponseWriter, r *http.Request, groupID uint32)
+	// Get all members of a Microsoft group.
+	// (GET /api/msft-groups/{groupID}/users)
+	GetAPIMSFTGroupsGroupIDUsers(w http.ResponseWriter, r *http.Request, groupID uint32)
 	// Satisfy CORS preflight for marking a notification as read.
 	// (OPTIONS /api/notifications/{notificationID}/read)
 	OptionsAPINotificationsNotificationIDRead(w http.ResponseWriter, r *http.Request, notificationID uint32)
@@ -668,97 +668,6 @@ func (siw *ServerInterfaceWrapper) RenderEvent(w http.ResponseWriter, r *http.Re
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.RenderEvent(w, r)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// GetAPIGroups operation middleware
-func (siw *ServerInterfaceWrapper) GetAPIGroups(w http.ResponseWriter, r *http.Request) {
-
-	var err error
-
-	// Parameter object where we will unmarshal all parameters from the context
-	var params GetAPIGroupsParams
-
-	// ------------- Optional query parameter "name" -------------
-
-	err = runtime.BindQueryParameter("form", true, false, "name", r.URL.Query(), &params.Name)
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "name", Err: err})
-		return
-	}
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetAPIGroups(w, r, params)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// GetAPIGroupsMe operation middleware
-func (siw *ServerInterfaceWrapper) GetAPIGroupsMe(w http.ResponseWriter, r *http.Request) {
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetAPIGroupsMe(w, r)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// GetAPIGroupsGroupID operation middleware
-func (siw *ServerInterfaceWrapper) GetAPIGroupsGroupID(w http.ResponseWriter, r *http.Request) {
-
-	var err error
-
-	// ------------- Path parameter "groupID" -------------
-	var groupID uint32
-
-	err = runtime.BindStyledParameterWithOptions("simple", "groupID", mux.Vars(r)["groupID"], &groupID, runtime.BindStyledParameterOptions{Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "groupID", Err: err})
-		return
-	}
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetAPIGroupsGroupID(w, r, groupID)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// GetAPIGroupsGroupIDUsers operation middleware
-func (siw *ServerInterfaceWrapper) GetAPIGroupsGroupIDUsers(w http.ResponseWriter, r *http.Request) {
-
-	var err error
-
-	// ------------- Path parameter "groupID" -------------
-	var groupID uint32
-
-	err = runtime.BindStyledParameterWithOptions("simple", "groupID", mux.Vars(r)["groupID"], &groupID, runtime.BindStyledParameterOptions{Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "groupID", Err: err})
-		return
-	}
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetAPIGroupsGroupIDUsers(w, r, groupID)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1003,6 +912,97 @@ func (siw *ServerInterfaceWrapper) PatchAPIInvitesInviteIDDecline(w http.Respons
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.PatchAPIInvitesInviteIDDecline(w, r, inviteID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAPIMSFTGroups operation middleware
+func (siw *ServerInterfaceWrapper) GetAPIMSFTGroups(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetAPIMSFTGroupsParams
+
+	// ------------- Optional query parameter "name" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "name", r.URL.Query(), &params.Name)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "name", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAPIMSFTGroups(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAPIMSFTGroupsMe operation middleware
+func (siw *ServerInterfaceWrapper) GetAPIMSFTGroupsMe(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAPIMSFTGroupsMe(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAPIMSFTGroupsGroupID operation middleware
+func (siw *ServerInterfaceWrapper) GetAPIMSFTGroupsGroupID(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "groupID" -------------
+	var groupID uint32
+
+	err = runtime.BindStyledParameterWithOptions("simple", "groupID", mux.Vars(r)["groupID"], &groupID, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "groupID", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAPIMSFTGroupsGroupID(w, r, groupID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAPIMSFTGroupsGroupIDUsers operation middleware
+func (siw *ServerInterfaceWrapper) GetAPIMSFTGroupsGroupIDUsers(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "groupID" -------------
+	var groupID uint32
+
+	err = runtime.BindStyledParameterWithOptions("simple", "groupID", mux.Vars(r)["groupID"], &groupID, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "groupID", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAPIMSFTGroupsGroupIDUsers(w, r, groupID)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1526,14 +1526,6 @@ func HandlerWithOptions(si ServerInterface, options GorillaServerOptions) http.H
 
 	r.HandleFunc(options.BaseURL+"/api/events", wrapper.RenderEvent).Methods("GET")
 
-	r.HandleFunc(options.BaseURL+"/api/groups", wrapper.GetAPIGroups).Methods("GET")
-
-	r.HandleFunc(options.BaseURL+"/api/groups/me", wrapper.GetAPIGroupsMe).Methods("GET")
-
-	r.HandleFunc(options.BaseURL+"/api/groups/{groupID}", wrapper.GetAPIGroupsGroupID).Methods("GET")
-
-	r.HandleFunc(options.BaseURL+"/api/groups/{groupID}/users", wrapper.GetAPIGroupsGroupIDUsers).Methods("GET")
-
 	r.HandleFunc(options.BaseURL+"/api/healthcheck", wrapper.GetAPIHealthcheck).Methods("GET")
 
 	r.HandleFunc(options.BaseURL+"/api/invites", wrapper.OptionsAPIInvites).Methods("OPTIONS")
@@ -1555,6 +1547,14 @@ func HandlerWithOptions(si ServerInterface, options GorillaServerOptions) http.H
 	r.HandleFunc(options.BaseURL+"/api/invites/{inviteID}/decline", wrapper.OptionsAPIInvitesInviteIDDecline).Methods("OPTIONS")
 
 	r.HandleFunc(options.BaseURL+"/api/invites/{inviteID}/decline", wrapper.PatchAPIInvitesInviteIDDecline).Methods("PATCH")
+
+	r.HandleFunc(options.BaseURL+"/api/msft-groups", wrapper.GetAPIMSFTGroups).Methods("GET")
+
+	r.HandleFunc(options.BaseURL+"/api/msft-groups/me", wrapper.GetAPIMSFTGroupsMe).Methods("GET")
+
+	r.HandleFunc(options.BaseURL+"/api/msft-groups/{groupID}", wrapper.GetAPIMSFTGroupsGroupID).Methods("GET")
+
+	r.HandleFunc(options.BaseURL+"/api/msft-groups/{groupID}/users", wrapper.GetAPIMSFTGroupsGroupIDUsers).Methods("GET")
 
 	r.HandleFunc(options.BaseURL+"/api/notifications/{notificationID}/read", wrapper.OptionsAPINotificationsNotificationIDRead).Methods("OPTIONS")
 
@@ -1598,87 +1598,87 @@ func HandlerWithOptions(si ServerInterface, options GorillaServerOptions) http.H
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"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",
+	"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",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file

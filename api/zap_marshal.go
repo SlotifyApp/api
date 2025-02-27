@@ -84,7 +84,7 @@ func (paiBody PatchAPIInvitesInviteIDJSONRequestBody) MarshalLogObject(enc zapco
 	return nil
 }
 
-func (g GetAPIGroupsParams) MarshalLogObject(enc zapcore.ObjectEncoder) error {
+func (g GetAPIMSFTGroupsParams) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 	var name string
 	if g.Name != nil {
 		name = *g.Name
