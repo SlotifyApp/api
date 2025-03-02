@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"time"
 
@@ -26,7 +27,6 @@ func (s Server) PostAPISchedulingSlots(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var body SchedulingSlotsBodySchema
-	var err error
 	if err = json.NewDecoder(r.Body).Decode(&body); err != nil {
 		// TODO: Add zap log for body
 		logger.Error(ErrUnmarshalBody, zap.Error(err))

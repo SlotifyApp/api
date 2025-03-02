@@ -80,6 +80,7 @@ func TestSlotifyGroup_PostSlotifyGroups(t *testing.T) {
 			req.Header.Add("Content-Type", "application/json")
 
 			ctx := context.WithValue(req.Context(), api.UserIDCtxKey{}, user.Id)
+			ctx = context.WithValue(ctx, api.RequestIDCtxKey{}, uuid.NewString())
 			req = req.WithContext(ctx)
 
 			req.Header.Set(api.ReqHeader, uuid.NewString())
@@ -198,6 +199,8 @@ func TestSlotifyGroup_GetSlotifyGroupsSlotifyGroupID(t *testing.T) {
 
 			rr := httptest.NewRecorder()
 			req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/slotify-groups/%d", tt.slotifyGroupID), nil)
+			ctx := context.WithValue(req.Context(), api.RequestIDCtxKey{}, uuid.NewString())
+			req = req.WithContext(ctx)
 
 			req.Header.Set(api.ReqHeader, uuid.NewString())
 
@@ -335,6 +338,8 @@ func TestSlotifyGroup_GetAPISlotifyGroupsMe(t *testing.T) {
 			req := httptest.NewRequest(http.MethodGet, "/api/slotify-groups/me", nil)
 
 			ctx := context.WithValue(req.Context(), api.UserIDCtxKey{}, tt.userID)
+			ctx = context.WithValue(ctx, api.RequestIDCtxKey{}, uuid.NewString())
+
 			req = req.WithContext(ctx)
 
 			req.Header.Set(api.ReqHeader, uuid.NewString())

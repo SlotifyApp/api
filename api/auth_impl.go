@@ -17,7 +17,6 @@ func (s Server) PostAPIRefresh(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	refreshToken, ok := r.Context().Value(RefreshTokenCtxKey{}).(string)
-
 	if !ok {
 		s.Logger.Error("failed to parse refresh token from context value into string")
 		sendError(w, http.StatusUnauthorized, "failed to parse refresh token from context value into string")
