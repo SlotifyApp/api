@@ -19,7 +19,7 @@ func RemoveCookies(w http.ResponseWriter) {
 		Path:     "/",
 		HttpOnly: true,
 		// TODO: Change to true when https is configured
-		Secure: false,
+		Secure: true,
 	})
 	http.SetCookie(w, &http.Cookie{
 		Name:     "refresh_token",
@@ -27,7 +27,7 @@ func RemoveCookies(w http.ResponseWriter) {
 		MaxAge:   0, // Expire the cookie
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   false,
+		Secure:   true,
 	})
 }
 
@@ -38,7 +38,7 @@ func CreateCookies(w http.ResponseWriter, accessToken, refreshToken string) {
 		Value:    accessToken,
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   false,
+		Secure:   true,
 		SameSite: http.SameSiteLaxMode,
 		Expires:  time.Now().Add(time.Hour * AccessTokenCookieExpiryHours),
 	})
@@ -49,7 +49,7 @@ func CreateCookies(w http.ResponseWriter, accessToken, refreshToken string) {
 		Value:    refreshToken,         // Refresh token value
 		Path:     "/",                  // Make the cookie available for the entire site
 		HttpOnly: true,                 // Prevent client-side access to refresh token (mitigates XSS attacks)
-		Secure:   false,                // Use "Secure" flag for HTTPS-only cookies
+		Secure:   true,                 // Use "Secure" flag for HTTPS-only cookies
 		SameSite: http.SameSiteLaxMode, // Restrict cookie to first-party context
 		Expires:  time.Now().Add(time.Hour * RefreshTokenCookieExpiryHours),
 	})
