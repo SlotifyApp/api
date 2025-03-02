@@ -77,6 +77,7 @@ jobs:
             # Pull the Docker image from ECR
             IMAGE_TAG=${{ github.sha }}
             docker pull ${{ secrets.AWS_ECR_URL }}:$IMAGE_TAG-amd64
+            tmux kill-server
             docker-compose down
             echo "
               services:
@@ -99,6 +100,5 @@ jobs:
                     ACCESS_TOKEN_JWT_SECRET: ${{ secrets.ACCESS_TOKEN_JWT_SECRET }}
                     REFRESH_TOKEN_JWT_SECRET: ${{ secrets.REFRESH_TOKEN_JWT_SECRET }}
               " > docker-compose.yml
-
               # Run the container using Docker Compose
-              docker-compose up -d
+              tmux new-session -d "docker-compose up"

@@ -65,17 +65,15 @@ func AuthMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		log.Print("AuthMiddleware executed")
-
 		// Get access_token cookie.
 		accessTokenCookie, err := r.Cookie("access_token")
 		if err != nil {
-			log.Printf("failed to get access_token cookie: %s", err.Error())
+			log.Printf("error fetching access_token cookie: route: %s, err: %s", r.URL.Path, err.Error())
 			http.Error(w, "Missing or invalid token", http.StatusUnauthorized)
 			return
 		}
 		if accessTokenCookie == nil || accessTokenCookie.Value == "" {
-			log.Printf("cookie value of access token was not present")
+			log.Printf("access_token was nil/empty: route: %s", r.URL.Path)
 			http.Error(w, "Missing or invalid token", http.StatusUnauthorized)
 			return
 		}
@@ -87,12 +85,12 @@ func AuthMiddleware(next http.Handler) http.Handler {
 		// set refresh token in request context
 		refreshTokenCookie, err := r.Cookie("refresh_token")
 		if err != nil {
-			log.Printf("failed to get refresh_token cookie: %s", err.Error())
+			log.Printf("error fetching refresh_token cookie: route: %s, err: %s", r.URL.Path, err.Error())
 			http.Error(w, "Missing or invalid token", http.StatusUnauthorized)
 			return
 		}
 		if refreshTokenCookie == nil || refreshTokenCookie.Value == "" {
-			log.Printf("cookie value of refresh token was not present")
+			log.Printf("refresh_token was nil/empty: route: %s", r.URL.Path)
 			http.Error(w, "Missing or invalid token", http.StatusUnauthorized)
 			return
 		}
@@ -118,7 +116,6 @@ func JWTMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		log.Print("JWTMiddleware executed")
 		userID, err := jwt.GetUserIDFromReq(r)
 		if err != nil {
 			log.Print("failed to get userid from request access token")
