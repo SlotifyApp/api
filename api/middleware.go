@@ -21,7 +21,6 @@ const (
 
 // CORSMiddleware sets access control headers.
 func CORSMiddleware(next http.Handler) http.Handler {
-	log.Printf("In CorsMiddleware")
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		frontendURL, present := os.LookupEnv("FRONTEND_URL")
 		if !present {
