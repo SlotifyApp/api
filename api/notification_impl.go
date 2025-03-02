@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"net/http"
+	"os"
 
 	"github.com/SlotifyApp/slotify-backend/database"
 	"go.uber.org/zap"
@@ -17,9 +18,16 @@ func (s Server) RenderEvent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	frontendURL, present := os.LookupEnv("FRONTEND_URL")
+	if !present {
+		s.Logger.Error("failed to get FRONTEND_URL env var")
+		sendError(w, http.StatusInternalServerError, "Sorry, failed to get required env var")
+		return
+	}
+
 	w.Header().Set("Content-Type", "text/event-stream")
-	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000") // Allow frontend origin
-	w.Header().Set("Access-Control-Allow-Credentials", "true")             // Allow cookies to be sent
+	w.Header().Set("Access-Control-Allow-Origin", frontendURL) // Your frontend's origin
+	w.Header().Set("Access-Control-Allow-Credentials", "true") // Allow cookies to be sent
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
 
@@ -50,8 +58,14 @@ func (s Server) RenderEvent(w http.ResponseWriter, r *http.Request) {
 
 // (OPTIONS /api/notifications/{notificationID}/read).
 func (s Server) OptionsAPINotificationsNotificationIDRead(w http.ResponseWriter, _ *http.Request, _ uint32) {
+	frontendURL, present := os.LookupEnv("FRONTEND_URL")
+	if !present {
+		s.Logger.Error("failed to get FRONTEND_URL env var")
+		sendError(w, http.StatusInternalServerError, "Sorry, failed to get required env var")
+		return
+	}
 	// Set CORS headers
-	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")        // Your frontend's origin
+	w.Header().Set("Access-Control-Allow-Origin", frontendURL)                    // Your frontend's origin
 	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, OPTIONS")   // Allowed methods
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization") // Allowed headers
 	w.Header().Set("Access-Control-Allow-Credentials", "true")                    // Allow credentials (cookies, etc.)

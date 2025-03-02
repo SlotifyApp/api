@@ -176,10 +176,14 @@ func msftAuthoriseByCode(ctx context.Context,
 	msalClient *confidential.Client,
 	authCode string,
 ) (MSFTTokenResult, error) {
+	backendURL, present := os.LookupEnv("BACKEND_URL")
+	if !present {
+		return MSFTTokenResult{}, errors.New("failed to get BACKEND_URL env value")
+	}
 	// exchange authorisation code for access token
 	res, err := msalClient.AcquireTokenByAuthCode(ctx,
 		authCode,
-		"http://localhost:8080/api/auth/callback",
+		fmt.Sprintf("%s/api/auth/callback", backendURL),
 		getMSFTScopes(),
 	)
 	if err != nil {

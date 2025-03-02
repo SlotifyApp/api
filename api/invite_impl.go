@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/SlotifyApp/slotify-backend/database"
@@ -387,7 +388,14 @@ func (s Server) GetAPISlotifyGroupsSlotifyGroupIDInvites(w http.ResponseWriter,
 // (OPTIONS /api/invites).
 func (s Server) OptionsAPIInvites(w http.ResponseWriter, _ *http.Request) {
 	// Set CORS headers
-	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")        // Your frontend's origin
+	frontendURL, present := os.LookupEnv("FRONTEND_URL")
+	if !present {
+		sendError(w, http.StatusInternalServerError, "Sorry, failed to get required env var")
+		return
+	}
+
+	// Set CORS headers
+	w.Header().Set("Access-Control-Allow-Origin", frontendURL)                    // Your frontend's origin
 	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, OPTIONS")   // Allowed methods
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization") // Allowed headers
 	w.Header().Set("Access-Control-Allow-Credentials", "true")                    // Allow credentials (cookies, etc.)
@@ -399,7 +407,14 @@ func (s Server) OptionsAPIInvites(w http.ResponseWriter, _ *http.Request) {
 // (OPTIONS /api/invites/{inviteID}Satisfy CORS preflight for invites.)
 func (s Server) OptionsAPIInvitesInviteID(w http.ResponseWriter, _ *http.Request, _ uint32) {
 	// Set CORS headers
-	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")        // Your frontend's origin
+	frontendURL, present := os.LookupEnv("FRONTEND_URL")
+	if !present {
+		sendError(w, http.StatusInternalServerError, "Sorry, failed to get required env var")
+		return
+	}
+
+	// Set CORS headers
+	w.Header().Set("Access-Control-Allow-Origin", frontendURL)                    // Your frontend's origin
 	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, OPTIONS")   // Allowed methods
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization") // Allowed headers
 	w.Header().Set("Access-Control-Allow-Credentials", "true")                    // Allow credentials (cookies, etc.)
@@ -413,7 +428,14 @@ func (s Server) OptionsAPIInvitesInviteIDDecline(w http.ResponseWriter,
 	_ *http.Request, _ uint32,
 ) {
 	// Set CORS headers
-	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")        // Your frontend's origin
+	frontendURL, present := os.LookupEnv("FRONTEND_URL")
+	if !present {
+		sendError(w, http.StatusInternalServerError, "Sorry, failed to get required env var")
+		return
+	}
+
+	// Set CORS headers
+	w.Header().Set("Access-Control-Allow-Origin", frontendURL)                    // Your frontend's origin
 	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, OPTIONS")   // Allowed methods
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization") // Allowed headers
 	w.Header().Set("Access-Control-Allow-Credentials", "true")                    // Allow credentials (cookies, etc.)
@@ -427,7 +449,14 @@ func (s Server) OptionsAPIInvitesInviteIDAccept(w http.ResponseWriter,
 	_ *http.Request, _ uint32,
 ) {
 	// Set CORS headers
-	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")        // Your frontend's origin
+	frontendURL, present := os.LookupEnv("FRONTEND_URL")
+	if !present {
+		sendError(w, http.StatusInternalServerError, "Sorry, failed to get required env var")
+		return
+	}
+
+	// Set CORS headers
+	w.Header().Set("Access-Control-Allow-Origin", frontendURL)                    // Your frontend's origin
 	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, OPTIONS")   // Allowed methods
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization") // Allowed headers
 	w.Header().Set("Access-Control-Allow-Credentials", "true")                    // Allow credentials (cookies, etc.)

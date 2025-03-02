@@ -2,7 +2,9 @@ package api
 
 import (
 	"context"
+	"fmt"
 	"net/http"
+	"os"
 
 	"github.com/SlotifyApp/slotify-backend/database"
 	"github.com/SlotifyApp/slotify-backend/jwt"
@@ -111,5 +113,12 @@ func (s Server) GetAPIAuthCallback(w http.ResponseWriter, r *http.Request, param
 
 	CreateCookies(w, tks.AccessToken, tks.RefreshToken)
 
-	http.Redirect(w, r, "http://localhost:3000/dashboard", http.StatusFound)
+	frontendURL, present := os.LookupEnv("FRONTEND_URL")
+	if !present {
+		s.Logger.Error("failed to get FRONTEND_URL value")
+		sendError(w, http.StatusInternalServerError, "Sorry, failed to get required env var")
+		return
+	}
+
+	http.Redirect(w, r, fmt.Sprintf("%s/dashboard", frontendURL), http.StatusFound)
 }

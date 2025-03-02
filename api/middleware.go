@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/SlotifyApp/slotify-backend/jwt"
@@ -22,8 +23,15 @@ const (
 func CORSMiddleware(next http.Handler) http.Handler {
 	log.Printf("In CorsMiddleware")
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000") // Allow frontend origin
-		w.Header().Set("Access-Control-Allow-Credentials", "true")             // Allow cookies to be sent
+		frontendURL, present := os.LookupEnv("FRONTEND_URL")
+		if !present {
+			sendError(w, http.StatusInternalServerError, "Sorry, failed to get required env var")
+			return
+		}
+
+		// Set CORS headers
+		w.Header().Set("Access-Control-Allow-Origin", frontendURL) // Your frontend's origin
+		w.Header().Set("Access-Control-Allow-Credentials", "true") // Allow cookies to be sent
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, DELETE, UPDATE, PATCH, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 
