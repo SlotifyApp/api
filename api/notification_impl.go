@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"net/http"
+	"os"
 
 	"github.com/SlotifyApp/slotify-backend/database"
 	"go.uber.org/zap"
@@ -17,6 +18,13 @@ func (s Server) RenderEvent(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		logger.Error("failed to get userid from request context")
 		sendError(w, http.StatusUnauthorized, "Try again later.")
+		return
+	}
+
+	frontendURL, present := os.LookupEnv("FRONTEND_URL")
+	if !present {
+		s.Logger.Error("failed to get FRONTEND_URL env var")
+		sendError(w, http.StatusInternalServerError, "Sorry, failed to get required env var")
 		return
 	}
 
