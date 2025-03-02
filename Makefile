@@ -1,5 +1,5 @@
 build_image:
-	docker compose -f ./shared/docker/compose.prod.yml build
+	docker build -f ./shared/docker/api.Dockerfile -t slotify-api .
 
 db_shell:
 	# After 'make run', this will give you a shell to the mariadb
