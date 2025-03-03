@@ -56,24 +56,6 @@ func (s Server) RenderEvent(w http.ResponseWriter, r *http.Request) {
 	s.NotificationService.DeleteUserConn(s.Logger, userID, w)
 }
 
-// (OPTIONS /api/notifications/{notificationID}/read).
-func (s Server) OptionsAPINotificationsNotificationIDRead(w http.ResponseWriter, _ *http.Request, _ uint32) {
-	frontendURL, present := os.LookupEnv("FRONTEND_URL")
-	if !present {
-		s.Logger.Error("failed to get FRONTEND_URL env var")
-		sendError(w, http.StatusInternalServerError, "Sorry, failed to get required env var")
-		return
-	}
-	// Set CORS headers
-	w.Header().Set("Access-Control-Allow-Origin", frontendURL)                    // Your frontend's origin
-	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, OPTIONS")   // Allowed methods
-	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization") // Allowed headers
-	w.Header().Set("Access-Control-Allow-Credentials", "true")                    // Allow credentials (cookies, etc.)
-
-	// Send a 204 No Content response to indicate that the preflight request was successful
-	w.WriteHeader(http.StatusNoContent)
-}
-
 // (PATCH /api/notifications/{notificationID}/read). Mark notifications as being read.
 func (s Server) PatchAPINotificationsNotificationIDRead(w http.ResponseWriter, r *http.Request, notificationID uint32) {
 	ctx, cancel := context.WithTimeout(r.Context(), database.DatabaseTimeout)

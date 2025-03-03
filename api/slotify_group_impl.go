@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"os"
 
 	"github.com/SlotifyApp/slotify-backend/database"
 	"go.uber.org/zap"
@@ -341,22 +340,4 @@ func (s Server) GetAPISlotifyGroupsSlotifyGroupIDUsers(w http.ResponseWriter, r 
 	}
 
 	SetHeaderAndWriteResponse(w, http.StatusOK, users)
-}
-
-// (OPTIONS /api/slotify-groups).
-func (s Server) OptionsAPISlotifyGroups(w http.ResponseWriter, _ *http.Request) {
-	frontendURL, present := os.LookupEnv("FRONTEND_URL")
-	if !present {
-		s.Logger.Error("failed to get FRONTEND_URL env var")
-		sendError(w, http.StatusInternalServerError, "Sorry, failed to get required env var")
-		return
-	}
-	// Set CORS headers
-	w.Header().Set("Access-Control-Allow-Origin", frontendURL)                    // Your frontend's origin
-	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, OPTIONS")   // Allowed methods
-	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization") // Allowed headers
-	w.Header().Set("Access-Control-Allow-Credentials", "true")                    // Allow credentials (cookies, etc.)
-
-	// Send a 204 No Content response to indicate that the preflight request was successful
-	w.WriteHeader(http.StatusNoContent)
 }

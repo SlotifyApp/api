@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"os"
 	"time"
 
 	"github.com/SlotifyApp/slotify-backend/database"
@@ -101,22 +100,4 @@ func (s Server) PostAPICalendarMe(w http.ResponseWriter, r *http.Request) {
 	}
 
 	SetHeaderAndWriteResponse(w, http.StatusCreated, events)
-}
-
-func (s Server) OptionsAPICalendarMe(w http.ResponseWriter, _ *http.Request) {
-	// Set CORS headers
-	frontendURL, present := os.LookupEnv("FRONTEND_URL")
-	if !present {
-		s.Logger.Error("failed to get FRONTEND_URL env var")
-		sendError(w, http.StatusInternalServerError, "Sorry, failed to get required env var")
-		return
-	}
-
-	w.Header().Set("Access-Control-Allow-Origin", frontendURL)                    // Your frontend's origin
-	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")          // Allowed methods
-	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization") // Allowed headers
-	w.Header().Set("Access-Control-Allow-Credentials", "true")                    // Allow credentials (cookies, etc.)
-
-	// Send a 204 No Content response to indicate that the preflight request was successful
-	w.WriteHeader(http.StatusNoContent)
 }

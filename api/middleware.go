@@ -4,7 +4,6 @@ import (
 	"context"
 	"log"
 	"net/http"
-	"os"
 	"time"
 
 	"github.com/SlotifyApp/slotify-backend/jwt"
@@ -18,30 +17,6 @@ import (
 const (
 	requestLimit = 100
 )
-
-// CORSMiddleware sets access control headers.
-func CORSMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		frontendURL, present := os.LookupEnv("FRONTEND_URL")
-		if !present {
-			sendError(w, http.StatusInternalServerError, "Sorry, failed to get required env var")
-			return
-		}
-
-		// Set CORS headers
-		w.Header().Set("Access-Control-Allow-Origin", frontendURL) // Your frontend's origin
-		w.Header().Set("Access-Control-Allow-Credentials", "true") // Allow cookies to be sent
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, DELETE, UPDATE, PATCH, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
-
-		if r.Method == http.MethodOptions {
-			w.WriteHeader(http.StatusNoContent)
-			return
-		}
-
-		next.ServeHTTP(w, r)
-	})
-}
 
 // RefreshTokenCtxKey is the key in context value for the refresh token value.
 type RefreshTokenCtxKey struct{}
@@ -133,7 +108,6 @@ func JWTMiddleware(next http.Handler) http.Handler {
 // ApplyMiddlewares applies all the middleware functions for the server.
 func ApplyMiddlewares(r *mux.Router, swagger *openapi3.T) {
 	middlewares := []mux.MiddlewareFunc{
-		CORSMiddleware,
 		AuthMiddleware,
 
 		// makes sure that requests and responses follow openapischema

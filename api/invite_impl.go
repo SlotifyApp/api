@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"os"
 	"time"
 
 	"github.com/SlotifyApp/slotify-backend/database"
@@ -383,84 +382,4 @@ func (s Server) GetAPISlotifyGroupsSlotifyGroupIDInvites(w http.ResponseWriter,
 	}
 
 	SetHeaderAndWriteResponse(w, http.StatusOK, invites)
-}
-
-// (OPTIONS /api/invites).
-func (s Server) OptionsAPIInvites(w http.ResponseWriter, _ *http.Request) {
-	// Set CORS headers
-	frontendURL, present := os.LookupEnv("FRONTEND_URL")
-	if !present {
-		sendError(w, http.StatusInternalServerError, "Sorry, failed to get required env var")
-		return
-	}
-
-	// Set CORS headers
-	w.Header().Set("Access-Control-Allow-Origin", frontendURL)                    // Your frontend's origin
-	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, OPTIONS")   // Allowed methods
-	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization") // Allowed headers
-	w.Header().Set("Access-Control-Allow-Credentials", "true")                    // Allow credentials (cookies, etc.)
-
-	// Send a 204 No Content response to indicate that the preflight request was successful
-	w.WriteHeader(http.StatusNoContent)
-}
-
-// (OPTIONS /api/invites/{inviteID}Satisfy CORS preflight for invites.)
-func (s Server) OptionsAPIInvitesInviteID(w http.ResponseWriter, _ *http.Request, _ uint32) {
-	// Set CORS headers
-	frontendURL, present := os.LookupEnv("FRONTEND_URL")
-	if !present {
-		sendError(w, http.StatusInternalServerError, "Sorry, failed to get required env var")
-		return
-	}
-
-	// Set CORS headers
-	w.Header().Set("Access-Control-Allow-Origin", frontendURL)                    // Your frontend's origin
-	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, OPTIONS")   // Allowed methods
-	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization") // Allowed headers
-	w.Header().Set("Access-Control-Allow-Credentials", "true")                    // Allow credentials (cookies, etc.)
-
-	// Send a 204 No Content response to indicate that the preflight request was successful
-	w.WriteHeader(http.StatusNoContent)
-}
-
-// (OPTIONS /api/invites/{inviteID}/decline Satisfy CORS preflight for declining invites.)
-func (s Server) OptionsAPIInvitesInviteIDDecline(w http.ResponseWriter,
-	_ *http.Request, _ uint32,
-) {
-	// Set CORS headers
-	frontendURL, present := os.LookupEnv("FRONTEND_URL")
-	if !present {
-		sendError(w, http.StatusInternalServerError, "Sorry, failed to get required env var")
-		return
-	}
-
-	// Set CORS headers
-	w.Header().Set("Access-Control-Allow-Origin", frontendURL)                    // Your frontend's origin
-	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, OPTIONS")   // Allowed methods
-	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization") // Allowed headers
-	w.Header().Set("Access-Control-Allow-Credentials", "true")                    // Allow credentials (cookies, etc.)
-
-	// Send a 204 No Content response to indicate that the preflight request was successful
-	w.WriteHeader(http.StatusNoContent)
-}
-
-// (OPTIONS /api/invites/{inviteID}/accept Satisfy CORS preflight for declining invites.)
-func (s Server) OptionsAPIInvitesInviteIDAccept(w http.ResponseWriter,
-	_ *http.Request, _ uint32,
-) {
-	// Set CORS headers
-	frontendURL, present := os.LookupEnv("FRONTEND_URL")
-	if !present {
-		sendError(w, http.StatusInternalServerError, "Sorry, failed to get required env var")
-		return
-	}
-
-	// Set CORS headers
-	w.Header().Set("Access-Control-Allow-Origin", frontendURL)                    // Your frontend's origin
-	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, OPTIONS")   // Allowed methods
-	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization") // Allowed headers
-	w.Header().Set("Access-Control-Allow-Credentials", "true")                    // Allow credentials (cookies, etc.)
-
-	// Send a 204 No Content response to indicate that the preflight request was successful
-	w.WriteHeader(http.StatusNoContent)
 }
