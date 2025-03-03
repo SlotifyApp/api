@@ -8,6 +8,7 @@ on:
 permissions:
   id-token: write # This is required for requesting the JWT
   contents: read
+
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
@@ -24,22 +25,6 @@ jobs:
         run: |
           sudo apt-get update -y
           sudo apt-get install -y make
-
-      # Step 4: Set up environment variables from GitHub Secrets
-      - name: Set up environment variables
-        run: |
-          echo "DB_HOST=${{ secrets.DB_HOST }}" >> $GITHUB_ENV
-          echo "DB_PORT=${{ secrets.DB_PORT }}" >> $GITHUB_ENV
-          echo "DB_USERNAME=${{ secrets.DB_USERNAME }}" >> $GITHUB_ENV
-          echo "DB_PASSWORD=${{ secrets.DB_PASSWORD }}" >> $GITHUB_ENV
-          echo "DB_NAME=${{ secrets.DB_NAME }}" >> $GITHUB_ENV
-          echo "BACKEND_URL=${{ secrets.BACKEND_URL }}" >> $GITHUB_ENV
-          echo "FRONTEND_URL=${{ secrets.FRONTEND_URL }}" >> $GITHUB_ENV
-          echo "MICROSOFT_TENANT_ID=${{ secrets.MICROSOFT_TENANT_ID }}" >> $GITHUB_ENV
-          echo "MICROSOFT_CLIENT_ID=${{ secrets.MICROSOFT_CLIENT_ID }}" >> $GITHUB_ENV
-          echo "MICROSOFT_CLIENT_SECRET=${{ secrets.MICROSOFT_CLIENT_SECRET }}" >> $GITHUB_ENV
-          echo "ACCESS_TOKEN_JWT_SECRET=${{ secrets.ACCESS_TOKEN_JWT_SECRET }}" >> $GITHUB_ENV
-          echo "REFRESH_TOKEN_JWT_SECRET=${{ secrets.REFRESH_TOKEN_JWT_SECRET }}" >> $GITHUB_ENV
 
       - name: Build Docker image for amd64 using Make
         run: |
@@ -58,6 +43,32 @@ jobs:
         run: |
           aws ecr get-login-password --region eu-west-2 | docker login --username AWS --password-stdin ${{ secrets.AWS_ECR_URL }}
 
+      - name: scp move the docker compose, .env and nginx conf
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.AWS_EC2_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.AWS_EC2_HOST }} >> ~/.ssh/known_hosts
+          DOCKER_ENV_FILE="./docker-env"
+          echo "DB_HOST=${{ secrets.DB_HOST }}" >> $DOCKER_ENV_FILE
+          echo "DB_PORT=${{ secrets.DB_PORT }}" >> $DOCKER_ENV_FILE
+          echo "DB_USERNAME=${{ secrets.DB_USERNAME }}" >> $DOCKER_ENV_FILE
+          echo "DB_PASSWORD=${{ secrets.DB_PASSWORD }}" >> $DOCKER_ENV_FILE
+          echo "DB_NAME=${{ secrets.DB_NAME }}" >> $DOCKER_ENV_FILE
+          echo "AWS_ECR_URL=${{ secrets.AWS_ECR_URL }}" >> $DOCKER_ENV_FILE
+          echo "IMAGE_TAG=${{ github.sha }}" >> $DOCKER_ENV_FILE
+          echo "BACKEND_URL=${{ secrets.BACKEND_URL }}" >> $DOCKER_ENV_FILE
+          echo "FRONTEND_URL=${{ secrets.FRONTEND_URL }}" >> $DOCKER_ENV_FILE
+          echo "MICROSOFT_TENANT_ID=${{ secrets.MICROSOFT_TENANT_ID }}" >> $DOCKER_ENV_FILE
+          echo "MICROSOFT_CLIENT_ID=${{ secrets.MICROSOFT_CLIENT_ID }}" >> $DOCKER_ENV_FILE
+          echo "MICROSOFT_CLIENT_SECRET=${{ secrets.MICROSOFT_CLIENT_SECRET }}" >> $DOCKER_ENV_FILE
+          echo "ACCESS_TOKEN_JWT_SECRET=${{ secrets.ACCESS_TOKEN_JWT_SECRET }}" >> $DOCKER_ENV_FILE
+          echo "REFRESH_TOKEN_JWT_SECRET=${{ secrets.REFRESH_TOKEN_JWT_SECRET }}" >> $DOCKER_ENV_FILE
+          echo "NGINX_CONF_PATH=/home/ec2-user/nginx.conf" >> $DOCKER_ENV_FILE
+          scp -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no $DOCKER_ENV_FILE ec2-user@${{ secrets.AWS_EC2_HOST }}:/home/ec2-user/.env
+          scp -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no ./shared/docker/compose.prod.yml ec2-user@${{ secrets.AWS_EC2_HOST }}:/home/ec2-user/docker-compose.yml
+          scp -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no ./shared/nginx/prod.nginx.conf ec2-user@${{ secrets.AWS_EC2_HOST }}:/home/ec2-user/nginx.conf
+
       # Step 8: Tag Docker image and push to ECR
       - name: Tag Docker image and push to ECR
         run: |
@@ -73,7 +84,6 @@ jobs:
           username: ec2-user
           key: ${{ secrets.AWS_EC2_KEY }} # EC2 SSH private key
           script: |
-
             # Remove all images
             docker rmi $(docker images -q)
             # Pull the Docker image from ECR
@@ -82,26 +92,5 @@ jobs:
             docker pull ${{ secrets.AWS_ECR_URL }}:$IMAGE_TAG-amd64
             tmux kill-server || true
             docker-compose down
-            echo "
-              services:
-                api:
-                  image: ${{ secrets.AWS_ECR_URL }}:$IMAGE_TAG-amd64
-                  container_name: slotify-api-container
-                  ports:
-                    - '80:8080'
-                  environment:
-                    BACKEND_URL: ${{ secrets.BACKEND_URL }}
-                    FRONTEND_URL: ${{ secrets.FRONTEND_URL }}
-                    DB_HOST: ${{ secrets.DB_HOST }}
-                    DB_PORT: ${{ secrets.DB_PORT }}
-                    DB_USERNAME: ${{ secrets.DB_USERNAME }}
-                    DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
-                    DB_NAME: ${{ secrets.DB_NAME }}
-                    MICROSOFT_TENANT_ID: ${{ secrets.MICROSOFT_TENANT_ID }}
-                    MICROSOFT_CLIENT_ID: ${{ secrets.MICROSOFT_CLIENT_ID }}
-                    MICROSOFT_CLIENT_SECRET: ${{ secrets.MICROSOFT_CLIENT_SECRET }}
-                    ACCESS_TOKEN_JWT_SECRET: ${{ secrets.ACCESS_TOKEN_JWT_SECRET }}
-                    REFRESH_TOKEN_JWT_SECRET: ${{ secrets.REFRESH_TOKEN_JWT_SECRET }}
-              " > docker-compose.yml
-              # Run the container using Docker Compose
-              tmux new-session -d "docker-compose up"
+            # Run the container using Docker Compose
+            tmux new-session -d "docker-compose up"
