@@ -42,7 +42,8 @@ func AuthMiddleware(next http.Handler) http.Handler {
 		// Get access_token cookie.
 		accessTokenCookie, err := r.Cookie("access_token")
 		if err != nil {
-			log.Printf("error fetching access_token cookie: route: %s, err: %s", r.URL.Path, err.Error())
+			reqUUID := ReadReqUUID(r)
+			log.Printf("error fetching access_token cookie: route: %s, err: %s, ID: %s", r.URL.Path, err.Error(), reqUUID)
 			http.Error(w, "Missing or invalid token", http.StatusUnauthorized)
 			return
 		}
