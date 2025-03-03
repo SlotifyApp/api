@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"os"
 
 	"github.com/SlotifyApp/slotify-backend/database"
 	"go.uber.org/zap"
