@@ -73,11 +73,14 @@ jobs:
           username: ec2-user
           key: ${{ secrets.AWS_EC2_KEY }} # EC2 SSH private key
           script: |
-            aws ecr get-login-password --region eu-west-2 | sudo docker login --username AWS --password-stdin ${{ secrets.AWS_ECR_URL }}
+
+            # Remove all images
+            docker rmi $(docker images -q)
             # Pull the Docker image from ECR
             IMAGE_TAG=${{ github.sha }}
+            aws ecr get-login-password --region eu-west-2 | docker login --username AWS --password-stdin ${{ secrets.AWS_ECR_URL }}
             docker pull ${{ secrets.AWS_ECR_URL }}:$IMAGE_TAG-amd64
-            tmux kill-server
+            tmux kill-server || true
             docker-compose down
             echo "
               services:
