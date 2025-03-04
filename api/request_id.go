@@ -18,7 +18,7 @@ func WriteReqUUID(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(writer http.ResponseWriter, req *http.Request) {
 		reqUUID := uuid.New().String()
 		ctx := context.WithValue(req.Context(), ReqUUIDKey, reqUUID)
-		writer.Header().Set(string(ReqHeader), reqUUID)
+		writer.Header().Set(ReqHeader, reqUUID)
 		next.ServeHTTP(writer, req.WithContext(ctx))
 	})
 }
@@ -26,7 +26,6 @@ func WriteReqUUID(next http.Handler) http.Handler {
 func ReadReqUUID(req *http.Request) string {
 	if reqUUID, ok := req.Context().Value(ReqUUIDKey).(string); ok {
 		return reqUUID
-	} else {
-		return ""
 	}
+	return "Error fetching ID of Request!"
 }
