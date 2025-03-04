@@ -153,7 +153,19 @@ func (q *Queries) CountUserByID(ctx context.Context, id uint32) (int64, error) {
 	return count, err
 }
 
-const createInvite = `-- name: CreateInvite :execrows
+const countWeekOldInvites = `-- name: CountWeekOldInvites :one
+SELECT COUNT(*) FROM Invite
+WHERE created_at + INTERVAL 1 WEEK <= CURDATE()
+`
+
+func (q *Queries) CountWeekOldInvites(ctx context.Context) (int64, error) {
+	row := q.queryRow(ctx, q.countWeekOldInvitesStmt, countWeekOldInvites)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const createInvite = `-- name: CreateInvite :execlastid
 INSERT INTO Invite (slotify_group_id, from_user_id, to_user_id, message, expiry_date, created_at)
 VALUES(?, ?, ?, ?, ?, ?)
 `
@@ -179,7 +191,7 @@ func (q *Queries) CreateInvite(ctx context.Context, arg CreateInviteParams) (int
 	if err != nil {
 		return 0, err
 	}
-	return result.RowsAffected()
+	return result.LastInsertId()
 }
 
 const createNotification = `-- name: CreateNotification :execlastid

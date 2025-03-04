@@ -3,7 +3,6 @@ package api
 import (
 	"context"
 	"net/http"
-	"os"
 
 	"github.com/SlotifyApp/slotify-backend/database"
 	"go.uber.org/zap"
@@ -18,16 +17,7 @@ func (s Server) RenderEvent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	frontendURL, present := os.LookupEnv("FRONTEND_URL")
-	if !present {
-		s.Logger.Error("failed to get FRONTEND_URL env var")
-		sendError(w, http.StatusInternalServerError, "Sorry, failed to get required env var")
-		return
-	}
-
 	w.Header().Set("Content-Type", "text/event-stream")
-	w.Header().Set("Access-Control-Allow-Origin", frontendURL) // Your frontend's origin
-	w.Header().Set("Access-Control-Allow-Credentials", "true") // Allow cookies to be sent
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
 
