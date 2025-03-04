@@ -65,6 +65,14 @@ func GetWeekOldInviteCount(t *testing.T, ctx context.Context, db *database.Datab
 }
 
 // GetCount gets the row count of a given SQL table.
+func GetWeekOldInviteCount(t *testing.T, ctx context.Context, db *database.Database) int {
+	count, err := db.CountWeekOldInvites(ctx)
+	require.NoError(t, err, "unable to query row")
+
+	return int(count)
+}
+
+// GetCount gets the row count of a given SQL table.
 func GetCount(t *testing.T, db *sql.DB, table string) int {
 	//nolint: gosec //This is a test helper, not used in actual production.
 	query := fmt.Sprintf("SELECT COUNT(*) FROM %s", table)
