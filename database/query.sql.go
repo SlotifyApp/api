@@ -42,8 +42,8 @@ func (q *Queries) AddUserToSlotifyGroup(ctx context.Context, arg AddUserToSlotif
 
 const batchDeleteWeekOldInvites = `-- name: BatchDeleteWeekOldInvites :execrows
 DELETE FROM Invite
-WHERE created_at + INTERVAL 1 WEEK <= CURDATE()
-  AND id >= (SELECT MIN(id) FROM Invite WHERE created_at + INTERVAL 1 WEEK <= CURDATE())
+WHERE created_at <= CURDATE() - INTERVAL 1 WEEK
+  AND id >= (SELECT MIN(id) FROM Invite WHERE DATE(created_at) <= CURDATE() - INTERVAL 1 WEEK)
 ORDER BY id
 LIMIT ?
 `
@@ -155,7 +155,7 @@ func (q *Queries) CountUserByID(ctx context.Context, id uint32) (int64, error) {
 
 const countWeekOldInvites = `-- name: CountWeekOldInvites :one
 SELECT COUNT(*) FROM Invite
-WHERE created_at + INTERVAL 1 WEEK <= CURDATE()
+WHERE DATE(created_at) <= CURDATE() - INTERVAL 1 WEEK
 `
 
 func (q *Queries) CountWeekOldInvites(ctx context.Context) (int64, error) {

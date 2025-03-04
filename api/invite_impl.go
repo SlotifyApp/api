@@ -10,6 +10,7 @@ import (
 
 	"github.com/SlotifyApp/slotify-backend/database"
 	"github.com/avast/retry-go"
+	openapi_types "github.com/oapi-codegen/runtime/types"
 	"go.uber.org/zap"
 )
 
@@ -41,24 +42,30 @@ func (s Server) PostAPIInvites(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var u database.User
-	if u, err = s.DB.GetUserByID(ctx, invitesCreateBody.ToUserID); err != nil {
+	if u, err = s.DB.GetUserByID(ctx, userID); err != nil {
+		s.Logger.Errorf("invite api: failed to get user by id", zap.Error(err))
+		sendError(w, http.StatusBadRequest, "failed to get user by id")
+		return
+	}
+
+	var toUser database.User
+	if toUser, err = s.DB.GetUserByID(ctx, invitesCreateBody.ToUserID); err != nil {
 		s.Logger.Errorf("invite api: failed to get user by id", zap.Error(err))
 		sendError(w, http.StatusBadRequest, "failed to get user by id")
 		return
 	}
 
 	// check if fromUser is in group and check if toUser is in group
-	err = checkIfUsersInGroup(checkIfUsersInGroupParams{
+	if err = checkIfUsersInGroup(checkIfUsersInGroupParams{
 		ctx:              ctx,
 		db:               s.DB,
 		fromUserID:       userID,
-		toUserFirstName:  u.FirstName,
-		toUserLastName:   u.LastName,
+		toUserFirstName:  toUser.FirstName,
+		toUserLastName:   toUser.LastName,
 		slotifyGroupID:   invitesCreateBody.SlotifyGroupID,
 		slotifyGroupName: g.Name,
 		toUserID:         invitesCreateBody.ToUserID,
-	})
-	if err != nil {
+	}); err != nil {
 		s.Logger.Errorf("invite api: ", zap.Error(err))
 		sendError(w, http.StatusBadRequest, err.Error())
 		return
@@ -73,8 +80,12 @@ func (s Server) PostAPIInvites(w http.ResponseWriter, r *http.Request) {
 		CreatedAt:      invitesCreateBody.CreatedAt,
 	}
 
+	var inviteID int64
 	err = retry.Do(func() error {
-		return database.CreateInviteWrapper(ctx, s.DB, params)
+		if inviteID, err = s.DB.CreateInvite(ctx, params); err != nil {
+			return fmt.Errorf("failed to create invite: %w", err)
+		}
+		return nil
 	}, retry.Attempts(3), retry.Delay(time.Millisecond*500))
 	if err != nil {
 		s.Logger.Error("failed to create invite", zap.Error(err))
@@ -90,11 +101,22 @@ func (s Server) PostAPIInvites(w http.ResponseWriter, r *http.Request) {
 		logger:          s.Logger,
 		db:              s.DB,
 		groupName:       g.Name,
-		toUserFirstName: u.FirstName,
-		toUserLastName:  u.LastName,
+		toUserFirstName: toUser.FirstName,
+		toUserLastName:  toUser.LastName,
 	})
 
-	SetHeaderAndWriteResponse(w, http.StatusCreated, "Successfully created invite")
+	createdInvite := InvitesGroup{
+		CreatedAt:         invitesCreateBody.CreatedAt,
+		ExpiryDate:        openapi_types.Date{Time: invitesCreateBody.ExpiryDate.Time},
+		FromUserEmail:     openapi_types.Email(u.Email),
+		FromUserFirstName: u.FirstName, FromUserLastName: u.LastName,
+		//nolint: gosec // id is unsigned 32 bit int
+		InviteID: uint32(inviteID), Message: invitesCreateBody.Message,
+		Status: InviteStatusPending, ToUserEmail: openapi_types.Email(toUser.Email),
+		ToUserFirstName: toUser.FirstName, ToUserLastName: toUser.LastName,
+	}
+
+	SetHeaderAndWriteResponse(w, http.StatusCreated, createdInvite)
 }
 
 // (GET /api/invites/me Get all invites for logged in user.)

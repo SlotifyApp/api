@@ -54,6 +54,9 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.countUserByIDStmt, err = db.PrepareContext(ctx, countUserByID); err != nil {
 		return nil, fmt.Errorf("error preparing query CountUserByID: %w", err)
 	}
+	if q.countWeekOldInvitesStmt, err = db.PrepareContext(ctx, countWeekOldInvites); err != nil {
+		return nil, fmt.Errorf("error preparing query CountWeekOldInvites: %w", err)
+	}
 	if q.createInviteStmt, err = db.PrepareContext(ctx, createInvite); err != nil {
 		return nil, fmt.Errorf("error preparing query CreateInvite: %w", err)
 	}
@@ -197,6 +200,11 @@ func (q *Queries) Close() error {
 	if q.countUserByIDStmt != nil {
 		if cerr := q.countUserByIDStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing countUserByIDStmt: %w", cerr)
+		}
+	}
+	if q.countWeekOldInvitesStmt != nil {
+		if cerr := q.countWeekOldInvitesStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing countWeekOldInvitesStmt: %w", cerr)
 		}
 	}
 	if q.createInviteStmt != nil {
@@ -398,6 +406,7 @@ type Queries struct {
 	countSlotifyGroupMembersStmt        *sql.Stmt
 	countUserByEmailStmt                *sql.Stmt
 	countUserByIDStmt                   *sql.Stmt
+	countWeekOldInvitesStmt             *sql.Stmt
 	createInviteStmt                    *sql.Stmt
 	createNotificationStmt              *sql.Stmt
 	createRefreshTokenStmt              *sql.Stmt
@@ -444,6 +453,7 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		countSlotifyGroupMembersStmt:        q.countSlotifyGroupMembersStmt,
 		countUserByEmailStmt:                q.countUserByEmailStmt,
 		countUserByIDStmt:                   q.countUserByIDStmt,
+		countWeekOldInvitesStmt:             q.countWeekOldInvitesStmt,
 		createInviteStmt:                    q.createInviteStmt,
 		createNotificationStmt:              q.createNotificationStmt,
 		createRefreshTokenStmt:              q.createRefreshTokenStmt,

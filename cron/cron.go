@@ -25,18 +25,18 @@ func RegisterDBCronJobs(ctx context.Context, db *database.Database, l *logger.Lo
 	var err error
 	c := cron.New()
 	if _, err = c.AddFunc("@midnight", func() {
-		removeWeekOldNotifications(ctx, db, l)
+		RemoveWeekOldNotifications(ctx, db, l)
 	}); err != nil {
 		return fmt.Errorf("failed to register daily remove week old notifications cron job: %w", err)
 	}
 	if _, err = c.AddFunc("@midnight", func() {
-		removeWeekOldInvites(ctx, db, l)
+		RemoveWeekOldInvites(ctx, db, l)
 	}); err != nil {
 		return fmt.Errorf("failed to register daily remove week old invites cron job: %w", err)
 	}
 
 	if _, err = c.AddFunc("@midnight", func() {
-		expireInvites(ctx, db, l)
+		ExpireInvites(ctx, db, l)
 	}); err != nil {
 		return fmt.Errorf("failed to register expire invites cron job: %w", err)
 	}
@@ -46,9 +46,9 @@ func RegisterDBCronJobs(ctx context.Context, db *database.Database, l *logger.Lo
 	return nil
 }
 
-// removeWeekOldInvites will delete invites that are a week old from the db.
+// RemoveWeekOldInvites will delete invites that are a week old from the db.
 // nolint: dupl// It's ok to duplicate this, it's a batch and not much code
-func removeWeekOldInvites(ctx context.Context, db *database.Database, l *logger.Logger) {
+func RemoveWeekOldInvites(ctx context.Context, db *database.Database, l *logger.Logger) {
 	l.Info("running remove week old invites cron job")
 
 	var affectedRows int64 = 1
@@ -88,9 +88,9 @@ func removeWeekOldInvites(ctx context.Context, db *database.Database, l *logger.
 	}
 }
 
-// removeWeekOldNotifications will delete notifications from the db that are a week old.
+// RemoveWeekOldNotifications will delete notifications from the db that are a week old.
 // nolint: dupl// It's ok to duplicate this, it's a batch and not much code
-func removeWeekOldNotifications(ctx context.Context, db *database.Database, l *logger.Logger) {
+func RemoveWeekOldNotifications(ctx context.Context, db *database.Database, l *logger.Logger) {
 	l.Info("running remove week old notifications cron job")
 
 	var affectedRows int64 = 1
@@ -130,8 +130,8 @@ func removeWeekOldNotifications(ctx context.Context, db *database.Database, l *l
 	}
 }
 
-// expireInvites will expire all invites that have passed their expiry date.
-func expireInvites(ctx context.Context, db *database.Database, l *logger.Logger) {
+// ExpireInvites will expire all invites that have passed their expiry date.
+func ExpireInvites(ctx context.Context, db *database.Database, l *logger.Logger) {
 	l.Info("running expire invites cron job")
 
 	var affectedRows int64 = 1

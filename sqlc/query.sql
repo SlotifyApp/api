@@ -132,7 +132,7 @@ WHERE user_id=? AND notification_id=?;
 SELECT * FROM Invite
 WHERE id=?;
 
--- name: CreateInvite :execrows
+-- name: CreateInvite :execlastid
 INSERT INTO Invite (slotify_group_id, from_user_id, to_user_id, message, expiry_date, created_at)
 VALUES(?, ?, ?, ?, ?, ?);
 
@@ -164,8 +164,8 @@ AND i.slotify_group_id=?;
 
 -- name: BatchDeleteWeekOldInvites :execrows
 DELETE FROM Invite
-WHERE created_at + INTERVAL 1 WEEK <= CURDATE()
-  AND id >= (SELECT MIN(id) FROM Invite WHERE created_at + INTERVAL 1 WEEK <= CURDATE())
+WHERE created_at <= CURDATE() - INTERVAL 1 WEEK
+  AND id >= (SELECT MIN(id) FROM Invite WHERE DATE(created_at) <= CURDATE() - INTERVAL 1 WEEK)
 ORDER BY id
 LIMIT ?;
 
@@ -176,3 +176,7 @@ WHERE expiry_date <= CURDATE()
   AND id >= (SELECT MIN(id) FROM Invite WHERE expiry_date <= CURDATE() AND status != 'expired')
 ORDER BY id
 LIMIT ?;
+
+-- name: CountWeekOldInvites :one
+SELECT COUNT(*) FROM Invite
+WHERE DATE(created_at) <= CURDATE() - INTERVAL 1 WEEK;

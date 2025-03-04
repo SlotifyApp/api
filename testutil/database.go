@@ -24,6 +24,14 @@ import (
 )
 
 // GetCount gets the row count of a given SQL table.
+func GetWeekOldInviteCount(t *testing.T, ctx context.Context, db *database.Database) int {
+	count, err := db.CountWeekOldInvites(ctx)
+	require.NoError(t, err, "unable to query row")
+
+	return int(count)
+}
+
+// GetCount gets the row count of a given SQL table.
 func GetCount(t *testing.T, db *sql.DB, table string) int {
 	//nolint: gosec //This is a test helper, not used in actual production.
 	query := fmt.Sprintf("SELECT COUNT(*) FROM %s", table)
@@ -141,9 +149,7 @@ func NewServerAndDB(t *testing.T,
 		notificationService = opts.notificationService
 	}
 
-	db, err := database.NewDatabaseWithContext(ctx)
-	require.NoError(t, err, "error creating database handle")
-	require.NotNil(t, db, "db handle cannot be nil")
+	db := NewDB(t, ctx)
 
 	server, err := api.NewServerWithContext(ctx, db,
 		api.WithNotInitMSALClient(), api.WithNotificationService(notificationService))
@@ -152,6 +158,16 @@ func NewServerAndDB(t *testing.T,
 	require.NotNil(t, db, "server cannot be nil")
 
 	return db, server
+}
+
+func NewDB(t *testing.T,
+	ctx context.Context,
+) *database.Database {
+	db, err := database.NewDatabaseWithContext(ctx)
+	require.NoError(t, err, "error creating database handle")
+	require.NotNil(t, db, "db handle cannot be nil")
+
+	return db
 }
 
 // CloseDB closes the given DB handle, often used with 'defer'.

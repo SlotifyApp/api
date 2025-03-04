@@ -73,6 +73,7 @@ func openAndPingDBContext(ctx context.Context, dsn string) (*sql.DB, error) {
 	if err = db.PingContext(ctx); err != nil {
 		return nil, fmt.Errorf("unable to ping database: %w", err)
 	}
+	log.Printf("Successfully pinged database!")
 
 	return db, nil
 }
@@ -164,7 +165,6 @@ func NewDatabaseWithContext(ctx context.Context, dbOpts ...Option) (*Database, e
 		password = *opts.password
 	}
 	dsn := getDSN(port, dbHost, uname, password, dbName)
-	log.Printf("db connection string: %s", dsn)
 	var db *sql.DB
 	if db, err = openAndPingDBContext(ctx, dsn); err != nil {
 		return nil, fmt.Errorf("unable to init database: %w", err)
