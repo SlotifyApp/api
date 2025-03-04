@@ -77,6 +77,7 @@ func (s Server) PostAPIInvites(w http.ResponseWriter, r *http.Request) {
 		ToUserID:       invitesCreateBody.ToUserID,
 		Message:        invitesCreateBody.Message,
 		ExpiryDate:     invitesCreateBody.ExpiryDate.Time,
+		Status:         database.InviteStatusPending,
 		CreatedAt:      invitesCreateBody.CreatedAt,
 	}
 

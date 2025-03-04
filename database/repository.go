@@ -42,6 +42,9 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.checkMemberInSlotifyGroupStmt, err = db.PrepareContext(ctx, checkMemberInSlotifyGroup); err != nil {
 		return nil, fmt.Errorf("error preparing query CheckMemberInSlotifyGroup: %w", err)
 	}
+	if q.countExpiredInvitesStmt, err = db.PrepareContext(ctx, countExpiredInvites); err != nil {
+		return nil, fmt.Errorf("error preparing query CountExpiredInvites: %w", err)
+	}
 	if q.countSlotifyGroupByIDStmt, err = db.PrepareContext(ctx, countSlotifyGroupByID); err != nil {
 		return nil, fmt.Errorf("error preparing query CountSlotifyGroupByID: %w", err)
 	}
@@ -56,6 +59,9 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	}
 	if q.countWeekOldInvitesStmt, err = db.PrepareContext(ctx, countWeekOldInvites); err != nil {
 		return nil, fmt.Errorf("error preparing query CountWeekOldInvites: %w", err)
+	}
+	if q.countWeekOldNotificationsStmt, err = db.PrepareContext(ctx, countWeekOldNotifications); err != nil {
+		return nil, fmt.Errorf("error preparing query CountWeekOldNotifications: %w", err)
 	}
 	if q.createInviteStmt, err = db.PrepareContext(ctx, createInvite); err != nil {
 		return nil, fmt.Errorf("error preparing query CreateInvite: %w", err)
@@ -182,6 +188,11 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing checkMemberInSlotifyGroupStmt: %w", cerr)
 		}
 	}
+	if q.countExpiredInvitesStmt != nil {
+		if cerr := q.countExpiredInvitesStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing countExpiredInvitesStmt: %w", cerr)
+		}
+	}
 	if q.countSlotifyGroupByIDStmt != nil {
 		if cerr := q.countSlotifyGroupByIDStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing countSlotifyGroupByIDStmt: %w", cerr)
@@ -205,6 +216,11 @@ func (q *Queries) Close() error {
 	if q.countWeekOldInvitesStmt != nil {
 		if cerr := q.countWeekOldInvitesStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing countWeekOldInvitesStmt: %w", cerr)
+		}
+	}
+	if q.countWeekOldNotificationsStmt != nil {
+		if cerr := q.countWeekOldNotificationsStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing countWeekOldNotificationsStmt: %w", cerr)
 		}
 	}
 	if q.createInviteStmt != nil {
@@ -402,11 +418,13 @@ type Queries struct {
 	batchDeleteWeekOldNotificationsStmt *sql.Stmt
 	batchExpireInvitesStmt              *sql.Stmt
 	checkMemberInSlotifyGroupStmt       *sql.Stmt
+	countExpiredInvitesStmt             *sql.Stmt
 	countSlotifyGroupByIDStmt           *sql.Stmt
 	countSlotifyGroupMembersStmt        *sql.Stmt
 	countUserByEmailStmt                *sql.Stmt
 	countUserByIDStmt                   *sql.Stmt
 	countWeekOldInvitesStmt             *sql.Stmt
+	countWeekOldNotificationsStmt       *sql.Stmt
 	createInviteStmt                    *sql.Stmt
 	createNotificationStmt              *sql.Stmt
 	createRefreshTokenStmt              *sql.Stmt
@@ -449,11 +467,13 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		batchDeleteWeekOldNotificationsStmt: q.batchDeleteWeekOldNotificationsStmt,
 		batchExpireInvitesStmt:              q.batchExpireInvitesStmt,
 		checkMemberInSlotifyGroupStmt:       q.checkMemberInSlotifyGroupStmt,
+		countExpiredInvitesStmt:             q.countExpiredInvitesStmt,
 		countSlotifyGroupByIDStmt:           q.countSlotifyGroupByIDStmt,
 		countSlotifyGroupMembersStmt:        q.countSlotifyGroupMembersStmt,
 		countUserByEmailStmt:                q.countUserByEmailStmt,
 		countUserByIDStmt:                   q.countUserByIDStmt,
 		countWeekOldInvitesStmt:             q.countWeekOldInvitesStmt,
+		countWeekOldNotificationsStmt:       q.countWeekOldNotificationsStmt,
 		createInviteStmt:                    q.createInviteStmt,
 		createNotificationStmt:              q.createNotificationStmt,
 		createRefreshTokenStmt:              q.createRefreshTokenStmt,

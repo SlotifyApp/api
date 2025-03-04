@@ -58,8 +58,8 @@ func (q *Queries) BatchDeleteWeekOldInvites(ctx context.Context, limit int32) (i
 
 const batchDeleteWeekOldNotifications = `-- name: BatchDeleteWeekOldNotifications :execrows
 DELETE FROM Notification
-WHERE created + INTERVAL 1 WEEK <= CURDATE()
-  AND id >= (SELECT MIN(id) FROM Notification WHERE created + INTERVAL 1 WEEK <= CURDATE())
+WHERE created <= CURDATE() - INTERVAL 1 WEEK
+  AND id >= (SELECT MIN(id) FROM Notification WHERE created <= CURDATE() - INTERVAL 1 WEEK)
 ORDER BY id
 LIMIT ?
 `
@@ -101,6 +101,18 @@ type CheckMemberInSlotifyGroupParams struct {
 
 func (q *Queries) CheckMemberInSlotifyGroup(ctx context.Context, arg CheckMemberInSlotifyGroupParams) (int64, error) {
 	row := q.queryRow(ctx, q.checkMemberInSlotifyGroupStmt, checkMemberInSlotifyGroup, arg.UserID, arg.SlotifyGroupID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const countExpiredInvites = `-- name: CountExpiredInvites :one
+SELECT COUNT(*) FROM Invite
+WHERE status='expired'
+`
+
+func (q *Queries) CountExpiredInvites(ctx context.Context) (int64, error) {
+	row := q.queryRow(ctx, q.countExpiredInvitesStmt, countExpiredInvites)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -165,18 +177,31 @@ func (q *Queries) CountWeekOldInvites(ctx context.Context) (int64, error) {
 	return count, err
 }
 
+const countWeekOldNotifications = `-- name: CountWeekOldNotifications :one
+SELECT COUNT(*) FROM Notification
+WHERE DATE(created) <= CURDATE() - INTERVAL 1 WEEK
+`
+
+func (q *Queries) CountWeekOldNotifications(ctx context.Context) (int64, error) {
+	row := q.queryRow(ctx, q.countWeekOldNotificationsStmt, countWeekOldNotifications)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createInvite = `-- name: CreateInvite :execlastid
-INSERT INTO Invite (slotify_group_id, from_user_id, to_user_id, message, expiry_date, created_at)
-VALUES(?, ?, ?, ?, ?, ?)
+INSERT INTO Invite (slotify_group_id, from_user_id, to_user_id, message, status, expiry_date, created_at)
+VALUES(?, ?, ?, ?, ?, ?, ?)
 `
 
 type CreateInviteParams struct {
-	SlotifyGroupID uint32    `json:"slotifyGroupId"`
-	FromUserID     uint32    `json:"fromUserId"`
-	ToUserID       uint32    `json:"toUserId"`
-	Message        string    `json:"message"`
-	ExpiryDate     time.Time `json:"expiryDate"`
-	CreatedAt      time.Time `json:"createdAt"`
+	SlotifyGroupID uint32       `json:"slotifyGroupId"`
+	FromUserID     uint32       `json:"fromUserId"`
+	ToUserID       uint32       `json:"toUserId"`
+	Message        string       `json:"message"`
+	Status         InviteStatus `json:"status"`
+	ExpiryDate     time.Time    `json:"expiryDate"`
+	CreatedAt      time.Time    `json:"createdAt"`
 }
 
 func (q *Queries) CreateInvite(ctx context.Context, arg CreateInviteParams) (int64, error) {
@@ -185,6 +210,7 @@ func (q *Queries) CreateInvite(ctx context.Context, arg CreateInviteParams) (int
 		arg.FromUserID,
 		arg.ToUserID,
 		arg.Message,
+		arg.Status,
 		arg.ExpiryDate,
 		arg.CreatedAt,
 	)

@@ -23,7 +23,40 @@ import (
 	"go.uber.org/mock/gomock"
 )
 
-// GetCount gets the row count of a given SQL table.
+func CreateNotificationAndLink(t *testing.T, ctx context.Context, db *database.Database,
+	arg database.CreateNotificationParams, userID uint32,
+) {
+	notificationID, err := db.CreateNotification(ctx, arg)
+
+	require.NoError(t, err, "failed to create notification")
+
+	_, err = db.CreateUserNotification(ctx,
+		database.CreateUserNotificationParams{
+			UserID: userID,
+			//nolint: gosec // id is unsigned 32 bit int
+			NotificationID: uint32(notificationID),
+		})
+
+	require.NoError(t, err, "failed to link user to notification")
+}
+
+// GetExpiredInvitesCount is a test wrapper for CountWeekOldInvites.
+func GetExpiredInvitesCount(t *testing.T, ctx context.Context, db *database.Database) int {
+	count, err := db.CountExpiredInvites(ctx)
+	require.NoError(t, err, "unable to query row")
+
+	return int(count)
+}
+
+// GetWeekOldNotificationCount is a test wrapper for CountWeekOldInvites.
+func GetWeekOldNotificationCount(t *testing.T, ctx context.Context, db *database.Database) int {
+	count, err := db.CountWeekOldNotifications(ctx)
+	require.NoError(t, err, "unable to query row")
+
+	return int(count)
+}
+
+// GetWeekOldInviteCount is a test wrapper for CountWeekOldInvites.
 func GetWeekOldInviteCount(t *testing.T, ctx context.Context, db *database.Database) int {
 	count, err := db.CountWeekOldInvites(ctx)
 	require.NoError(t, err, "unable to query row")

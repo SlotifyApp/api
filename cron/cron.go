@@ -17,9 +17,9 @@ const (
 )
 
 // RegisterDBCronJobs registers db functions to run at midnight everyday.
-func RegisterDBCronJobs(ctx context.Context, db *database.Database, l *logger.Logger) error {
-	// Max time for all cron jobs is 2 hours
-	ctx, cancel := context.WithTimeout(ctx, 2*time.Hour)
+func RegisterDBCronJobs(db *database.Database, l *logger.Logger) error {
+	// Max time for all cron jobs is 5 hours
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Hour)
 	defer cancel()
 
 	var err error

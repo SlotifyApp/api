@@ -105,10 +105,14 @@ DELETE FROM RefreshToken WHERE user_id=?;
 -- name: CreateNotification :execlastid
 INSERT INTO Notification (message, created) VALUES(?, ?);
 
+-- name: CountWeekOldNotifications :one
+SELECT COUNT(*) FROM Notification
+WHERE DATE(created) <= CURDATE() - INTERVAL 1 WEEK;
+
 -- name: BatchDeleteWeekOldNotifications :execrows
 DELETE FROM Notification
-WHERE created + INTERVAL 1 WEEK <= CURDATE()
-  AND id >= (SELECT MIN(id) FROM Notification WHERE created + INTERVAL 1 WEEK <= CURDATE())
+WHERE created <= CURDATE() - INTERVAL 1 WEEK
+  AND id >= (SELECT MIN(id) FROM Notification WHERE created <= CURDATE() - INTERVAL 1 WEEK)
 ORDER BY id
 LIMIT ?;
 
@@ -133,8 +137,8 @@ SELECT * FROM Invite
 WHERE id=?;
 
 -- name: CreateInvite :execlastid
-INSERT INTO Invite (slotify_group_id, from_user_id, to_user_id, message, expiry_date, created_at)
-VALUES(?, ?, ?, ?, ?, ?);
+INSERT INTO Invite (slotify_group_id, from_user_id, to_user_id, message, status, expiry_date, created_at)
+VALUES(?, ?, ?, ?, ?, ?, ?);
 
 -- name: UpdateInviteStatus :execrows
 UPDATE Invite SET status=?
@@ -168,6 +172,10 @@ WHERE created_at <= CURDATE() - INTERVAL 1 WEEK
   AND id >= (SELECT MIN(id) FROM Invite WHERE DATE(created_at) <= CURDATE() - INTERVAL 1 WEEK)
 ORDER BY id
 LIMIT ?;
+
+-- name: CountExpiredInvites :one
+SELECT COUNT(*) FROM Invite
+WHERE status='expired';
 
 -- name: BatchExpireInvites :execrows
 UPDATE Invite SET status = 'expired'
