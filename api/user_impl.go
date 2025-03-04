@@ -287,8 +287,8 @@ func (s Server) GetAPIMSFTUsers(w http.ResponseWriter, r *http.Request) {
 
 	groupable, err := graph.Users().Get(context.Background(), nil)
 	if err != nil {
-		s.Logger.Error("failed to get users from microsoft")
-		sendError(w, http.StatusNotFound, "Failed to find group")
+		s.Logger.Errorf("failed to get users from microsoft: %v", err)
+		sendError(w, http.StatusNotFound, fmt.Sprintf("Failed to find users: %v", err))
 		return
 	}
 
