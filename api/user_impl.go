@@ -9,6 +9,7 @@ import (
 	"net/http"
 
 	"github.com/SlotifyApp/slotify-backend/database"
+	graphusers "github.com/microsoftgraph/msgraph-sdk-go/users"
 	openapi_types "github.com/oapi-codegen/runtime/types"
 	"go.uber.org/zap"
 )
@@ -306,6 +307,62 @@ func (s Server) GetAPIMSFTUsers(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	// no error 204 since we got an array
+
+	SetHeaderAndWriteResponse(w, http.StatusOK, users)
+}
+
+// (GET /api/msft-users/search).
+func (s Server) GetAPIMSFTUsersSearch(w http.ResponseWriter, r *http.Request, params GetAPIMSFTUsersSearchParams) {
+	ctx, cancel := context.WithTimeout(r.Context(), database.DatabaseTimeout)
+	defer cancel()
+
+	// Get userID from request
+	userID, ok := r.Context().Value(UserIDCtxKey{}).(uint32)
+	if !ok {
+		s.Logger.Error("failed to get userid from request context")
+		sendError(w, http.StatusUnauthorized, "Try again later.")
+		return
+	}
+
+	graph, err := CreateMSFTGraphClient(ctx, s.MSALClient, s.DB, userID)
+	if err != nil {
+		s.Logger.Error("failed to create msgraph client", zap.Error(err))
+		sendError(w, http.StatusBadGateway, "Failed to connect to microsoft graph API")
+		return
+	}
+
+	var requestParameters *graphusers.ItemPeopleRequestBuilderGetQueryParameters
+
+	requestSearch := fmt.Sprintf("\"%s\"", *params.Search)
+	requestParameters = &graphusers.ItemPeopleRequestBuilderGetQueryParameters{
+		Search: &requestSearch,
+	}
+
+	configuration := &graphusers.ItemPeopleRequestBuilderGetRequestConfiguration{
+		QueryParameters: requestParameters,
+	}
+
+	groupable, err := graph.Me().People().Get(context.Background(), configuration)
+	if err != nil {
+		s.Logger.Error("failed to get persons from microsoft")
+		sendError(w, http.StatusNotFound, "Failed to find group")
+		return
+	}
+
+	var users []MSFTGroupUser
+
+	if groupable.GetValue() != nil {
+		for _, usr := range groupable.GetValue() {
+			var user MSFTGroupUser
+			user, err = PersonableToMSFTGroupUser(usr)
+			if err != nil {
+				s.Logger.Error("failed to convert userable to user")
+				sendError(w, http.StatusInternalServerError, "Failed to convert userable to user")
+				return
+			}
+			users = append(users, user)
+		}
+	}
 
 	SetHeaderAndWriteResponse(w, http.StatusOK, users)
 }
