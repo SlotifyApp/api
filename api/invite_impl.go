@@ -15,7 +15,7 @@ import (
 )
 
 // (POST /api/invites) Create a new invite.
-func (s Server) PostAPIInvites(w http.ResponseWriter, r *http.Request) {
+func (s Server) PostAPIInvite(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 4*database.DatabaseTimeout)
 	defer cancel()
 	reqUUID := ReadReqUUID(r)
@@ -30,7 +30,8 @@ func (s Server) PostAPIInvites(w http.ResponseWriter, r *http.Request) {
 	var invitesCreateBody PostAPIInvitesJSONRequestBody
 	var err error
 	if err = json.NewDecoder(r.Body).Decode(&invitesCreateBody); err != nil {
-		s.Logger.Error(ErrUnmarshalBody.Error()+"request ID: "+reqUUID+", ", zap.Object("body", invitesCreateBody), zap.Error(err))
+		s.Logger.Error(ErrUnmarshalBody.Error()+"request ID: "+reqUUID+", ",
+			zap.Object("body", invitesCreateBody), zap.Error(err))
 		sendError(w, http.StatusBadRequest, ErrUnmarshalBody.Error())
 		return
 	}
