@@ -26,7 +26,6 @@ func (s Server) PostAPIInvites(w http.ResponseWriter, r *http.Request) {
 		sendError(w, http.StatusUnauthorized, "Try again later.")
 		return
 	}
-
 	var invitesCreateBody PostAPIInvitesJSONRequestBody
 	var err error
 	if err = json.NewDecoder(r.Body).Decode(&invitesCreateBody); err != nil {
@@ -35,28 +34,24 @@ func (s Server) PostAPIInvites(w http.ResponseWriter, r *http.Request) {
 		sendError(w, http.StatusBadRequest, ErrUnmarshalBody.Error())
 		return
 	}
-
 	var g database.SlotifyGroup
 	if g, err = s.DB.GetSlotifyGroupByID(ctx, invitesCreateBody.SlotifyGroupID); err != nil {
 		s.Logger.Errorf("invite api: failed to get group by id, request ID: "+reqUUID+", ", zap.Error(err))
 		sendError(w, http.StatusBadRequest, "failed to get group by id")
 		return
 	}
-
 	var u database.User
 	if u, err = s.DB.GetUserByID(ctx, userID); err != nil {
 		s.Logger.Errorf("invite api: failed to get user by id, request ID: "+reqUUID+", ", zap.Error(err))
 		sendError(w, http.StatusBadRequest, "failed to get user by id")
 		return
 	}
-
 	var toUser database.User
 	if toUser, err = s.DB.GetUserByID(ctx, invitesCreateBody.ToUserID); err != nil {
 		s.Logger.Errorf("invite api: failed to get user by id, request ID: "+reqUUID+", ", zap.Error(err))
 		sendError(w, http.StatusBadRequest, "failed to get user by id")
 		return
 	}
-
 	// check if fromUser is in group and check if toUser is in group
 	if err = checkIfUsersInGroup(checkIfUsersInGroupParams{
 		ctx:              ctx,
@@ -72,7 +67,6 @@ func (s Server) PostAPIInvites(w http.ResponseWriter, r *http.Request) {
 		sendError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-
 	params := database.CreateInviteParams{
 		SlotifyGroupID: invitesCreateBody.SlotifyGroupID,
 		FromUserID:     userID,
@@ -82,7 +76,6 @@ func (s Server) PostAPIInvites(w http.ResponseWriter, r *http.Request) {
 		Status:         database.InviteStatusPending,
 		CreatedAt:      invitesCreateBody.CreatedAt,
 	}
-
 	var inviteID int64
 	err = retry.Do(func() error {
 		if inviteID, err = s.DB.CreateInvite(ctx, params); err != nil {
@@ -95,7 +88,6 @@ func (s Server) PostAPIInvites(w http.ResponseWriter, r *http.Request) {
 		sendError(w, http.StatusBadGateway, "Failed to create invite")
 		return
 	}
-
 	sendPostInviteNotification(sendPostInviteNotificationParams{
 		ctx:             ctx,
 		toUserID:        invitesCreateBody.ToUserID,
@@ -107,7 +99,6 @@ func (s Server) PostAPIInvites(w http.ResponseWriter, r *http.Request) {
 		toUserFirstName: toUser.FirstName,
 		toUserLastName:  toUser.LastName,
 	})
-
 	createdInvite := InvitesGroup{
 		CreatedAt:         invitesCreateBody.CreatedAt,
 		ExpiryDate:        openapi_types.Date{Time: invitesCreateBody.ExpiryDate.Time},
@@ -118,7 +109,6 @@ func (s Server) PostAPIInvites(w http.ResponseWriter, r *http.Request) {
 		Status: InviteStatusPending, ToUserEmail: openapi_types.Email(toUser.Email),
 		ToUserFirstName: toUser.FirstName, ToUserLastName: toUser.LastName,
 	}
-
 	SetHeaderAndWriteResponse(w, http.StatusCreated, createdInvite)
 }
 
