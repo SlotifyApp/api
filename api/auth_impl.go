@@ -27,7 +27,6 @@ func (s Server) PostAPIRefresh(w http.ResponseWriter, r *http.Request) {
 
 	claims, err := jwt.ParseJWT(refreshToken, jwt.RefreshTokenJWTSecretEnv)
 	if err != nil {
-		s.Logger.Errorf("failed to verify refreshToken, ", uuidStr, zap.Error(err))
 		sendError(w, http.StatusUnauthorized, "refresh token was invalid")
 		return
 	}
@@ -36,15 +35,12 @@ func (s Server) PostAPIRefresh(w http.ResponseWriter, r *http.Request) {
 
 	var rt database.RefreshToken
 	if rt, err = s.DB.GetRefreshTokenByUserID(ctx, userID); err != nil {
-		s.Logger.Error("failed to get refresh token for user, ", uuidStr, zap.Error(err))
 		sendError(w, http.StatusUnauthorized, "failed to refresh token")
 		return
 	}
 
 	// check if the actual user's refresh token matches the request's refresh token
 	if rt.Token != refreshToken || rt.Revoked {
-		s.Logger.Error("Failed to match provided token or verify token OR token was revoked, "+
-			"", uuidStr, zap.Error(err))
 		sendError(w, http.StatusUnauthorized, "failed to refresh token")
 		return
 	}
