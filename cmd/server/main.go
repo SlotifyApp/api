@@ -43,6 +43,7 @@ func main() {
 
 	r := mux.NewRouter()
 
+	r.Use(api.WriteReqUUID)
 	api.ApplyMiddlewares(r, swagger)
 
 	h := api.HandlerFromMux(server, r)
