@@ -42,8 +42,8 @@ func (s Server) PostAPIRefresh(w http.ResponseWriter, r *http.Request) {
 
 	// check if the actual user's refresh token matches the request's refresh token
 	if rt.Token != refreshToken || rt.Revoked {
-		s.Logger.Error("Failed to match provided token or verify token OR token was revoked,
-		 request ID: "+reqUUID+", ", zap.Error(err))
+		s.Logger.Error("Failed to match provided token or verify token OR token was revoked, "+
+			"request ID: "+reqUUID+", ", zap.Error(err))
 		sendError(w, http.StatusUnauthorized, "failed to refresh token")
 		return
 	}

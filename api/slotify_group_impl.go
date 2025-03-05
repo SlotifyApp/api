@@ -257,8 +257,8 @@ func (s Server) DeleteAPISlotifyGroupsSlotifyGroupID(w http.ResponseWriter, r *h
 			sendError(w, http.StatusInternalServerError, "add slotifyGroup query timed out")
 			return
 		default:
-			s.Logger.Error("slotifyGroup api: failed to DeleteSlotifyGroupsSlotifyGroupID, 
-			request ID: "+reqUUID+", ", zap.Error(err))
+			s.Logger.Error("slotifyGroup api: failed to DeleteSlotifyGroupsSlotifyGroupID, "+
+				"request ID: "+reqUUID+", ", zap.Error(err))
 			sendError(w, http.StatusInternalServerError,
 				"slotifyGroup api: slotifyGroup deletion unsuccessful")
 			return
@@ -304,8 +304,8 @@ func (s Server) GetAPISlotifyGroupsSlotifyGroupID(w http.ResponseWriter, r *http
 				fmt.Sprintf("slotifyGroup api: slotifyGroup with id %d does not exist", slotifyGroupID))
 			return
 		default:
-			s.Logger.Error("slotifyGroup api: failed to GetSlotifyGroupsSlotifyGroupID,
-			 request ID: "+reqUUID+", ", zap.Error(err))
+			s.Logger.Error("slotifyGroup api: failed to GetSlotifyGroupsSlotifyGroupID, "+
+				"request ID: "+reqUUID+", ", zap.Error(err))
 			sendError(w, http.StatusInternalServerError, "slotifyGroup api: failed to get slotifyGroup")
 			return
 		}
@@ -321,8 +321,8 @@ func (s Server) GetAPISlotifyGroupsSlotifyGroupIDUsers(w http.ResponseWriter, r 
 	count, err := s.DB.CountSlotifyGroupByID(ctx, slotifyGroupID)
 	reqUUID := ReadReqUUID(r)
 	if err != nil {
-		s.Logger.Error("slotifyGroup api: failed to get users of a group: failed to get count of group by id,
-		 request ID: "+reqUUID+", ",
+		s.Logger.Error("slotifyGroup api: failed to get users of a group: failed to get count of group by id, "+
+			"request ID: "+reqUUID+", ",
 			zap.Uint32("slotifyGroupID",
 				slotifyGroupID),
 			zap.Error(err),
@@ -332,8 +332,8 @@ func (s Server) GetAPISlotifyGroupsSlotifyGroupIDUsers(w http.ResponseWriter, r 
 	}
 
 	if count == 0 {
-		s.Logger.Error("slotifyGroup api: slotifyGroup members of non-existent slotifyGroup requested,
-		 request ID: "+reqUUID+", ",
+		s.Logger.Error("slotifyGroup api: slotifyGroup members of non-existent slotifyGroup requested, "+
+			"request ID: "+reqUUID+", ",
 			zap.Uint32("slotifyGroupID", slotifyGroupID), zap.Error(err))
 		sendError(w, http.StatusNotFound,
 			fmt.Sprintf("slotifyGroup api: slotifyGroup with id(%d) does not exist", slotifyGroupID))
