@@ -28,13 +28,7 @@ func (s Server) RenderEvent(w http.ResponseWriter, r *http.Request) {
 	f, ok := w.(http.Flusher)
 
 	if !ok {
-<<<<<<< HEAD
-		s.Logger.Error("failed to flush event stream headers, responsewriter did not implement Flusher interface"+
-			", ", uuidStr)
-=======
-		s.Logger.Error("failed to flush event stream headers, responsewriter did not implement Flusher interface
-		, request ID: " + reqUUID)
->>>>>>> 98a370c5 (fix: lint issues)
+		s.Logger.Error("failed to flush event stream headers, responsewriter did not implement Flusher interface")
 		sendError(w, http.StatusInternalServerError, "failed to flush event stream headers")
 		return
 	}
