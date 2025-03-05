@@ -43,9 +43,14 @@ func parseEventableResp(events []graphmodels.Eventable) []CalendarEvent {
 			startTime = e.GetStart().GetDateTime()
 		}
 
+		var body *string
+		if e.GetBody() != nil {
+			body = e.GetBody().GetContent()
+		}
+
 		ce := CalendarEvent{
 			Attendees:   attendees,
-			Body:        e.GetBodyPreview(),
+			Body:        body,
 			Created:     e.GetCreatedDateTime(),
 			EndTime:     endTime,
 			Id:          e.GetId(),
