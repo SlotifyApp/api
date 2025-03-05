@@ -11,6 +11,7 @@ import (
 // (GET /api/events), HTTP SSE route.
 func (s Server) RenderEvent(w http.ResponseWriter, r *http.Request) {
 	userID, ok := r.Context().Value(UserIDCtxKey{}).(uint32)
+	reqUUID := ReadReqUUID(r)
 	if !ok {
 		s.Logger.Error("failed to get userid from request context")
 		sendError(w, http.StatusUnauthorized, "Try again later.")
@@ -26,7 +27,7 @@ func (s Server) RenderEvent(w http.ResponseWriter, r *http.Request) {
 	f, ok := w.(http.Flusher)
 
 	if !ok {
-		s.Logger.Error("failed to flush event stream headers, responsewriter did not implement Flusher interface")
+		s.Logger.Error("failed to flush event stream headers, responsewriter did not implement Flusher interface, request ID: " + reqUUID)
 		sendError(w, http.StatusInternalServerError, "failed to flush event stream headers")
 		return
 	}
@@ -34,7 +35,7 @@ func (s Server) RenderEvent(w http.ResponseWriter, r *http.Request) {
 	f.Flush()
 
 	if err := s.NotificationService.RegisterUserClient(s.Logger, userID, w); err != nil {
-		s.Logger.Errorf("failed to register user client", zap.Error(err))
+		s.Logger.Errorf("failed to register user client, request ID: "+reqUUID+", ", zap.Error(err))
 		sendError(w, http.StatusUnauthorized, "failed to register user client")
 		return
 	}
@@ -52,8 +53,9 @@ func (s Server) PatchAPINotificationsNotificationIDRead(w http.ResponseWriter, r
 	defer cancel()
 
 	userID, ok := r.Context().Value(UserIDCtxKey{}).(uint32)
+	reqUUID := ReadReqUUID(r)
 	if !ok {
-		s.Logger.Error("failed to get userid from request context")
+		s.Logger.Error("failed to get userid from request context, request ID: " + reqUUID)
 		sendError(w, http.StatusUnauthorized, "Try again later.")
 		return
 	}
@@ -65,7 +67,7 @@ func (s Server) PatchAPINotificationsNotificationIDRead(w http.ResponseWriter, r
 
 	rowsAffected, err := s.DB.MarkNotificationAsRead(ctx, dbParams)
 	if err != nil {
-		s.Logger.Error("failed to mark notification as read", zap.Error(err))
+		s.Logger.Error("failed to mark notification as read, request ID: "+reqUUID+", ", zap.Error(err))
 		sendError(w, http.StatusInternalServerError, "Failed to mark notification as read.")
 		return
 	}
@@ -75,7 +77,7 @@ func (s Server) PatchAPINotificationsNotificationIDRead(w http.ResponseWriter, r
 			ActualRows:   rowsAffected,
 			ExpectedRows: []int64{1},
 		}
-		s.Logger.Error("failed to mark notification as read", zap.Error(err))
+		s.Logger.Error("failed to mark notification as read, request ID: "+reqUUID+", ", zap.Error(err))
 		sendError(w, http.StatusBadRequest, "Failed to mark notification as read.")
 		return
 	}
@@ -89,15 +91,16 @@ func (s Server) GetAPIUsersMeNotifications(w http.ResponseWriter, r *http.Reques
 	defer cancel()
 
 	userID, ok := r.Context().Value(UserIDCtxKey{}).(uint32)
+	reqUUID := ReadReqUUID(r)
 	if !ok {
-		s.Logger.Error("failed to get userid from request context")
+		s.Logger.Error("failed to get userid from request context, request ID: " + reqUUID)
 		sendError(w, http.StatusUnauthorized, "Try again later.")
 		return
 	}
 
 	notifs, err := s.DB.GetUnreadUserNotifications(ctx, userID)
 	if err != nil {
-		s.Logger.Error("failed to get unread user notifications")
+		s.Logger.Error("failed to get unread user notifications, request ID: " + reqUUID)
 		sendError(w, http.StatusInternalServerError, "failed to get unread user notifications from db")
 		return
 	}
