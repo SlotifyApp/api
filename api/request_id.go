@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"errors"
 	"net/http"
 
 	"github.com/google/uuid"
@@ -27,5 +28,5 @@ func ReadReqUUID(req *http.Request) string {
 	if reqUUID, ok := req.Context().Value(ReqUUIDKey).(string); ok {
 		return reqUUID
 	}
-	return "Error fetching ID of Request!"
+	return errors.New("error: unable to fetch id of this request").Error()
 }

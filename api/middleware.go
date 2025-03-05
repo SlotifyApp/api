@@ -41,14 +41,14 @@ func AuthMiddleware(next http.Handler) http.Handler {
 
 		// Get access_token cookie.
 		accessTokenCookie, err := r.Cookie("access_token")
+		reqUUID := ReadReqUUID(r)
 		if err != nil {
-			reqUUID := ReadReqUUID(r)
 			log.Printf("error fetching access_token cookie: route: %s, err: %s, ID: %s", r.URL.Path, err.Error(), reqUUID)
 			http.Error(w, "Missing or invalid token", http.StatusUnauthorized)
 			return
 		}
 		if accessTokenCookie == nil || accessTokenCookie.Value == "" {
-			log.Printf("access_token was nil/empty: route: %s", r.URL.Path)
+			log.Printf("access_token was nil/empty: route: %s, ID: %s", r.URL.Path, reqUUID)
 			http.Error(w, "Missing or invalid token", http.StatusUnauthorized)
 			return
 		}
@@ -60,12 +60,12 @@ func AuthMiddleware(next http.Handler) http.Handler {
 		// set refresh token in request context
 		refreshTokenCookie, err := r.Cookie("refresh_token")
 		if err != nil {
-			log.Printf("error fetching refresh_token cookie: route: %s, err: %s", r.URL.Path, err.Error())
+			log.Printf("error fetching refresh_token cookie: route: %s, err: %s, ID: %s", r.URL.Path, err.Error(), reqUUID)
 			http.Error(w, "Missing or invalid token", http.StatusUnauthorized)
 			return
 		}
 		if refreshTokenCookie == nil || refreshTokenCookie.Value == "" {
-			log.Printf("refresh_token was nil/empty: route: %s", r.URL.Path)
+			log.Printf("refresh_token was nil/empty: route: %s, ID: %s", r.URL.Path, reqUUID)
 			http.Error(w, "Missing or invalid token", http.StatusUnauthorized)
 			return
 		}
