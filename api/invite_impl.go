@@ -15,7 +15,7 @@ import (
 )
 
 // (POST /api/invites) Create a new invite.
-func (s Server) PostAPIInvite(w http.ResponseWriter, r *http.Request) {
+func (s Server) PostAPIInvites(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 4*database.DatabaseTimeout)
 	defer cancel()
 	reqUUID, _ := ReadReqUUID(r)
