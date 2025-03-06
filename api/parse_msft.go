@@ -177,14 +177,16 @@ func processMSFTTimeSlot(s graphmodels.MeetingTimeSuggestionable) *MeetingTimeSl
 	start := timeSlot.GetStart()
 	end := timeSlot.GetEnd()
 
+	layout := "2006-01-02T15:04:05.0000000"
+
 	if start != nil && start.GetDateTime() != nil {
-		if t, err := time.Parse(time.RFC3339Nano, *start.GetDateTime()); err != nil {
+		if t, err := time.Parse(layout, *start.GetDateTime()); err == nil {
 			processedMeetingTimeSlot.Start = t
 		}
 	}
 
 	if end != nil && end.GetDateTime() != nil {
-		if t, err := time.Parse(time.RFC3339Nano, *end.GetDateTime()); err != nil {
+		if t, err := time.Parse(layout, *end.GetDateTime()); err == nil {
 			processedMeetingTimeSlot.End = t
 		}
 	}

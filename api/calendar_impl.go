@@ -73,9 +73,9 @@ func (s Server) PostAPICalendarMe(w http.ResponseWriter, r *http.Request) {
 
 	event := parseCalendarEventToMSFTEvent(eventRequest)
 
-	var events graphmodels.Eventable
+	var createdEventable graphmodels.Eventable
 	err = retry.Do(func() error {
-		events, err = graph.Me().Events().Post(ctx, event, nil)
+		createdEventable, err = graph.Me().Events().Post(ctx, event, nil)
 		if err != nil {
 			return fmt.Errorf("graph api create calendar failed: %w", err)
 		}
@@ -99,5 +99,7 @@ func (s Server) PostAPICalendarMe(w http.ResponseWriter, r *http.Request) {
 		s.Logger.Error("failed to send notification", zap.Error(err))
 	}
 
-	SetHeaderAndWriteResponse(w, http.StatusCreated, events)
+	createdEvent := parseEventableResp([]graphmodels.Eventable{createdEventable})[0]
+
+	SetHeaderAndWriteResponse(w, http.StatusCreated, createdEvent)
 }
