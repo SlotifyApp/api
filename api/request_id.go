@@ -8,6 +8,10 @@ import (
 	"github.com/google/uuid"
 )
 
+type uuidCtxKey struct {
+	uuid string
+}
+
 type ctxKey string
 
 const (
@@ -18,15 +22,16 @@ const (
 func WriteReqUUID(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(writer http.ResponseWriter, req *http.Request) {
 		reqUUID := uuid.New().String()
-		ctx := context.WithValue(req.Context(), ReqUUIDKey, reqUUID)
+		reqCtxKey := uuidCtxKey{uuid: reqUUID}
+		ctx := context.WithValue(req.Context(), ReqUUIDKey, reqCtxKey)
 		writer.Header().Set(ReqHeader, reqUUID)
 		next.ServeHTTP(writer, req.WithContext(ctx))
 	})
 }
 
-func ReadReqUUID(req *http.Request) string {
-	if reqUUID, ok := req.Context().Value(ReqUUIDKey).(string); ok {
-		return reqUUID
+func ReadReqUUID(req *http.Request) (string, error) {
+	if reqCtxKey, ok := req.Context().Value(ReqUUIDKey).(uuidCtxKey); ok {
+		return reqCtxKey.uuid, nil
 	}
-	return errors.New("error: unable to fetch id of this request").Error()
+	return "", errors.New("error: unable to fetch id of this request")
 }

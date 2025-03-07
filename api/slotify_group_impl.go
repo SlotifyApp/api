@@ -20,9 +20,10 @@ func (s Server) DeleteSlotifyGroupsSlotifyGroupIDLeaveMe(w http.ResponseWriter,
 	defer cancel()
 
 	userID, ok := r.Context().Value(UserIDCtxKey{}).(uint32)
-	reqUUID := ReadReqUUID(r)
+	reqUUID, _ := ReadReqUUID(r)
+	uuidStr := zap.String("request ID: ", reqUUID)
 	if !ok {
-		s.Logger.Error("failed to get userid from request context, request ID: " + reqUUID)
+		s.Logger.Error("failed to get userid from request context, ", uuidStr)
 		sendError(w, http.StatusUnauthorized, "Try again later.")
 		return
 	}
@@ -33,14 +34,14 @@ func (s Server) DeleteSlotifyGroupsSlotifyGroupIDLeaveMe(w http.ResponseWriter,
 		UserID:         userID,
 		SlotifyGroupID: slotifyGroupID,
 	}); err != nil {
-		s.Logger.Error("failed to get count of member in slotify group, request ID: "+reqUUID+", ", zap.Error(err))
+		s.Logger.Error("failed to get count of member in slotify group, ", uuidStr, zap.Error(err))
 		sendError(w, http.StatusInternalServerError, "Failed to check if member is in slotify group")
 		return
 	}
 
 	// User not a member of the group
 	if count == 0 {
-		s.Logger.Error("user was not a member of the group, so can't leave, request ID: "+reqUUID+", ", zap.Error(err),
+		s.Logger.Error("user was not a member of the group, so can't leave, ", uuidStr, zap.Error(err),
 			zap.Uint32("userID", userID),
 			zap.Uint32("slotifyGroupID", slotifyGroupID),
 		)
@@ -50,7 +51,7 @@ func (s Server) DeleteSlotifyGroupsSlotifyGroupIDLeaveMe(w http.ResponseWriter,
 
 	var memberCount int64
 	if memberCount, err = s.DB.CountSlotifyGroupMembers(ctx, slotifyGroupID); err != nil {
-		s.Logger.Error("failed to get member count, request ID: "+reqUUID+", ", zap.Error(err),
+		s.Logger.Error("failed to get member count, ", uuidStr, zap.Error(err),
 			zap.Uint32("userID", userID),
 			zap.Uint32("slotifyGroupID", slotifyGroupID),
 		)
@@ -62,7 +63,7 @@ func (s Server) DeleteSlotifyGroupsSlotifyGroupIDLeaveMe(w http.ResponseWriter,
 	if memberCount == 1 {
 		var rowsAffected int64
 		if rowsAffected, err = s.DB.DeleteSlotifyGroupByID(ctx, slotifyGroupID); err != nil {
-			s.Logger.Error("failed to delete slotify group, request ID: "+reqUUID+", ", zap.Error(err),
+			s.Logger.Error("failed to delete slotify group, ", uuidStr, zap.Error(err),
 				zap.Uint32("userID", userID),
 				zap.Uint32("slotifyGroupID", slotifyGroupID),
 			)
@@ -73,7 +74,7 @@ func (s Server) DeleteSlotifyGroupsSlotifyGroupIDLeaveMe(w http.ResponseWriter,
 		var expectedRows int64 = 2
 		if rowsAffected != expectedRows {
 			err = database.WrongNumberSQLRowsError{ActualRows: rowsAffected, ExpectedRows: []int64{expectedRows}}
-			s.Logger.Error("failed to delete slotify group, request ID: "+reqUUID+", ", zap.Error(err),
+			s.Logger.Error("failed to delete slotify group, ", uuidStr, zap.Error(err),
 				zap.Uint32("userID", userID),
 				zap.Uint32("slotifyGroupID", slotifyGroupID),
 			)
@@ -87,7 +88,7 @@ func (s Server) DeleteSlotifyGroupsSlotifyGroupIDLeaveMe(w http.ResponseWriter,
 			SlotifyGroupID: slotifyGroupID,
 		}); err != nil {
 			err = database.WrongNumberSQLRowsError{ActualRows: rowsAffected, ExpectedRows: []int64{1}}
-			s.Logger.Error("failed to remove slotify member, request ID: "+reqUUID+", ", zap.Error(err),
+			s.Logger.Error("failed to remove slotify member, ", uuidStr, zap.Error(err),
 				zap.Uint32("userID", userID),
 				zap.Uint32("slotifyGroupID", slotifyGroupID),
 			)
@@ -106,7 +107,7 @@ func (s Server) DeleteSlotifyGroupsSlotifyGroupIDLeaveMe(w http.ResponseWriter,
 	}
 	// Still successful, just notifications failed
 	if err = sendLeaverNotifications(p); err != nil {
-		s.Logger.Error("failed to send leaver notifications, request ID: "+reqUUID+", ", zap.Error(err),
+		s.Logger.Error("failed to send leaver notifications, ", uuidStr, zap.Error(err),
 			zap.Uint32("userID", userID),
 			zap.Uint32("slotifyGroupID", slotifyGroupID),
 		)
@@ -118,7 +119,8 @@ func (s Server) DeleteSlotifyGroupsSlotifyGroupIDLeaveMe(w http.ResponseWriter,
 // (GET /api/slotify-groups/me).
 func (s Server) GetAPISlotifyGroupsMe(w http.ResponseWriter, r *http.Request) {
 	userID, ok := r.Context().Value(UserIDCtxKey{}).(uint32)
-	reqUUID := ReadReqUUID(r)
+	reqUUID, _ := ReadReqUUID(r)
+	uuidStr := zap.String("request ID: ", reqUUID)
 	if !ok {
 		s.Logger.Error("failed to get userid from request context, request ID: " + reqUUID)
 		sendError(w, http.StatusUnauthorized, "Try again later.")
@@ -132,17 +134,17 @@ func (s Server) GetAPISlotifyGroupsMe(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		switch {
 		case errors.Is(err, context.Canceled):
-			s.Logger.Error("getting users slotifyGroup failed: context was cancelled, request ID: "+reqUUID+", ",
+			s.Logger.Error("getting users slotifyGroup failed: context was cancelled, ", uuidStr,
 				zap.Uint32("userID", userID))
 			sendError(w, http.StatusUnauthorized, "Try again later.")
 			return
 		case errors.Is(err, context.DeadlineExceeded):
-			s.Logger.Error("getting users slotifyGroup query timed out, request ID: "+reqUUID+", ",
+			s.Logger.Error("getting users slotifyGroup query timed out, ", uuidStr,
 				zap.Uint32("userID", userID))
 			sendError(w, http.StatusUnauthorized, "Try again later.")
 			return
 		default:
-			s.Logger.Error("failed to get users slotifyGroups, request ID: "+reqUUID+", ", zap.Uint32("userID", userID))
+			s.Logger.Error("failed to get users slotifyGroups, ", uuidStr, zap.Uint32("userID", userID))
 			sendError(w, http.StatusInternalServerError, fmt.Sprintf("Sorry, failed to get user id(%d)'s slotifyGroups", userID))
 			return
 		}
@@ -156,9 +158,10 @@ func (s Server) PostAPISlotifyGroups(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	userID, ok := r.Context().Value(UserIDCtxKey{}).(uint32)
-	reqUUID := ReadReqUUID(r)
+	reqUUID, _ := ReadReqUUID(r)
+	uuidStr := zap.String("request ID: ", reqUUID)
 	if !ok {
-		s.Logger.Error("failed to get userid from request context, request ID: " + reqUUID)
+		s.Logger.Error("failed to get userid from request context, ", uuidStr)
 		sendError(w, http.StatusUnauthorized, "Try again later.")
 		return
 	}
@@ -166,7 +169,7 @@ func (s Server) PostAPISlotifyGroups(w http.ResponseWriter, r *http.Request) {
 	var slotifyGroupBody PostAPISlotifyGroupsJSONRequestBody
 	var err error
 	if err = json.NewDecoder(r.Body).Decode(&slotifyGroupBody); err != nil {
-		s.Logger.Error(ErrUnmarshalBody.Error()+", request ID: "+reqUUID+", ",
+		s.Logger.Error(ErrUnmarshalBody.Error()+", ", uuidStr,
 			zap.Object("body", slotifyGroupBody), zap.Error(err))
 		sendError(w, http.StatusBadRequest, ErrUnmarshalBody.Error())
 		return
@@ -174,14 +177,14 @@ func (s Server) PostAPISlotifyGroups(w http.ResponseWriter, r *http.Request) {
 
 	tx, err := s.DB.DB.Begin()
 	if err != nil {
-		s.Logger.Error("failed to start db transaction, request ID: "+reqUUID+", ", zap.Error(err))
+		s.Logger.Error("failed to start db transaction, ", uuidStr, zap.Error(err))
 		sendError(w, http.StatusInternalServerError, "callback route: failed to start db transaction")
 		return
 	}
 
 	defer func() {
 		if err = tx.Rollback(); err != nil {
-			s.Logger.Error("failed to rollback db transaction, request ID: "+reqUUID+", ", zap.Error(err))
+			s.Logger.Error("failed to rollback db transaction, ", uuidStr, zap.Error(err))
 		}
 	}()
 
@@ -192,13 +195,13 @@ func (s Server) PostAPISlotifyGroups(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		switch {
 		case database.IsDuplicateEntrySQLError(err):
-			s.Logger.Error("slotifyGroup api: slotifyGroup already exists, request ID: "+reqUUID+", ",
+			s.Logger.Error("slotifyGroup api: slotifyGroup already exists, ", uuidStr,
 				zap.Object("req_body", slotifyGroupBody), zap.Error(err))
 			sendError(w, http.StatusBadRequest,
 				fmt.Sprintf("slotifyGroup with name %s already exists", slotifyGroupBody.Name))
 			return
 		default:
-			s.Logger.Error("failed to create slotifyGroup, request ID: "+reqUUID+", ",
+			s.Logger.Error("failed to create slotifyGroup, ", uuidStr,
 				zap.Object("body", slotifyGroupBody), zap.Error(err))
 			sendError(w, http.StatusBadRequest, "slotifyGroup api: slotifyGroup creation unsuccessful")
 			return
@@ -216,7 +219,7 @@ func (s Server) PostAPISlotifyGroups(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err = AddUserToSlotifyGroup(p); err != nil {
-		s.Logger.Error("creating group was successful, but adding user to the group was not, request ID: "+reqUUID+", ",
+		s.Logger.Error("creating group was successful, but adding user to the group was not, ", uuidStr,
 			zap.Uint32("userID", userID),
 			zap.Int64("slotifyGroupID", slotifyGroupID),
 			zap.Error(err))
@@ -225,7 +228,7 @@ func (s Server) PostAPISlotifyGroups(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err = tx.Commit(); err != nil {
-		s.Logger.Error("failed to commit db transaction, request ID: "+reqUUID+", ", zap.Error(err))
+		s.Logger.Error("failed to commit db transaction, ", uuidStr, zap.Error(err))
 		sendError(w, http.StatusInternalServerError, "failed to create a group and add you to it")
 		return
 	}
@@ -243,22 +246,23 @@ func (s Server) DeleteAPISlotifyGroupsSlotifyGroupID(w http.ResponseWriter, r *h
 	defer cancel()
 
 	rowsDeleted, err := s.DB.DeleteSlotifyGroupByID(ctx, slotifyGroupID)
-	reqUUID := ReadReqUUID(r)
+	reqUUID, _ := ReadReqUUID(r)
+	uuidStr := zap.String("request ID: ", reqUUID)
 	if err != nil {
 		switch {
 		case errors.Is(err, context.Canceled):
-			s.Logger.Error("slotifyGroup api: delete slotifyGroup by id query timed out, request ID: "+reqUUID+", ",
+			s.Logger.Error("slotifyGroup api: delete slotifyGroup by id query timed out, ", uuidStr,
 				zap.Uint32("slotifyGroupID", slotifyGroupID))
 			sendError(w, http.StatusInternalServerError, "add slotifyGroup query timed out")
 			return
 		case errors.Is(err, context.DeadlineExceeded):
-			s.Logger.Error("slotifyGroup api: delete slotifyGroup by id query timed out, request ID: "+reqUUID+", ",
+			s.Logger.Error("slotifyGroup api: delete slotifyGroup by id query timed out, ", uuidStr,
 				zap.Uint32("slotifyGroupID", slotifyGroupID))
 			sendError(w, http.StatusInternalServerError, "add slotifyGroup query timed out")
 			return
 		default:
 			s.Logger.Error("slotifyGroup api: failed to DeleteSlotifyGroupsSlotifyGroupID, "+
-				"request ID: "+reqUUID+", ", zap.Error(err))
+				"", uuidStr, zap.Error(err))
 			sendError(w, http.StatusInternalServerError,
 				"slotifyGroup api: slotifyGroup deletion unsuccessful")
 			return
@@ -270,7 +274,7 @@ func (s Server) DeleteAPISlotifyGroupsSlotifyGroupID(w http.ResponseWriter, r *h
 			ActualRows:   rowsDeleted,
 			ExpectedRows: []int64{1},
 		}
-		s.Logger.Errorf("slotifyGroup api failed to delete slotifyGroup, request ID: "+reqUUID+", ", zap.Error(err))
+		s.Logger.Errorf("slotifyGroup api failed to delete slotifyGroup, ", uuidStr, zap.Error(err))
 		sendError(w, http.StatusBadRequest, "slotifyGroup api: incorrect slotifyGroup id")
 		return
 	}
@@ -284,28 +288,29 @@ func (s Server) GetAPISlotifyGroupsSlotifyGroupID(w http.ResponseWriter, r *http
 	defer cancel()
 
 	slotifyGroup, err := s.DB.GetSlotifyGroupByID(ctx, slotifyGroupID)
-	reqUUID := ReadReqUUID(r)
+	reqUUID, _ := ReadReqUUID(r)
+	uuidStr := zap.String("request ID: ", reqUUID)
 	if err != nil {
 		switch {
 		case errors.Is(err, context.Canceled):
-			s.Logger.Error("slotifyGroup api: context cancelled, request ID: "+reqUUID+", ",
+			s.Logger.Error("slotifyGroup api: context cancelled, ", uuidStr,
 				zap.Uint32("slotifyGroupID", slotifyGroupID), zap.Error(err))
 			sendError(w, http.StatusInternalServerError, "sorry try again")
 			return
 		case errors.Is(err, context.DeadlineExceeded):
-			s.Logger.Error("slotifyGroup api: delete slotifyGroup by id query timed out, request ID: "+reqUUID+", ",
+			s.Logger.Error("slotifyGroup api: delete slotifyGroup by id query timed out, ", uuidStr,
 				zap.Uint32("slotifyGroupID", slotifyGroupID))
 			sendError(w, http.StatusInternalServerError, "add slotifyGroup query timed out")
 			return
 		case errors.Is(err, sql.ErrNoRows):
-			s.Logger.Error("slotifyGroup api: failed to get slotifyGroup by id, no matching rows, request ID: "+reqUUID+", ",
+			s.Logger.Error("slotifyGroup api: failed to get slotifyGroup by id, no matching rows, ", uuidStr,
 				zap.Error(err))
 			sendError(w, http.StatusNotFound,
 				fmt.Sprintf("slotifyGroup api: slotifyGroup with id %d does not exist", slotifyGroupID))
 			return
 		default:
 			s.Logger.Error("slotifyGroup api: failed to GetSlotifyGroupsSlotifyGroupID, "+
-				"request ID: "+reqUUID+", ", zap.Error(err))
+				"", uuidStr, zap.Error(err))
 			sendError(w, http.StatusInternalServerError, "slotifyGroup api: failed to get slotifyGroup")
 			return
 		}
@@ -319,10 +324,11 @@ func (s Server) GetAPISlotifyGroupsSlotifyGroupIDUsers(w http.ResponseWriter, r 
 	defer cancel()
 
 	count, err := s.DB.CountSlotifyGroupByID(ctx, slotifyGroupID)
-	reqUUID := ReadReqUUID(r)
+	reqUUID, _ := ReadReqUUID(r)
+	uuidStr := zap.String("request ID: ", reqUUID)
 	if err != nil {
 		s.Logger.Error("slotifyGroup api: failed to get users of a group: failed to get count of group by id, "+
-			"request ID: "+reqUUID+", ",
+			"", uuidStr,
 			zap.Uint32("slotifyGroupID",
 				slotifyGroupID),
 			zap.Error(err),
@@ -333,7 +339,7 @@ func (s Server) GetAPISlotifyGroupsSlotifyGroupIDUsers(w http.ResponseWriter, r 
 
 	if count == 0 {
 		s.Logger.Error("slotifyGroup api: slotifyGroup members of non-existent slotifyGroup requested, "+
-			"request ID: "+reqUUID+", ",
+			"", uuidStr,
 			zap.Uint32("slotifyGroupID", slotifyGroupID), zap.Error(err))
 		sendError(w, http.StatusNotFound,
 			fmt.Sprintf("slotifyGroup api: slotifyGroup with id(%d) does not exist", slotifyGroupID))
@@ -342,7 +348,7 @@ func (s Server) GetAPISlotifyGroupsSlotifyGroupIDUsers(w http.ResponseWriter, r 
 
 	users, err := s.DB.GetAllSlotifyGroupMembers(ctx, slotifyGroupID)
 	if err != nil {
-		s.Logger.Error("slotifyGroup api: failed to get users of a group, request ID: "+reqUUID+", ",
+		s.Logger.Error("slotifyGroup api: failed to get users of a group, ", uuidStr,
 			zap.Uint32("slotifyGroupID",
 				slotifyGroupID),
 			zap.Error(err),

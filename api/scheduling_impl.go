@@ -16,9 +16,10 @@ func (s Server) PostAPISchedulingFree(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	userID, ok := r.Context().Value(UserIDCtxKey{}).(uint32)
-	reqUUID := ReadReqUUID(r)
+	reqUUID, _ := ReadReqUUID(r)
+	uuidStr := zap.String("request ID: ", reqUUID)
 	if !ok {
-		s.Logger.Error("failed to get userid from request context, request ID: " + reqUUID)
+		s.Logger.Error("failed to get userid from request context, request ID: ", uuidStr)
 		sendError(w, http.StatusUnauthorized, "Try again later.")
 		return
 	}
@@ -27,21 +28,21 @@ func (s Server) PostAPISchedulingFree(w http.ResponseWriter, r *http.Request) {
 	var err error
 	if err = json.NewDecoder(r.Body).Decode(&body); err != nil {
 		// TODO: Add zap log for body
-		s.Logger.Error(ErrUnmarshalBody.Error()+", request ID: "+reqUUID+", ", zap.Error(err))
+		s.Logger.Error(ErrUnmarshalBody.Error(), uuidStr, zap.Error(err))
 		sendError(w, http.StatusBadRequest, ErrUnmarshalBody.Error())
 		return
 	}
 
 	graph, err := CreateMSFTGraphClient(ctx, s.MSALClient, s.DB, userID)
 	if err != nil {
-		s.Logger.Error("failed to create msgraph client, request ID: "+reqUUID+", ", zap.Error(err))
+		s.Logger.Error("failed to create msgraph client, ", uuidStr, zap.Error(err))
 		sendError(w, http.StatusBadGateway, "Failed to connect to microsoft graph API")
 		return
 	}
 
 	respBody, err := makeFindMeetingTimesAPICall(ctx, graph, body)
 	if err != nil {
-		s.Logger.Error("failed to make msgraph api call to findMeetings, request ID: "+reqUUID+", ", zap.Error(err))
+		s.Logger.Error("failed to make msgraph api call to findMeetings, ", uuidStr, zap.Error(err))
 		sendError(w, http.StatusBadGateway, "Failed to process/send microsoft graph API request for findMeeting")
 		return
 	}

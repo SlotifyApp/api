@@ -18,37 +18,37 @@ import (
 func (s Server) PostAPIInvites(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 4*database.DatabaseTimeout)
 	defer cancel()
-	reqUUID := ReadReqUUID(r)
-
+	reqUUID, _ := ReadReqUUID(r)
+	uuidStr := zap.String("request ID: ", reqUUID)
 	userID, ok := r.Context().Value(UserIDCtxKey{}).(uint32)
 	if !ok {
-		s.Logger.Error("failed to get userid from request context, request ID: " + reqUUID)
+		s.Logger.Error("failed to get userid from request context, ", uuidStr)
 		sendError(w, http.StatusUnauthorized, "Try again later.")
 		return
 	}
 	var invitesCreateBody PostAPIInvitesJSONRequestBody
 	var err error
 	if err = json.NewDecoder(r.Body).Decode(&invitesCreateBody); err != nil {
-		s.Logger.Error(ErrUnmarshalBody.Error()+"request ID: "+reqUUID+", ",
+		s.Logger.Error(ErrUnmarshalBody.Error()+"", uuidStr,
 			zap.Object("body", invitesCreateBody), zap.Error(err))
 		sendError(w, http.StatusBadRequest, ErrUnmarshalBody.Error())
 		return
 	}
 	var g database.SlotifyGroup
 	if g, err = s.DB.GetSlotifyGroupByID(ctx, invitesCreateBody.SlotifyGroupID); err != nil {
-		s.Logger.Errorf("invite api: failed to get group by id, request ID: "+reqUUID+", ", zap.Error(err))
+		s.Logger.Errorf("invite api: failed to get group by id, ", uuidStr, zap.Error(err))
 		sendError(w, http.StatusBadRequest, "failed to get group by id")
 		return
 	}
 	var u database.User
 	if u, err = s.DB.GetUserByID(ctx, userID); err != nil {
-		s.Logger.Errorf("invite api: failed to get user by id, request ID: "+reqUUID+", ", zap.Error(err))
+		s.Logger.Errorf("invite api: failed to get user by id, ", uuidStr, zap.Error(err))
 		sendError(w, http.StatusBadRequest, "failed to get user by id")
 		return
 	}
 	var toUser database.User
 	if toUser, err = s.DB.GetUserByID(ctx, invitesCreateBody.ToUserID); err != nil {
-		s.Logger.Errorf("invite api: failed to get user by id, request ID: "+reqUUID+", ", zap.Error(err))
+		s.Logger.Errorf("invite api: failed to get user by id, ", uuidStr, zap.Error(err))
 		sendError(w, http.StatusBadRequest, "failed to get user by id")
 		return
 	}
@@ -63,7 +63,7 @@ func (s Server) PostAPIInvites(w http.ResponseWriter, r *http.Request) {
 		slotifyGroupName: g.Name,
 		toUserID:         invitesCreateBody.ToUserID,
 	}); err != nil {
-		s.Logger.Errorf("request ID: "+reqUUID+", "+"invite api: ", zap.Error(err))
+		s.Logger.Errorf(uuidStr.String, "invite api: ", zap.Error(err))
 		sendError(w, http.StatusBadRequest, err.Error())
 		return
 	}
@@ -79,12 +79,12 @@ func (s Server) PostAPIInvites(w http.ResponseWriter, r *http.Request) {
 	var inviteID int64
 	err = retry.Do(func() error {
 		if inviteID, err = s.DB.CreateInvite(ctx, params); err != nil {
-			return fmt.Errorf("failed to create invite: %w, request ID: "+reqUUID+", ", err)
+			return fmt.Errorf("failed to create invite: %w, request ID: %s", err, uuidStr.String)
 		}
 		return nil
 	}, retry.Attempts(3), retry.Delay(time.Millisecond*500))
 	if err != nil {
-		s.Logger.Error("failed to create invite, request ID: "+reqUUID+", ", zap.Error(err))
+		s.Logger.Error("failed to create invite, ", uuidStr, zap.Error(err))
 		sendError(w, http.StatusBadGateway, "Failed to create invite")
 		return
 	}
@@ -118,9 +118,10 @@ func (s Server) GetAPIInvitesMe(w http.ResponseWriter, r *http.Request, params G
 	defer cancel()
 
 	userID, ok := r.Context().Value(UserIDCtxKey{}).(uint32)
-	reqUUID := ReadReqUUID(r)
+	reqUUID, _ := ReadReqUUID(r)
+	uuidStr := zap.String("request ID: ", reqUUID)
 	if !ok {
-		s.Logger.Error("failed to get userid from request context, request ID: " + reqUUID + ", ")
+		s.Logger.Error("failed to get userid from request context, ", uuidStr)
 		sendError(w, http.StatusUnauthorized, "Try again later.")
 		return
 	}
@@ -129,15 +130,15 @@ func (s Server) GetAPIInvitesMe(w http.ResponseWriter, r *http.Request, params G
 	if err != nil {
 		switch {
 		case errors.Is(err, context.Canceled):
-			s.Logger.Error("invite api: failed to get invites: context cancelled, request ID: " + reqUUID)
+			s.Logger.Error("invite api: failed to get invites: context cancelled, ", uuidStr)
 			sendError(w, http.StatusInternalServerError, "user api: failed to get invites")
 			return
 		case errors.Is(err, context.DeadlineExceeded):
-			s.Logger.Error("invite api: failed to get invites: query timed out, request ID: " + reqUUID)
+			s.Logger.Error("invite api: failed to get invites: query timed out, ", uuidStr)
 			sendError(w, http.StatusInternalServerError, "invite api: failed to get invites")
 			return
 		default:
-			s.Logger.Error("invite api: failed to get invites, request ID: " + reqUUID)
+			s.Logger.Error("invite api: failed to get invites, ", uuidStr)
 			sendError(w, http.StatusInternalServerError, "user api: failed to get invites")
 			return
 		}
@@ -152,9 +153,10 @@ func (s Server) DeleteAPIInvitesInviteID(w http.ResponseWriter, r *http.Request,
 	defer cancel()
 
 	userID, ok := r.Context().Value(UserIDCtxKey{}).(uint32)
-	reqUUID := ReadReqUUID(r)
+	reqUUID, _ := ReadReqUUID(r)
+	uuidStr := zap.String("request ID: ", reqUUID)
 	if !ok {
-		s.Logger.Error("failed to get userid from request context, request ID: " + reqUUID)
+		s.Logger.Error("failed to get userid from request context, ", uuidStr)
 		sendError(w, http.StatusUnauthorized, "Try again later.")
 		return
 	}
@@ -162,7 +164,7 @@ func (s Server) DeleteAPIInvitesInviteID(w http.ResponseWriter, r *http.Request,
 	var invite database.Invite
 	var err error
 	if invite, err = s.DB.GetInviteByID(ctx, inviteID); err != nil {
-		s.Logger.Error("failed to get invite by id, request ID: "+reqUUID+", ", zap.Error(err))
+		s.Logger.Error("failed to get invite by id, ", uuidStr, zap.Error(err))
 		sendError(w, http.StatusBadGateway, "Failed to get invite by id")
 		return
 	}
@@ -172,13 +174,13 @@ func (s Server) DeleteAPIInvitesInviteID(w http.ResponseWriter, r *http.Request,
 		UserID:         userID,
 		SlotifyGroupID: invite.SlotifyGroupID,
 	}); err != nil {
-		s.Logger.Error("failed to see if user is in group, request ID: "+reqUUID+", ", zap.Error(err))
+		s.Logger.Error("failed to see if user is in group, ", uuidStr, zap.Error(err))
 		sendError(w, http.StatusInternalServerError, "failed to see if user is in group")
 		return
 	}
 
 	if !userIsInGroup {
-		s.Logger.Error("user is not in group, cannot delete invite, request ID: "+reqUUID+", ", zap.Error(err))
+		s.Logger.Error("user is not in group, cannot delete invite, ", uuidStr, zap.Error(err))
 		sendError(w, http.StatusUnauthorized, "You are not apart of the group, cannto delete invite.")
 		return
 	}
@@ -187,7 +189,7 @@ func (s Server) DeleteAPIInvitesInviteID(w http.ResponseWriter, r *http.Request,
 		return database.DeleteInviteByIDWrapper(ctx, s.DB, inviteID)
 	}, retry.Attempts(3), retry.Delay(time.Millisecond*500))
 	if err != nil {
-		s.Logger.Error("failed to delete invite, request ID: "+reqUUID+", ", zap.Error(err))
+		s.Logger.Error("failed to delete invite, ", uuidStr, zap.Error(err))
 		sendError(w, http.StatusBadGateway, "Failed to create invite")
 		return
 	}
@@ -201,9 +203,10 @@ func (s Server) PatchAPIInvitesInviteID(w http.ResponseWriter, r *http.Request, 
 	defer cancel()
 
 	userID, ok := r.Context().Value(UserIDCtxKey{}).(uint32)
-	reqUUID := ReadReqUUID(r)
+	reqUUID, _ := ReadReqUUID(r)
+	uuidStr := zap.String("request ID: ", reqUUID)
 	if !ok {
-		s.Logger.Error("failed to get userid from request context, request ID: " + reqUUID)
+		s.Logger.Error("failed to get userid from request context, ", uuidStr)
 		sendError(w, http.StatusUnauthorized, "Try again later.")
 		return
 	}
@@ -211,20 +214,20 @@ func (s Server) PatchAPIInvitesInviteID(w http.ResponseWriter, r *http.Request, 
 	var body PatchAPIInvitesInviteIDJSONRequestBody
 	var err error
 	if err = json.NewDecoder(r.Body).Decode(&body); err != nil {
-		s.Logger.Error(ErrUnmarshalBody.Error()+", request ID: "+reqUUID+", ", zap.Object("body", body), zap.Error(err))
+		s.Logger.Error(ErrUnmarshalBody.Error()+", ", uuidStr, zap.Object("body", body), zap.Error(err))
 		sendError(w, http.StatusBadRequest, ErrUnmarshalBody.Error())
 		return
 	}
 
 	var invite database.Invite
 	if invite, err = s.DB.GetInviteByID(ctx, inviteID); err != nil {
-		s.Logger.Error("failed to get invite details from invite id, request ID: "+reqUUID+", ", zap.Error(err))
+		s.Logger.Error("failed to get invite details from invite id, ", uuidStr, zap.Error(err))
 		sendError(w, http.StatusInternalServerError, "failed to get invite details from invite id")
 		return
 	}
 
 	if invite.FromUserID != userID {
-		s.Logger.Error("user cannot, request ID: "+reqUUID+", ", zap.Error(err))
+		s.Logger.Error("user cannot, ", uuidStr, zap.Error(err))
 		sendError(w, http.StatusUnauthorized,
 			"can only edit your invite message, contact the person who created the invite")
 		return
@@ -246,18 +249,18 @@ func (s Server) PatchAPIInvitesInviteID(w http.ResponseWriter, r *http.Request, 
 		if err != nil {
 			switch {
 			case errors.Is(err, context.Canceled):
-				return fmt.Errorf("context cancelled deleting invite: %w, request ID: "+reqUUID+", ",
-					err)
+				return fmt.Errorf("context cancelled deleting invite: %w, request ID: %s: ",
+					err, uuidStr.String)
 			case errors.Is(err, context.DeadlineExceeded):
-				return fmt.Errorf("deadline exceeded during deleting invite: %w, request ID: "+reqUUID+", ", err)
+				return fmt.Errorf("deadline exceeded during deleting invite: %w, request ID: %s", err, uuidStr.String)
 			default:
-				return fmt.Errorf("failed to delete invite: %w, request ID: "+reqUUID+", ", err)
+				return fmt.Errorf("failed to delete invite: %w, request ID: %s", err, uuidStr.String)
 			}
 		}
 		return nil
 	}, retry.Attempts(3), retry.Delay(time.Millisecond*500))
 	if err != nil {
-		s.Logger.Error("failed to update invite message, request ID: "+reqUUID+", ", zap.Error(err))
+		s.Logger.Error("failed to update invite message, ", uuidStr, zap.Error(err))
 		sendError(w, http.StatusBadGateway, "Failed to update invite message")
 		return
 	}
@@ -273,9 +276,10 @@ func (s Server) PatchAPIInvitesInviteIDDecline(w http.ResponseWriter, r *http.Re
 	defer cancel()
 
 	userID, ok := r.Context().Value(UserIDCtxKey{}).(uint32)
-	reqUUID := ReadReqUUID(r)
+	reqUUID, _ := ReadReqUUID(r)
+	uuidStr := zap.String("request ID: ", reqUUID)
 	if !ok {
-		s.Logger.Error("failed to get userid from request context, request ID: " + reqUUID)
+		s.Logger.Error("failed to get userid from request context, ", uuidStr)
 		sendError(w, http.StatusUnauthorized, "Try again later.")
 		return
 	}
@@ -291,7 +295,7 @@ func (s Server) PatchAPIInvitesInviteIDDecline(w http.ResponseWriter, r *http.Re
 
 	var err error
 	if _, err = validateAndUpdateInviteStatus(p); err != nil {
-		s.Logger.Error("failed to validate and update invite status, request ID: "+reqUUID+", ", zap.Error(err))
+		s.Logger.Error("failed to validate and update invite status, ", uuidStr, zap.Error(err))
 		sendError(w, http.StatusBadGateway, err.Error())
 		return
 	}
@@ -307,23 +311,24 @@ func (s Server) PatchAPIInvitesInviteIDAccept(w http.ResponseWriter, r *http.Req
 	defer cancel()
 
 	userID, ok := r.Context().Value(UserIDCtxKey{}).(uint32)
-	reqUUID := ReadReqUUID(r)
+	reqUUID, _ := ReadReqUUID(r)
+	uuidStr := zap.String("request ID: ", reqUUID)
 	if !ok {
-		s.Logger.Error("failed to get userid from request context, request ID: " + reqUUID)
+		s.Logger.Error("failed to get userid from request context, ", uuidStr)
 		sendError(w, http.StatusUnauthorized, "Try again later.")
 		return
 	}
 
 	tx, err := s.DB.DB.Begin()
 	if err != nil {
-		s.Logger.Error("failed to start db transaction, request ID: "+reqUUID+", ", zap.Error(err))
+		s.Logger.Error("failed to start db transaction, ", uuidStr, zap.Error(err))
 		sendError(w, http.StatusInternalServerError, "callback route: failed to start db transaction")
 		return
 	}
 
 	defer func() {
 		if err = tx.Rollback(); err != nil {
-			s.Logger.Error("failed to rollback db transaction, request ID: "+reqUUID+", ", zap.Error(err))
+			s.Logger.Error("failed to rollback db transaction, ", uuidStr, zap.Error(err))
 		}
 	}()
 
@@ -340,7 +345,7 @@ func (s Server) PatchAPIInvitesInviteIDAccept(w http.ResponseWriter, r *http.Req
 
 	var invite database.Invite
 	if invite, err = validateAndUpdateInviteStatus(p); err != nil {
-		s.Logger.Error("failed to validate and update invite status, request ID: "+reqUUID+", ", zap.Error(err))
+		s.Logger.Error("failed to validate and update invite status, ", uuidStr, zap.Error(err))
 		sendError(w, http.StatusBadGateway, err.Error())
 		return
 	}
@@ -355,7 +360,7 @@ func (s Server) PatchAPIInvitesInviteIDAccept(w http.ResponseWriter, r *http.Req
 	}
 
 	if err = AddUserToSlotifyGroup(addUserParams); err != nil {
-		s.Logger.Error("failed to add user to slotify group, request ID: "+reqUUID+", ", zap.Error(err),
+		s.Logger.Error("failed to add user to slotify group, ", uuidStr, zap.Error(err),
 			zap.Uint32("slotifyGroupID", invite.SlotifyGroupID),
 			zap.Uint32("userID", userID),
 		)
@@ -364,7 +369,7 @@ func (s Server) PatchAPIInvitesInviteIDAccept(w http.ResponseWriter, r *http.Req
 	}
 
 	if err = tx.Commit(); err != nil {
-		s.Logger.Error("failed to commit db transaction, request ID: "+reqUUID+", ", zap.Error(err))
+		s.Logger.Error("failed to commit db transaction, ", uuidStr, zap.Error(err))
 		sendError(w, http.StatusInternalServerError, "failed to accept invite")
 		return
 	}
@@ -384,19 +389,20 @@ func (s Server) GetAPISlotifyGroupsSlotifyGroupIDInvites(w http.ResponseWriter,
 			SlotifyGroupID: slotifyGroupID,
 			Status:         params.Status,
 		})
-	reqUUID := ReadReqUUID(r)
+	reqUUID, _ := ReadReqUUID(r)
+	uuidStr := zap.String("request ID: ", reqUUID)
 	if err != nil {
 		switch {
 		case errors.Is(err, context.Canceled):
-			s.Logger.Error("context cancelled getting invites group, request ID: "+reqUUID+", ", zap.Error(err))
+			s.Logger.Error("context cancelled getting invites group, ", uuidStr, zap.Error(err))
 			sendError(w, http.StatusBadGateway, "Failed to update invite")
 			return
 		case errors.Is(err, context.DeadlineExceeded):
-			s.Logger.Error("context deadline exceeded while getting invites group, request ID: "+reqUUID+", ", zap.Error(err))
+			s.Logger.Error("context deadline exceeded while getting invites group, ", uuidStr, zap.Error(err))
 			sendError(w, http.StatusBadGateway, "Failed to update invite")
 			return
 		default:
-			s.Logger.Error("failed to get group invites, request ID: "+reqUUID+", ", zap.Error(err))
+			s.Logger.Error("failed to get group invites, ", uuidStr, zap.Error(err))
 			sendError(w, http.StatusBadGateway, "Failed to get group invites")
 			return
 		}
