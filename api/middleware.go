@@ -22,14 +22,14 @@ const (
 	ReqHeader    = "X-Request-ID"
 )
 
-// RequestIDCtxKey is the key in context value for the request id.
-type RequestIDCtxKey struct{}
-
 // RefreshTokenCtxKey is the key in context value for the refresh token value.
 type RefreshTokenCtxKey struct{}
 
 // UserIDCtxKey is the key in context value for the user id value.
 type UserIDCtxKey struct{}
+
+// RequestIDCtxKey is the key in context value for the request id.
+type RequestIDCtxKey struct{}
 
 // AuthMiddleware takes the http-only cookies and sets the access token under the Authorization header.
 // The refresh token is set in the request context.
