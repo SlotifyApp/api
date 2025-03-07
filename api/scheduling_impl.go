@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"time"
 
@@ -15,34 +16,36 @@ func (s Server) PostAPISchedulingFree(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), time.Minute*3)
 	defer cancel()
 
-	userID, ok := r.Context().Value(UserIDCtxKey{}).(uint32)
-	reqUUID, _ := ReadReqUUID(r)
-	uuidStr := zap.String("request ID: ", reqUUID)
-	if !ok {
-		s.Logger.Error("failed to get userid from request context, request ID: ", uuidStr)
-		sendError(w, http.StatusUnauthorized, "Try again later.")
+	reqID, userID, err := GetCtxValues(r)
+	if err != nil {
+		if errors.Is(err, ErrRequestIDNotFound) {
+			s.Logger.Error(err)
+			sendError(w, http.StatusInternalServerError, "Try again later.")
+		} else if errors.Is(err, ErrUserIDNotFound) {
+			s.Logger.Error(err)
+			sendError(w, http.StatusUnauthorized, "Try again later.")
+		}
 		return
 	}
 
 	var body SchedulingSlotsBodySchema
-	var err error
 	if err = json.NewDecoder(r.Body).Decode(&body); err != nil {
 		// TODO: Add zap log for body
-		s.Logger.Error(ErrUnmarshalBody.Error(), uuidStr, zap.Error(err))
+		s.Logger.Errorf(ErrUnmarshalBody.Error(), zap.String("request id", reqID), zap.Error(err))
 		sendError(w, http.StatusBadRequest, ErrUnmarshalBody.Error())
 		return
 	}
 
 	graph, err := CreateMSFTGraphClient(ctx, s.MSALClient, s.DB, userID)
 	if err != nil {
-		s.Logger.Error("failed to create msgraph client, ", uuidStr, zap.Error(err))
+		s.Logger.Error("%s: %s: failed to create msgraph client, ", reqID, zap.Error(err))
 		sendError(w, http.StatusBadGateway, "Failed to connect to microsoft graph API")
 		return
 	}
 
 	respBody, err := makeFindMeetingTimesAPICall(ctx, graph, body)
 	if err != nil {
-		s.Logger.Error("failed to make msgraph api call to findMeetings, ", uuidStr, zap.Error(err))
+		s.Logger.Error("failed to make msgraph api call to findMeetings, ", reqID, zap.Error(err))
 		sendError(w, http.StatusBadGateway, "Failed to process/send microsoft graph API request for findMeeting")
 		return
 	}

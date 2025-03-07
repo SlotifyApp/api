@@ -2,27 +2,41 @@ package api
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"time"
 
 	"github.com/SlotifyApp/slotify-backend/jwt"
 	"github.com/getkin/kin-openapi/openapi3"
+
 	chi_middleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/httprate"
+	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 	oapi_middleware "github.com/oapi-codegen/nethttp-middleware"
 )
 
 const (
 	requestLimit = 100
+	reqHeader    = "X-Request-ID"
 )
+
+// ErrUserIDNotFound is returned when the user id is not set in the request context.
+var ErrUserIDNotFound = errors.New("user id not found in request context")
+
+// ErrRequestIDNotFound is returned when the request id is not set in the request context.
+var ErrRequestIDNotFound = errors.New("request id not found in request context")
 
 // RefreshTokenCtxKey is the key in context value for the refresh token value.
 type RefreshTokenCtxKey struct{}
 
 // UserIDCtxKey is the key in context value for the user id value.
 type UserIDCtxKey struct{}
+
+// RequestIDCtxKey is the key in context value for the request id.
+type RequestIDCtxKey struct{}
 
 // AuthMiddleware takes the http-only cookies and sets the access token under the Authorization header.
 // The refresh token is set in the request context.
@@ -41,31 +55,30 @@ func AuthMiddleware(next http.Handler) http.Handler {
 
 		// Get access_token cookie.
 		accessTokenCookie, err := r.Cookie("access_token")
-		reqUUID, _ := ReadReqUUID(r)
 		if err != nil {
-			log.Printf("error fetching access_token cookie: route: %s, err: %s, ID: %s", r.URL.Path, err.Error(), reqUUID)
+			log.Printf("error fetching access_token cookie: route: %s, err: %s", r.URL.Path, err.Error())
 			http.Error(w, "Missing or invalid token", http.StatusUnauthorized)
 			return
 		}
 		if accessTokenCookie == nil || accessTokenCookie.Value == "" {
-			log.Printf("access_token was nil/empty: route: %s, ID: %s", r.URL.Path, reqUUID)
+			log.Printf("access_token was nil/empty: route: %s", r.URL.Path)
 			http.Error(w, "Missing or invalid token", http.StatusUnauthorized)
 			return
 		}
 
-		r.Header.Set("Authorization", "Bearer "+accessTokenCookie.Value)
+		r.Header.Set("Authorization", fmt.Sprintf("Bearer: %s", accessTokenCookie.Value))
 
 		// Some methods require refresh token and it is sent automatically
 		// anyway in any request from the frontend
 		// set refresh token in request context
 		refreshTokenCookie, err := r.Cookie("refresh_token")
 		if err != nil {
-			log.Printf("error fetching refresh_token cookie: route: %s, err: %s, ID: %s", r.URL.Path, err.Error(), reqUUID)
+			log.Printf("error fetching refresh_token cookie: route: %s, err: %s", r.URL.Path, err.Error())
 			http.Error(w, "Missing or invalid token", http.StatusUnauthorized)
 			return
 		}
 		if refreshTokenCookie == nil || refreshTokenCookie.Value == "" {
-			log.Printf("refresh_token was nil/empty: route: %s, ID: %s", r.URL.Path, reqUUID)
+			log.Printf("refresh_token was nil/empty: route: %s", r.URL.Path)
 			http.Error(w, "Missing or invalid token", http.StatusUnauthorized)
 			return
 		}
@@ -106,6 +119,19 @@ func JWTMiddleware(next http.Handler) http.Handler {
 	})
 }
 
+func RequestIDMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		reqID := uuid.NewString()
+
+		// set in context
+		ctx := context.WithValue(r.Context(), RequestIDCtxKey{}, reqID)
+		// set in response writer header
+		w.Header().Set(reqHeader, reqID)
+
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
 // ApplyMiddlewares applies all the middleware functions for the server.
 func ApplyMiddlewares(r *mux.Router, swagger *openapi3.T) {
 	middlewares := []mux.MiddlewareFunc{
@@ -114,6 +140,7 @@ func ApplyMiddlewares(r *mux.Router, swagger *openapi3.T) {
 		// makes sure that requests and responses follow openapischema
 		oapi_middleware.OapiRequestValidator(swagger),
 
+		RequestIDMiddleware,
 		JWTMiddleware,
 
 		// logs requests and statuses.
@@ -131,4 +158,18 @@ func ApplyMiddlewares(r *mux.Router, swagger *openapi3.T) {
 	for _, middleware := range middlewares {
 		r.Use(middleware)
 	}
+}
+
+func GetCtxValues(r *http.Request) (string, uint32, error) {
+	var reqID string
+	var userID uint32
+	var ok bool
+	if reqID, ok = r.Context().Value(RequestIDCtxKey{}).(string); !ok {
+		return "", 0, ErrRequestIDNotFound
+	}
+	if userID, ok = r.Context().Value(UserIDCtxKey{}).(uint32); !ok {
+		return "", 0, ErrUserIDNotFound
+	}
+
+	return reqID, userID, nil
 }

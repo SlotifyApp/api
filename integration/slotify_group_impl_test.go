@@ -14,6 +14,7 @@ import (
 	"github.com/SlotifyApp/slotify-backend/mocks"
 	"github.com/SlotifyApp/slotify-backend/testutil"
 	"github.com/brianvoe/gofakeit/v7"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 )
@@ -79,6 +80,7 @@ func TestSlotifyGroup_PostSlotifyGroups(t *testing.T) {
 			req.Header.Add("Content-Type", "application/json")
 
 			ctx := context.WithValue(req.Context(), api.UserIDCtxKey{}, user.Id)
+			ctx = context.WithValue(ctx, api.RequestIDCtxKey{}, uuid.NewString())
 			req = req.WithContext(ctx)
 
 			server.PostAPISlotifyGroups(rr, req)
@@ -143,6 +145,9 @@ func TestSlotifyGroup_DeleteSlotifyGroupsSlotifyGroupID(t *testing.T) {
 			rr := httptest.NewRecorder()
 			req := httptest.NewRequest(http.MethodDelete, fmt.Sprintf("/api/slotify-groups/%d", tt.slotifyGroupID), nil)
 
+			ctx := context.WithValue(req.Context(), api.RequestIDCtxKey{}, uuid.NewString())
+			req = req.WithContext(ctx)
+
 			server.DeleteAPISlotifyGroupsSlotifyGroupID(rr, req, tt.slotifyGroupID)
 
 			testutil.OpenAPIValidateTest(t, rr, req)
@@ -193,6 +198,8 @@ func TestSlotifyGroup_GetSlotifyGroupsSlotifyGroupID(t *testing.T) {
 
 			rr := httptest.NewRecorder()
 			req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/slotify-groups/%d", tt.slotifyGroupID), nil)
+			ctx := context.WithValue(req.Context(), api.RequestIDCtxKey{}, uuid.NewString())
+			req = req.WithContext(ctx)
 
 			server.GetAPISlotifyGroupsSlotifyGroupID(rr, req, tt.slotifyGroupID)
 
@@ -258,6 +265,9 @@ func TestSlotifyGroup_GetSlotifyGroupsSlotifyGroupIDUsers(t *testing.T) {
 
 			rr := httptest.NewRecorder()
 			req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/slotify-groups/%d/users", tt.slotifyGroupID), nil)
+
+			ctx := context.WithValue(req.Context(), api.RequestIDCtxKey{}, uuid.NewString())
+			req = req.WithContext(ctx)
 
 			server.GetAPISlotifyGroupsSlotifyGroupIDUsers(rr, req, tt.slotifyGroupID)
 
@@ -326,6 +336,8 @@ func TestSlotifyGroup_GetAPISlotifyGroupsMe(t *testing.T) {
 			req := httptest.NewRequest(http.MethodGet, "/api/slotify-groups/me", nil)
 
 			ctx := context.WithValue(req.Context(), api.UserIDCtxKey{}, tt.userID)
+			ctx = context.WithValue(ctx, api.RequestIDCtxKey{}, uuid.NewString())
+
 			req = req.WithContext(ctx)
 
 			server.GetAPISlotifyGroupsMe(rr, req)

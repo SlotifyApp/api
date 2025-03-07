@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -17,19 +18,21 @@ func (s Server) GetAPIMSFTGroups(w http.ResponseWriter, r *http.Request, params 
 	ctx, cancel := context.WithTimeout(r.Context(), database.DatabaseTimeout)
 	defer cancel()
 
-	// Get userID from request
-	userID, ok := r.Context().Value(UserIDCtxKey{}).(uint32)
-	reqUUID, _ := ReadReqUUID(r)
-	uuidStr := zap.String("request ID: ", reqUUID)
-	if !ok {
-		s.Logger.Error("failed to get userid from request context, ", uuidStr)
-		sendError(w, http.StatusUnauthorized, "Try again later.")
+	reqID, userID, err := GetCtxValues(r)
+	if err != nil {
+		if errors.Is(err, ErrRequestIDNotFound) {
+			s.Logger.Error(err)
+			sendError(w, http.StatusInternalServerError, "Try again later.")
+		} else if errors.Is(err, ErrUserIDNotFound) {
+			s.Logger.Error(err)
+			sendError(w, http.StatusUnauthorized, "Try again later.")
+		}
 		return
 	}
 
 	graph, err := CreateMSFTGraphClient(ctx, s.MSALClient, s.DB, userID)
 	if err != nil {
-		s.Logger.Error("failed to create msgraph client, ", uuidStr, zap.Error(err))
+		s.Logger.Errorf("%s: failed to create msgraph client, ", reqID, zap.Error(err))
 		sendError(w, http.StatusBadGateway, "Failed to connect to microsoft graph API")
 		return
 	}
@@ -43,13 +46,13 @@ func (s Server) GetAPIMSFTGroups(w http.ResponseWriter, r *http.Request, params 
 
 	gets, err := graph.Groups().Get(ctx, configuration)
 	if err != nil {
-		s.Logger.Error("failed to get group, ", uuidStr)
+		s.Logger.Errorf("%s: failed to get group, ", reqID)
 		sendError(w, http.StatusInternalServerError, "Failed to connect to get group")
 		return
 	}
 
 	if gets.GetValue() == nil || len(gets.GetValue()) == 0 {
-		s.Logger.Error("no group found, ", uuidStr)
+		s.Logger.Errorf("%s: no group found, ", reqID)
 		sendError(w, http.StatusNotFound, "Failed to find a group with name")
 		return
 	}
@@ -57,7 +60,7 @@ func (s Server) GetAPIMSFTGroups(w http.ResponseWriter, r *http.Request, params 
 	// uses the first group
 	group, err := GroupableToMSFTGroup(gets.GetValue()[0])
 	if err != nil {
-		s.Logger.Error("error converting groupable, ", uuidStr)
+		s.Logger.Errorf("%s: error converting groupable, ", reqID)
 		sendError(w, http.StatusInternalServerError, "Failed to convert groupable")
 		return
 	}
@@ -70,19 +73,21 @@ func (s Server) GetAPIMSFTGroupsMe(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), database.DatabaseTimeout)
 	defer cancel()
 
-	// Get userID from request
-	userID, ok := r.Context().Value(UserIDCtxKey{}).(uint32)
-	reqUUID, _ := ReadReqUUID(r)
-	uuidStr := zap.String("request ID: ", reqUUID)
-	if !ok {
-		s.Logger.Error("failed to get userid from request context, ", uuidStr)
-		sendError(w, http.StatusUnauthorized, "Try again later.")
+	reqID, userID, err := GetCtxValues(r)
+	if err != nil {
+		if errors.Is(err, ErrRequestIDNotFound) {
+			s.Logger.Error(err)
+			sendError(w, http.StatusInternalServerError, "Try again later.")
+		} else if errors.Is(err, ErrUserIDNotFound) {
+			s.Logger.Error(err)
+			sendError(w, http.StatusUnauthorized, "Try again later.")
+		}
 		return
 	}
 
 	graph, err := CreateMSFTGraphClient(ctx, s.MSALClient, s.DB, userID)
 	if err != nil {
-		s.Logger.Error("failed to create msgraph client, ", uuidStr, zap.Error(err))
+		s.Logger.Errorf("%s: failed to create msgraph client, ", reqID, zap.Error(err))
 		sendError(w, http.StatusBadGateway, "Failed to connect to microsoft graph API")
 		return
 	}
@@ -91,14 +96,14 @@ func (s Server) GetAPIMSFTGroupsMe(w http.ResponseWriter, r *http.Request) {
 
 	gets, err := graph.Users().ByUserId(userIDStr).MemberOf().Get(ctx, nil)
 	if err != nil {
-		s.Logger.Error("failed to retrieve memberof of user, ", uuidStr)
+		s.Logger.Errorf("%s: failed to retrieve memberof of user, ", reqID)
 		sendError(w, http.StatusInternalServerError, "Failed to get from microsoft")
 		return
 	}
 
 	groups, err := GetsToMSFTGroups(gets)
 	if err != nil {
-		s.Logger.Error("failed to retrive , ", uuidStr, zap.Error(err))
+		s.Logger.Errorf("%s: failed to retrive , ", reqID, zap.Error(err))
 		sendError(w, http.StatusInternalServerError, fmt.Sprintf("failed retrieving groups: %v", err))
 		return
 	}
@@ -110,19 +115,21 @@ func (s Server) GetAPIMSFTGroupsGroupID(w http.ResponseWriter, r *http.Request, 
 	ctx, cancel := context.WithTimeout(r.Context(), database.DatabaseTimeout)
 	defer cancel()
 
-	// Get userID from request
-	userID, ok := r.Context().Value(UserIDCtxKey{}).(uint32)
-	reqUUID, _ := ReadReqUUID(r)
-	uuidStr := zap.String("request ID: ", reqUUID)
-	if !ok {
-		s.Logger.Error("failed to get userid from request context, ", uuidStr)
-		sendError(w, http.StatusUnauthorized, "Try again later.")
+	reqID, userID, err := GetCtxValues(r)
+	if err != nil {
+		if errors.Is(err, ErrRequestIDNotFound) {
+			s.Logger.Error(err)
+			sendError(w, http.StatusInternalServerError, "Try again later.")
+		} else if errors.Is(err, ErrUserIDNotFound) {
+			s.Logger.Error(err)
+			sendError(w, http.StatusUnauthorized, "Try again later.")
+		}
 		return
 	}
 
 	graph, err := CreateMSFTGraphClient(ctx, s.MSALClient, s.DB, userID)
 	if err != nil {
-		s.Logger.Error("failed to create msgraph client, ", uuidStr, zap.Error(err))
+		s.Logger.Errorf("%s: failed to create msgraph client, ", reqID, zap.Error(err))
 		sendError(w, http.StatusBadGateway, "Failed to connect to microsoft graph API")
 		return
 	}
@@ -131,7 +138,7 @@ func (s Server) GetAPIMSFTGroupsGroupID(w http.ResponseWriter, r *http.Request, 
 
 	groupable, err := graph.Groups().ByGroupId(groupIDStr).Get(ctx, nil)
 	if err != nil {
-		s.Logger.Error("failed to get group from microsoft, ", uuidStr)
+		s.Logger.Errorf("%s: failed to get group from microsoft, ", reqID)
 		sendError(w, http.StatusNotFound, "Failed to find group")
 		return
 	}
@@ -141,12 +148,12 @@ func (s Server) GetAPIMSFTGroupsGroupID(w http.ResponseWriter, r *http.Request, 
 	if groupable != nil && groupable.GetId() != nil && groupable.GetDisplayName() != nil {
 		group, err = GroupableToMSFTGroup(groupable)
 		if err != nil {
-			s.Logger.Error("error converting groupable, ", uuidStr)
+			s.Logger.Errorf("%s: error converting groupable, ", reqID)
 			sendError(w, http.StatusInternalServerError, "Failed to convert groupable")
 			return
 		}
 	} else {
-		s.Logger.Error("got invalid group from microsoft, ", uuidStr)
+		s.Logger.Errorf("%s: got invalid group from microsoft, ", reqID)
 		sendError(w, http.StatusInternalServerError, "Invalid group")
 		return
 	}
@@ -159,19 +166,21 @@ func (s Server) GetAPIMSFTGroupsGroupIDUsers(w http.ResponseWriter, r *http.Requ
 	ctx, cancel := context.WithTimeout(r.Context(), database.DatabaseTimeout)
 	defer cancel()
 
-	// Get userID from request
-	userID, ok := r.Context().Value(UserIDCtxKey{}).(uint32)
-	reqUUID, _ := ReadReqUUID(r)
-	uuidStr := zap.String("request ID: ", reqUUID)
-	if !ok {
-		s.Logger.Error("failed to get userid from request context, ", uuidStr)
-		sendError(w, http.StatusUnauthorized, "Try again later.")
+	reqID, userID, err := GetCtxValues(r)
+	if err != nil {
+		if errors.Is(err, ErrRequestIDNotFound) {
+			s.Logger.Error(err)
+			sendError(w, http.StatusInternalServerError, "Try again later.")
+		} else if errors.Is(err, ErrUserIDNotFound) {
+			s.Logger.Error(err)
+			sendError(w, http.StatusUnauthorized, "Try again later.")
+		}
 		return
 	}
 
 	graph, err := CreateMSFTGraphClient(ctx, s.MSALClient, s.DB, userID)
 	if err != nil {
-		s.Logger.Error("failed to create msgraph client, ", uuidStr, zap.Error(err))
+		s.Logger.Errorf("%s: failed to create msgraph client, ", reqID, zap.Error(err))
 		sendError(w, http.StatusBadGateway, "Failed to connect to microsoft graph API")
 		return
 	}
@@ -180,7 +189,7 @@ func (s Server) GetAPIMSFTGroupsGroupIDUsers(w http.ResponseWriter, r *http.Requ
 
 	groupable, err := graph.Groups().ByGroupId(groupIDStr).Members().Get(ctx, nil)
 	if err != nil {
-		s.Logger.Error("failed to get group from microsoft, ", uuidStr)
+		s.Logger.Errorf("%s: failed to get group from microsoft, ", reqID)
 		sendError(w, http.StatusNotFound, "Failed to find group")
 		return
 	}
@@ -189,12 +198,11 @@ func (s Server) GetAPIMSFTGroupsGroupIDUsers(w http.ResponseWriter, r *http.Requ
 
 	if groupable.GetValue() != nil {
 		for _, dirs := range groupable.GetValue() {
-			var usr models.Userable
-			if usr, ok = dirs.(models.Userable); ok {
+			if usr, ok := dirs.(models.Userable); ok {
 				var user MSFTGroupUser
 				user, err = UserableToMSFTGroupUser(usr)
 				if err != nil {
-					s.Logger.Error("failed to convert userable to user, ", uuidStr)
+					s.Logger.Errorf("%s: failed to convert userable to user, ", reqID)
 					sendError(w, http.StatusInternalServerError, "Failed to convert userable to user")
 					return
 				}
