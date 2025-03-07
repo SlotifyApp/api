@@ -30,7 +30,6 @@ func (s Server) DeleteSlotifyGroupsSlotifyGroupIDLeaveMe(w http.ResponseWriter, 
 	}
 
 	var count int64
-	var err error
 	if count, err = s.DB.CheckMemberInSlotifyGroup(ctx, database.CheckMemberInSlotifyGroupParams{
 		UserID:         userID,
 		SlotifyGroupID: slotifyGroupID,
@@ -132,6 +131,18 @@ func (s Server) GetAPISlotifyGroupsMe(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 2*database.DatabaseTimeout)
 	defer cancel()
 
+	reqID, userID, err := GetCtxValues(r)
+	if err != nil {
+		if errors.Is(err, ErrRequestIDNotFound) {
+			s.Logger.Error(err)
+			sendError(w, http.StatusInternalServerError, "Try again later.")
+		} else if errors.Is(err, ErrUserIDNotFound) {
+			s.Logger.Error(err)
+			sendError(w, http.StatusUnauthorized, "Try again later.")
+		}
+		return
+	}
+
 	slotifyGroups, err := s.DB.GetUsersSlotifyGroups(ctx, userID)
 	if err != nil {
 		switch {
@@ -170,7 +181,6 @@ func (s Server) PostAPISlotifyGroups(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var slotifyGroupBody PostAPISlotifyGroupsJSONRequestBody
-	var err error
 	if err = json.NewDecoder(r.Body).Decode(&slotifyGroupBody); err != nil {
 		logger.Error(ErrUnmarshalBody, zap.Object("body", slotifyGroupBody), zap.Error(err))
 		sendError(w, http.StatusBadRequest, ErrUnmarshalBody.Error())
@@ -291,6 +301,13 @@ func (s Server) GetAPISlotifyGroupsSlotifyGroupID(w http.ResponseWriter, r *http
 	ctx, cancel := context.WithTimeout(r.Context(), database.DatabaseTimeout)
 	defer cancel()
 
+	reqID, _, err := GetCtxValues(r)
+	if err != nil && errors.Is(err, ErrRequestIDNotFound) {
+		s.Logger.Error(err)
+		sendError(w, http.StatusInternalServerError, "Try again later.")
+		return
+	}
+
 	slotifyGroup, err := s.DB.GetSlotifyGroupByID(ctx, slotifyGroupID)
 	if err != nil {
 		switch {
@@ -309,13 +326,13 @@ func (s Server) GetAPISlotifyGroupsSlotifyGroupID(w http.ResponseWriter, r *http
 				zap.Error(err))
 			sendError(w, http.StatusNotFound,
 				fmt.Sprintf("slotifyGroup api: slotifyGroup with id %d does not exist", slotifyGroupID))
-			return
 		default:
 			logger.Error("slotifyGroup api: failed to GetSlotifyGroupsSlotifyGroupID", zap.Error(err))
 			sendError(w, http.StatusInternalServerError, "slotifyGroup api: failed to get slotifyGroup")
-			return
 		}
+		return
 	}
+
 	SetHeaderAndWriteResponse(w, http.StatusOK, slotifyGroup)
 }
 
@@ -326,6 +343,13 @@ func (s Server) GetAPISlotifyGroupsSlotifyGroupIDUsers(w http.ResponseWriter, r 
 
 	ctx, cancel := context.WithTimeout(r.Context(), 5*database.DatabaseTimeout)
 	defer cancel()
+
+	reqID, _, err := GetCtxValues(r)
+	if err != nil && errors.Is(err, ErrRequestIDNotFound) {
+		s.Logger.Error(err)
+		sendError(w, http.StatusInternalServerError, "Try again later.")
+		return
+	}
 
 	count, err := s.DB.CountSlotifyGroupByID(ctx, slotifyGroupID)
 	if err != nil {

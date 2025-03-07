@@ -193,8 +193,7 @@ func (s Server) GetAPIMSFTGroupsGroupIDUsers(w http.ResponseWriter, r *http.Requ
 
 	if groupable.GetValue() != nil {
 		for _, dirs := range groupable.GetValue() {
-			var usr models.Userable
-			if usr, ok = dirs.(models.Userable); ok {
+			if usr, ok := dirs.(models.Userable); ok {
 				var user MSFTGroupUser
 				user, err = UserableToMSFTGroupUser(usr)
 				if err != nil {

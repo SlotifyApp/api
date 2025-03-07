@@ -24,8 +24,8 @@ func (s Server) PostAPIInvites(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 4*database.DatabaseTimeout)
 	defer cancel()
 
-	var invitesCreateBody PostAPIInvitesJSONRequestBody
 	var err error
+	var invitesCreateBody PostAPIInvitesJSONRequestBody
 	if err = json.NewDecoder(r.Body).Decode(&invitesCreateBody); err != nil {
 		logger.Error(ErrUnmarshalBody, zap.Object("body", invitesCreateBody), zap.Error(err))
 		sendError(w, http.StatusBadRequest, ErrUnmarshalBody.Error())
@@ -170,7 +170,6 @@ func (s Server) DeleteAPIInvitesInviteID(w http.ResponseWriter, r *http.Request,
 	}
 
 	var invite database.Invite
-	var err error
 	if invite, err = s.DB.GetInviteByID(ctx, inviteID); err != nil {
 		logger.Error("failed to get invite by id", zap.Error(err))
 		sendError(w, http.StatusBadGateway, "Failed to get invite by id")
@@ -220,8 +219,8 @@ func (s Server) PatchAPIInvitesInviteID(w http.ResponseWriter, r *http.Request, 
 		return
 	}
 
-	var body PatchAPIInvitesInviteIDJSONRequestBody
 	var err error
+	var body PatchAPIInvitesInviteIDJSONRequestBody
 	if err = json.NewDecoder(r.Body).Decode(&body); err != nil {
 		logger.Error(ErrUnmarshalBody, zap.Object("body", body), zap.Error(err))
 		sendError(w, http.StatusBadRequest, ErrUnmarshalBody.Error())
@@ -258,8 +257,7 @@ func (s Server) PatchAPIInvitesInviteID(w http.ResponseWriter, r *http.Request, 
 		if err != nil {
 			switch {
 			case errors.Is(err, context.Canceled):
-				return fmt.Errorf("context cancelled deleting invite: %w",
-					err)
+				return fmt.Errorf("context cancelled deleting invite: %w", err)
 			case errors.Is(err, context.DeadlineExceeded):
 				return fmt.Errorf("deadline exceeded during deleting invite: %w", err)
 			default:
@@ -301,7 +299,6 @@ func (s Server) PatchAPIInvitesInviteIDDecline(w http.ResponseWriter, r *http.Re
 		newStatus: InviteStatusAccepted,
 	}
 
-	var err error
 	if _, err = validateAndUpdateInviteStatus(p); err != nil {
 		logger.Error("failed to validate and update invite status", zap.Error(err))
 		sendError(w, http.StatusBadGateway, err.Error())
@@ -393,6 +390,18 @@ func (s Server) GetAPISlotifyGroupsSlotifyGroupIDInvites(w http.ResponseWriter,
 
 	ctx, cancel := context.WithTimeout(r.Context(), 2*database.DatabaseTimeout)
 	defer cancel()
+
+	reqID, _, err := GetCtxValues(r)
+	if err != nil {
+		if errors.Is(err, ErrRequestIDNotFound) {
+			s.Logger.Error(err)
+			sendError(w, http.StatusInternalServerError, "Try again later.")
+		} else if errors.Is(err, ErrUserIDNotFound) {
+			s.Logger.Error(err)
+			sendError(w, http.StatusUnauthorized, "Try again later.")
+		}
+		return
+	}
 
 	invites, err := s.DB.ListInvitesByGroup(ctx,
 		database.ListInvitesByGroupParams{

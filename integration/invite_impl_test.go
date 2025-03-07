@@ -95,6 +95,7 @@ func TestInvites_PostInvites(t *testing.T) {
 			req.Header.Add("Content-Type", "application/json")
 
 			ctx := context.WithValue(req.Context(), api.UserIDCtxKey{}, fromUser.Id)
+			ctx = context.WithValue(ctx, api.RequestIDCtxKey{}, uuid.NewString())
 			req = req.WithContext(ctx)
 			req.Header.Set(api.ReqHeader, uuid.NewString())
 

@@ -9,8 +9,10 @@ import (
 
 	"github.com/SlotifyApp/slotify-backend/jwt"
 	"github.com/getkin/kin-openapi/openapi3"
+
 	chi_middleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/httprate"
+	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 	oapi_middleware "github.com/oapi-codegen/nethttp-middleware"
 )
@@ -57,7 +59,7 @@ func AuthMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		r.Header.Set("Authorization", "Bearer "+accessTokenCookie.Value)
+		r.Header.Set("Authorization", fmt.Sprintf("Bearer: %s", accessTokenCookie.Value))
 
 		// Some methods require refresh token and it is sent automatically
 		// anyway in any request from the frontend
@@ -125,6 +127,19 @@ func JWTMiddleware(next http.Handler) http.Handler {
 	})
 }
 
+func RequestIDMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		reqID := uuid.NewString()
+
+		// set in context
+		ctx := context.WithValue(r.Context(), RequestIDCtxKey{}, reqID)
+		// set in response writer header
+		w.Header().Set(reqHeader, reqID)
+
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
 // ApplyMiddlewares applies all the middleware functions for the server.
 func ApplyMiddlewares(r *mux.Router, swagger *openapi3.T) {
 	middlewares := []mux.MiddlewareFunc{
@@ -136,6 +151,7 @@ func ApplyMiddlewares(r *mux.Router, swagger *openapi3.T) {
 		// makes sure that requests and responses follow openapischema
 		oapi_middleware.OapiRequestValidator(swagger),
 
+		RequestIDMiddleware,
 		JWTMiddleware,
 
 		// logs requests and statuses.
@@ -153,4 +169,18 @@ func ApplyMiddlewares(r *mux.Router, swagger *openapi3.T) {
 	for _, middleware := range middlewares {
 		r.Use(middleware)
 	}
+}
+
+func GetCtxValues(r *http.Request) (string, uint32, error) {
+	var reqID string
+	var userID uint32
+	var ok bool
+	if reqID, ok = r.Context().Value(RequestIDCtxKey{}).(string); !ok {
+		return "", 0, ErrRequestIDNotFound
+	}
+	if userID, ok = r.Context().Value(UserIDCtxKey{}).(uint32); !ok {
+		return "", 0, ErrUserIDNotFound
+	}
+
+	return reqID, userID, nil
 }
