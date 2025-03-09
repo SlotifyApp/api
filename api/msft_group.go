@@ -29,9 +29,9 @@ func UserableToMSFTUser(u models.Userable) (MSFTUser, error) {
 		return MSFTUser{}, errors.New("missing user ID")
 	}
 
-	email := *u.GetMail()
-	if email == "" {
-		email = "no-email@placeholder.com"
+	email := "no-email@placeholder.com"
+	if u.GetMail() != nil {
+		email = *u.GetMail()
 	}
 
 	firstName := ""
