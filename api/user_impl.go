@@ -292,12 +292,12 @@ func (s Server) GetAPIMSFTUsers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var users []MSFTGroupUser
+	var users []MSFTUser
 
 	if groupable.GetValue() != nil {
 		for _, usr := range groupable.GetValue() {
-			var user MSFTGroupUser
-			user, err = UserableToMSFTGroupUser(usr)
+			var user MSFTUser
+			user, err = UserableToMSFTUser(usr)
 			if err != nil {
 				s.Logger.Errorf("failed to convert userable to user: %v", err)
 				sendError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to convert userable to user: %v", err))
@@ -349,12 +349,12 @@ func (s Server) GetAPIMSFTUsersSearch(w http.ResponseWriter, r *http.Request, pa
 		return
 	}
 
-	var users []MSFTGroupUser
+	var users []MSFTUser
 
 	if groupable.GetValue() != nil {
 		for _, usr := range groupable.GetValue() {
-			var user MSFTGroupUser
-			user, err = PersonableToMSFTGroupUser(usr)
+			var user MSFTUser
+			user, err = PersonableToMSFTUser(usr)
 			if err != nil {
 				s.Logger.Error("failed to convert userable to user")
 				sendError(w, http.StatusInternalServerError, "Failed to convert userable to user")

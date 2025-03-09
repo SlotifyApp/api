@@ -24,9 +24,9 @@ func GroupableToMSFTGroup(g models.Groupable) (MSFTGroup, error) {
 	}, nil
 }
 
-func UserableToMSFTGroupUser(u models.Userable) (MSFTGroupUser, error) {
+func UserableToMSFTUser(u models.Userable) (MSFTUser, error) {
 	if u.GetId() == nil {
-		return MSFTGroupUser{}, errors.New("missing user ID")
+		return MSFTUser{}, errors.New("missing user ID")
 	}
 
 	email := *u.GetMail()
@@ -44,16 +44,16 @@ func UserableToMSFTGroupUser(u models.Userable) (MSFTGroupUser, error) {
 		lastName = *u.GetSurname()
 	}
 
-	return MSFTGroupUser{
+	return MSFTUser{
 		Email:     types.Email(email),
 		FirstName: firstName,
 		LastName:  lastName,
 	}, nil
 }
 
-func PersonableToMSFTGroupUser(u models.Personable) (MSFTGroupUser, error) {
+func PersonableToMSFTUser(u models.Personable) (MSFTUser, error) {
 	if u.GetId() == nil || u.GetScoredEmailAddresses() == nil || u.GetGivenName() == nil || u.GetSurname() == nil {
-		return MSFTGroupUser{}, errors.New("missing required fields")
+		return MSFTUser{}, errors.New("missing required fields")
 	}
 	var email string
 	if len(u.GetScoredEmailAddresses()) == 0 {
@@ -65,7 +65,7 @@ func PersonableToMSFTGroupUser(u models.Personable) (MSFTGroupUser, error) {
 			email = "No Email Found"
 		}
 	}
-	return MSFTGroupUser{
+	return MSFTUser{
 		Email:     types.Email(email),
 		FirstName: *u.GetGivenName(),
 		LastName:  *u.GetSurname(),
