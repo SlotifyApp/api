@@ -102,3 +102,14 @@ func performReschedulingCheckProcess(ctx context.Context,
 
 	return response, nil
 }
+
+func processReschedulingRequest(ctx context.Context,
+	graph *msgraphsdkgo.GraphServiceClient,
+	body ReschedulingRequestBodySchema,
+) (string, error) {
+	// Create placeholder meeting location
+
+	// Add data into the database
+
+	return "Request failed to be created", nil
+}
