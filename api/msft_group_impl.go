@@ -189,13 +189,14 @@ func (s Server) GetAPIMSFTGroupsGroupIDUsers(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	var users []MSFTGroupUser
+	var users []MSFTUser
 
 	if groupable.GetValue() != nil {
 		for _, dirs := range groupable.GetValue() {
-			if usr, ok := dirs.(models.Userable); ok {
-				var user MSFTGroupUser
-				user, err = UserableToMSFTGroupUser(usr)
+			var usr models.Userable
+			if usr, ok = dirs.(models.Userable); ok {
+				var user MSFTUser
+				user, err = UserableToMSFTUser(usr)
 				if err != nil {
 					logger.Error("failed to convert userable to user")
 					sendError(w, http.StatusInternalServerError, "Failed to convert userable to user")
