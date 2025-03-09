@@ -435,6 +435,40 @@ func (q *Queries) GetInviteByID(ctx context.Context, id uint32) (Invite, error) 
 	return i, err
 }
 
+const getMeetingByID = `-- name: GetMeetingByID :one
+SELECT id, meeting_pref_id, owner_id, msftmeetingid FROM Meeting
+WHERE id=?
+`
+
+func (q *Queries) GetMeetingByID(ctx context.Context, id uint32) (Meeting, error) {
+	row := q.queryRow(ctx, q.getMeetingByIDStmt, getMeetingByID, id)
+	var i Meeting
+	err := row.Scan(
+		&i.ID,
+		&i.MeetingPrefID,
+		&i.OwnerID,
+		&i.Msftmeetingid,
+	)
+	return i, err
+}
+
+const getMeetingPreferences = `-- name: GetMeetingPreferences :one
+SELECT id, meeting_start_time, start_date_range, end_date_range FROM MeetingPreferences
+WHERE id=?
+`
+
+func (q *Queries) GetMeetingPreferences(ctx context.Context, id uint32) (Meetingpreferences, error) {
+	row := q.queryRow(ctx, q.getMeetingPreferencesStmt, getMeetingPreferences, id)
+	var i Meetingpreferences
+	err := row.Scan(
+		&i.ID,
+		&i.MeetingStartTime,
+		&i.StartDateRange,
+		&i.EndDateRange,
+	)
+	return i, err
+}
+
 const getRefreshTokenByUserID = `-- name: GetRefreshTokenByUserID :one
 SELECT id, user_id, token, revoked FROM RefreshToken WHERE user_id=?
 `
