@@ -113,6 +113,7 @@ type Meeting struct {
 	ID            uint32 `json:"id"`
 	Meetinginfoid uint32 `json:"meetinginfoid"`
 	OwnerID       uint32 `json:"ownerId"`
+	Msftmeetingid string `json:"msftmeetingid"`
 }
 
 type Meetingpreferences struct {
@@ -120,7 +121,6 @@ type Meetingpreferences struct {
 	MeetingStartTime time.Time `json:"meetingStartTime"`
 	StartDateRange   time.Time `json:"startDateRange"`
 	EndDateRange     time.Time `json:"endDateRange"`
-	Msftmeetingid    string    `json:"msftmeetingid"`
 }
 
 type Notification struct {

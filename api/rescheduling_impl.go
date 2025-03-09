@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/SlotifyApp/slotify-backend/database"
 	"go.uber.org/zap"
 )
 
@@ -38,7 +39,26 @@ func (s Server) PostAPIRescheduleCheck(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	respBody, err := performReschedulingProcess(ctx, graph, body)
+	// Get data from db
+	var meeting database.Meeting
+	meeting, err = s.DB.GetMeetingByID(ctx, uint32(*body.OldMeeting.MeetingID))
+
+	if err != nil {
+		s.Logger.Error("failed to search meeting table in db", zap.Error(err))
+		sendError(w, http.StatusBadGateway, "Failed to process db request")
+		return
+	}
+
+	var meetingPref database.Meetingpreferences
+	meetingPref, err = s.DB.GetMeetingPreferences(ctx, meeting.Meetinginfoid)
+
+	if err != nil {
+		s.Logger.Error("failed to search meeting table in db", zap.Error(err))
+		sendError(w, http.StatusBadGateway, "Failed to process db request")
+		return
+	}
+
+	respBody, err := performReschedulingCheckProcess(ctx, graph, body, meetingPref)
 	if err != nil {
 		s.Logger.Error("failed to make msgraph api call to findMeetings", zap.Error(err))
 		sendError(w, http.StatusBadGateway, "Failed to process/send microsoft graph API request for findMeeting")
@@ -78,6 +98,12 @@ func (s Server) PostAPIRescheduleRequest(w http.ResponseWriter, r *http.Request)
 	}
 
 	resBody, err := processReschedulingRequest(ctx, graph, body)
+
+	if err != nil {
+		s.Logger.Error("failed to create request", zap.Error(err))
+		sendError(w, http.StatusBadGateway, "Failed to create request")
+		return
+	}
 
 	SetHeaderAndWriteResponse(w, http.StatusOK, resBody)
 }

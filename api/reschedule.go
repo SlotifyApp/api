@@ -3,11 +3,16 @@ package api
 import (
 	"context"
 	"fmt"
+	"time"
 
+	"github.com/SlotifyApp/slotify-backend/database"
 	msgraphsdkgo "github.com/microsoftgraph/msgraph-sdk-go"
+	graphmodels "github.com/microsoftgraph/msgraph-sdk-go/models"
 )
 
-func createSchedulingRequest(body ReschedulingCheckBodySchema) (SchedulingSlotsBodySchema, error) {
+func createSchedulingRequest(body ReschedulingCheckBodySchema,
+	meetingPref database.Meetingpreferences,
+) (SchedulingSlotsBodySchema, error) {
 	// Create request body for scheduling slots api call
 	newReqBody := SchedulingSlotsBodySchema{}
 
@@ -20,8 +25,33 @@ func createSchedulingRequest(body ReschedulingCheckBodySchema) (SchedulingSlotsB
 	newReqBody.MinimumAttendeePercentage = &minimum
 	newReqBody.LocationConstraint = *body.OldMeeting.LocationConstraint
 
-	// TODO
-	// For the time constraints, check a week before and after
+	// Add time contraints
+	timeConstraint := graphmodels.NewTimeConstraint()
+	activityDomain := graphmodels.WORK_ACTIVITYDOMAIN
+	timeConstraint.SetActivityDomain(&activityDomain)
+
+	timeSlots := []graphmodels.TimeSlotable{}
+
+	timeSlot := graphmodels.NewTimeSlot()
+	timeZone := "GMT Standard Time"
+
+	startTimeFormatted := meetingPref.StartDateRange.Format(time.RFC3339Nano)
+	endTimeFormatted := meetingPref.EndDateRange.Format(time.RFC3339Nano)
+
+	start := graphmodels.NewDateTimeTimeZone()
+	start.SetDateTime(&startTimeFormatted)
+	start.SetTimeZone(&timeZone)
+
+	end := graphmodels.NewDateTimeTimeZone()
+	end.SetDateTime(&endTimeFormatted)
+	end.SetTimeZone(&timeZone)
+
+	timeSlot.SetStart(start)
+	timeSlot.SetEnd(end)
+
+	timeSlots = append(timeSlots, timeSlot)
+
+	timeConstraint.SetTimeSlots(timeSlots)
 
 	return newReqBody, nil
 }
@@ -29,9 +59,10 @@ func createSchedulingRequest(body ReschedulingCheckBodySchema) (SchedulingSlotsB
 func checkValidReschedulingSlotExists(ctx context.Context,
 	graph *msgraphsdkgo.GraphServiceClient,
 	body ReschedulingCheckBodySchema,
+	meetingPref database.Meetingpreferences,
 ) (bool, error) {
 	// Call scheduling function to check for valid slots
-	newRequest, err := createSchedulingRequest(body)
+	newRequest, err := createSchedulingRequest(body, meetingPref)
 	if err != nil {
 		return false,
 			fmt.Errorf("failed in creating find meeting time request body: %w", err)
@@ -50,13 +81,14 @@ func checkValidReschedulingSlotExists(ctx context.Context,
 	return false, nil
 }
 
-func performReschedulingProcess(ctx context.Context,
+func performReschedulingCheckProcess(ctx context.Context,
 	graph *msgraphsdkgo.GraphServiceClient,
 	body ReschedulingCheckBodySchema,
+	meetingPref database.Meetingpreferences,
 ) (map[string]bool, error) {
 	// Check if the old meeting has valid rescheduling slots
 
-	validSlots, err := checkValidReschedulingSlotExists(ctx, graph, body)
+	validSlots, err := checkValidReschedulingSlotExists(ctx, graph, body, meetingPref)
 	if err != nil {
 		return nil,
 			fmt.Errorf("failed to check valid rescheduling slots exists: %w", err)
