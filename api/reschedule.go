@@ -28,17 +28,16 @@ func createSchedulingRequest(body ReschedulingCheckBodySchema) (SchedulingSlotsB
 
 func checkValidReschedulingSlotExists(ctx context.Context,
 	graph *msgraphsdkgo.GraphServiceClient,
-	body ReschedulingCheckBodySchema) (bool, error) {
+	body ReschedulingCheckBodySchema,
+) (bool, error) {
 	// Call scheduling function to check for valid slots
 	newRequest, err := createSchedulingRequest(body)
-
 	if err != nil {
 		return false,
 			fmt.Errorf("failed in creating find meeting time request body: %w", err)
 	}
 
 	res, err := makeFindMeetingTimesAPICall(ctx, graph, newRequest)
-
 	if err != nil {
 		return false,
 			fmt.Errorf("failed in calling fine meeting times api: %w", err)
@@ -53,11 +52,11 @@ func checkValidReschedulingSlotExists(ctx context.Context,
 
 func performReschedulingProcess(ctx context.Context,
 	graph *msgraphsdkgo.GraphServiceClient,
-	body ReschedulingCheckBodySchema) (map[string]bool, error) {
+	body ReschedulingCheckBodySchema,
+) (map[string]bool, error) {
 	// Check if the old meeting has valid rescheduling slots
 
 	validSlots, err := checkValidReschedulingSlotExists(ctx, graph, body)
-
 	if err != nil {
 		return nil,
 			fmt.Errorf("failed to check valid rescheduling slots exists: %w", err)
@@ -73,4 +72,15 @@ func performReschedulingProcess(ctx context.Context,
 	}
 
 	return response, nil
+}
+
+func processReschedulingRequest(ctx context.Context,
+	graph *msgraphsdkgo.GraphServiceClient,
+	body ReschedulingRequestBodySchema,
+) (string, error) {
+	// Create placeholder meeting location
+
+	// Add data into the database
+
+	return "Request failed to be created", nil
 }
