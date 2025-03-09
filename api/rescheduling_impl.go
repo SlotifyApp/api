@@ -59,6 +59,8 @@ func (s Server) PostAPIRescheduleCheck(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// TODO: Add check for if no meeting is found
+
 	var meetingPref database.Meetingpreferences
 	if meetingFound {
 		// Get meeting preferences if data exists
