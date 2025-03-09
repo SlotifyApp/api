@@ -14,16 +14,20 @@ import (
 	graphmodels "github.com/microsoftgraph/msgraph-sdk-go/models"
 )
 
-// (GET /calendar/me).
-func (s Server) GetAPICalendarMe(w http.ResponseWriter, r *http.Request, params GetAPICalendarMeParams) {
-	userID, _ := r.Context().Value(UserIDCtxKey{}).(uint32)
+// (GET /api/calendar/{userID}).
+func (s Server) GetAPICalendarUserID(w http.ResponseWriter,
+	r *http.Request, userID uint32, params GetAPICalendarUserIDParams,
+) {
+	loggedInUserID, _ := r.Context().Value(UserIDCtxKey{}).(uint32)
 	reqID, _ := r.Context().Value(RequestIDCtxKey{}).(string)
 
-	logger := s.Logger.With(zap.String("request_id", reqID), zap.Uint32("user_id", userID))
+	logger := s.Logger.With(zap.String("request_id", reqID), zap.Uint32("logged_in_user_id", loggedInUserID))
 
 	ctx, cancel := context.WithTimeout(r.Context(), time.Minute)
 	defer cancel()
 
+	// create graph client for the userID in query params.
+	// TODO: stop private events etc. from being shown
 	graph, err := CreateMSFTGraphClient(ctx, s.MSALClient, s.DB, userID)
 	if err != nil {
 		logger.Error("failed to create msgraph client", zap.Error(err))
@@ -40,6 +44,13 @@ func (s Server) GetAPICalendarMe(w http.ResponseWriter, r *http.Request, params 
 	}
 
 	SetHeaderAndWriteResponse(w, http.StatusOK, calendarEvents)
+}
+
+// (GET /calendar/me).
+func (s Server) GetAPICalendarMe(w http.ResponseWriter, r *http.Request, params GetAPICalendarMeParams) {
+	userID, _ := r.Context().Value(UserIDCtxKey{}).(uint32)
+
+	s.GetAPICalendarUserID(w, r, userID, GetAPICalendarUserIDParams(params))
 }
 
 // (POST /calendar/event).
