@@ -116,15 +116,15 @@ func ParseJWT(tk string, keyEnv string) (CustomClaims, error) {
 }
 
 // getAccessTokenFromReq extracts the JWT access token from the request Authorization: Bearer <jwt> header.
-func getAccessTokenFromReq(req *http.Request) (string, error) {
-	authHdr := req.Header.Get("Authorization")
+func getAccessTokenFromReq(r *http.Request) (string, error) {
+	authHdr := r.Header.Get("Authorization")
 	// Check for the Authorization header.
 	if authHdr == "" {
 		return "", ErrNoAuthHeader
 	}
 	// We expect a header value of the form "Bearer <token>", with 1 space after
 	// Bearer, per spec.
-	prefix := "Bearer "
+	prefix := "Bearer: "
 	if !strings.HasPrefix(authHdr, prefix) {
 		return "", ErrInvalidAuthHeader
 	}
@@ -136,11 +136,11 @@ func GetUserIDFromReq(r *http.Request) (uint32, error) {
 	var err error
 	var accessToken string
 	if accessToken, err = getAccessTokenFromReq(r); err != nil {
-		return 0, fmt.Errorf("failed to getuserid from req: %w", err)
+		return 0, fmt.Errorf("failed to access token from req: %w", err)
 	}
 	var claims CustomClaims
 	if claims, err = ParseJWT(accessToken, AccessTokenJWTSecretEnv); err != nil {
-		return 0, fmt.Errorf("failed to getuserid from req: %w", err)
+		return 0, fmt.Errorf("failed to parsed claims from req jwt access token: %w", err)
 	}
 
 	return claims.UserID, nil

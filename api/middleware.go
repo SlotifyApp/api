@@ -113,8 +113,8 @@ func JWTMiddleware(next http.Handler) http.Handler {
 
 		userID, err := jwt.GetUserIDFromReq(r)
 		if err != nil {
-			log.Print("failed to get userid from request access token")
-			sendError(w, http.StatusUnauthorized, "Try again later.")
+			log.Printf("failed to get userid from jwt tokens: %+v", err)
+			sendError(w, http.StatusUnauthorized, "failed to get userid from jwt access token")
 			return
 		}
 
@@ -132,15 +132,12 @@ func ApplyMiddlewares(r *mux.Router, swagger *openapi3.T) {
 		// Adds request id to the request context
 		RequestIDMiddleware,
 
-		AuthMiddleware,
-
 		// makes sure that requests and responses follow openapischema
 		oapi_middleware.OapiRequestValidator(swagger),
 
-		JWTMiddleware,
+		AuthMiddleware,
 
-		// logs requests and statuses.
-		chi_middleware.Logger,
+		JWTMiddleware,
 
 		chi_middleware.AllowContentType("application/json", "text/event-stream"),
 
