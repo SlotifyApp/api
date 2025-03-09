@@ -111,7 +111,7 @@ type Invite struct {
 
 type Meeting struct {
 	ID            uint32 `json:"id"`
-	Meetinginfoid uint32 `json:"meetinginfoid"`
+	MeetingPrefID uint32 `json:"meetingPrefId"`
 	OwnerID       uint32 `json:"ownerId"`
 	Msftmeetingid string `json:"msftmeetingid"`
 }
@@ -138,8 +138,8 @@ type Placeholdermeeting struct {
 	EndTime        time.Time `json:"endTime"`
 	Location       string    `json:"location"`
 	Duration       int32     `json:"duration"`
-	Startdaterange time.Time `json:"startdaterange"`
-	Enddaterange   time.Time `json:"enddaterange"`
+	StartDateRange time.Time `json:"startDateRange"`
+	EndDateRange   time.Time `json:"endDateRange"`
 }
 
 type Placeholdermeetingattendee struct {

@@ -49,8 +49,10 @@ func (s Server) PostAPIRescheduleCheck(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// TODO: Add check for if no meeting is found
+
 	var meetingPref database.Meetingpreferences
-	meetingPref, err = s.DB.GetMeetingPreferences(ctx, meeting.Meetinginfoid)
+	meetingPref, err = s.DB.GetMeetingPreferences(ctx, meeting.MeetingPrefID)
 
 	if err != nil {
 		s.Logger.Error("failed to search meeting table in db", zap.Error(err))
