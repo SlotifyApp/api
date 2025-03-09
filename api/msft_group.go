@@ -72,23 +72,6 @@ func PersonableToMSFTUser(u models.Personable) (MSFTUser, error) {
 	}, nil
 }
 
-func PersonableToMSFTGroupUser(u models.Personable) (MSFTGroupUser, error) {
-	if u.GetId() == nil || u.GetScoredEmailAddresses() == nil || u.GetGivenName() == nil || u.GetSurname() == nil {
-		return MSFTGroupUser{}, errors.New("missing required fields")
-	}
-	var email string
-	if len(u.GetScoredEmailAddresses()) == 0 {
-		email = "No Email Found"
-	} else {
-		u.GetScoredEmailAddresses()[0].GetAddress()
-	}
-	return MSFTGroupUser{
-		Email:     types.Email(email),
-		FirstName: *u.GetGivenName(),
-		LastName:  *u.GetSurname(),
-	}, nil
-}
-
 func GetsToMSFTGroups(d models.DirectoryObjectCollectionResponseable) ([]MSFTGroup, error) {
 	var groups []MSFTGroup
 	if d.GetValue() != nil {

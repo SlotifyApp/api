@@ -311,8 +311,13 @@ func (s Server) GetAPIMSFTUsers(w http.ResponseWriter, r *http.Request) {
 	SetHeaderAndWriteResponse(w, http.StatusOK, users)
 }
 
-// (GET /api/msft-users/search).
+// if param is empty then calls GetAPIMSFTUsers.
 func (s Server) GetAPIMSFTUsersSearch(w http.ResponseWriter, r *http.Request, params GetAPIMSFTUsersSearchParams) {
+	if params.Search == nil {
+		s.GetAPIMSFTUsers(w, r)
+		return
+	}
+
 	ctx, cancel := context.WithTimeout(r.Context(), database.DatabaseTimeout)
 	defer cancel()
 
