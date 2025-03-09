@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"errors"
 	"net/http"
 
 	"github.com/SlotifyApp/slotify-backend/database"
@@ -11,15 +10,10 @@ import (
 
 // (GET /api/events), HTTP SSE route.
 func (s Server) RenderEvent(w http.ResponseWriter, r *http.Request) {
+	userID, _ := r.Context().Value(UserIDCtxKey{}).(uint32)
 	reqID, _ := r.Context().Value(RequestIDCtxKey{}).(string)
-	logger := s.Logger.With("request_id", reqID)
 
-	userID, ok := r.Context().Value(UserIDCtxKey{}).(uint32)
-	if !ok {
-		logger.Error("failed to get userid from request context")
-		sendError(w, http.StatusUnauthorized, "Try again later.")
-		return
-	}
+	logger := s.Logger.With(zap.String("request_id", reqID), zap.Uint32("user_id", userID))
 
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
@@ -52,18 +46,13 @@ func (s Server) RenderEvent(w http.ResponseWriter, r *http.Request) {
 
 // (PATCH /api/notifications/{notificationID}/read). Mark notifications as being read.
 func (s Server) PatchAPINotificationsNotificationIDRead(w http.ResponseWriter, r *http.Request, notificationID uint32) {
+	userID, _ := r.Context().Value(UserIDCtxKey{}).(uint32)
 	reqID, _ := r.Context().Value(RequestIDCtxKey{}).(string)
-	logger := s.Logger.With("request_id", reqID)
+
+	logger := s.Logger.With(zap.String("request_id", reqID), zap.Uint32("user_id", userID))
 
 	ctx, cancel := context.WithTimeout(r.Context(), database.DatabaseTimeout)
 	defer cancel()
-
-	userID, ok := r.Context().Value(UserIDCtxKey{}).(uint32)
-	if !ok {
-		logger.Error("failed to get userid from request context")
-		sendError(w, http.StatusUnauthorized, "Try again later.")
-		return
-	}
 
 	dbParams := database.MarkNotificationAsReadParams{
 		UserID:         userID,
@@ -92,18 +81,13 @@ func (s Server) PatchAPINotificationsNotificationIDRead(w http.ResponseWriter, r
 
 // (GET /api/notifications/{notificationID}/read).
 func (s Server) GetAPIUsersMeNotifications(w http.ResponseWriter, r *http.Request) {
+	userID, _ := r.Context().Value(UserIDCtxKey{}).(uint32)
 	reqID, _ := r.Context().Value(RequestIDCtxKey{}).(string)
-	logger := s.Logger.With("request_id", reqID)
+
+	logger := s.Logger.With(zap.String("request_id", reqID), zap.Uint32("user_id", userID))
 
 	ctx, cancel := context.WithTimeout(r.Context(), database.DatabaseTimeout)
 	defer cancel()
-
-	userID, ok := r.Context().Value(UserIDCtxKey{}).(uint32)
-	if !ok {
-		logger.Error("failed to get userid from request context")
-		sendError(w, http.StatusUnauthorized, "Try again later.")
-		return
-	}
 
 	notifs, err := s.DB.GetUnreadUserNotifications(ctx, userID)
 	if err != nil {

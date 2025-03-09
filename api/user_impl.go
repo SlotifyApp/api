@@ -21,8 +21,10 @@ const (
 
 // (GET /users) Get a user by query params.
 func (s Server) GetAPIUsers(w http.ResponseWriter, r *http.Request, params GetAPIUsersParams) {
+	userID, _ := r.Context().Value(UserIDCtxKey{}).(uint32)
 	reqID, _ := r.Context().Value(RequestIDCtxKey{}).(string)
-	logger := s.Logger.With("request_id", reqID)
+
+	logger := s.Logger.With(zap.String("request_id", reqID), zap.Uint32("user_id", userID))
 
 	ctx, cancel := context.WithTimeout(r.Context(), database.DatabaseTimeout)
 	defer cancel()
@@ -67,7 +69,9 @@ func (s Server) GetAPIUsers(w http.ResponseWriter, r *http.Request, params GetAP
 // (POST /users) Create a new user.
 func (s Server) PostAPIUsers(w http.ResponseWriter, r *http.Request) {
 	reqID, _ := r.Context().Value(RequestIDCtxKey{}).(string)
-	logger := s.Logger.With("request_id", reqID)
+
+	logger := s.Logger.With(zap.String("request_id", reqID))
+
 	ctx, cancel := context.WithTimeout(r.Context(), database.DatabaseTimeout)
 
 	defer cancel()
@@ -123,8 +127,11 @@ func (s Server) PostAPIUsers(w http.ResponseWriter, r *http.Request) {
 
 // (DELETE /users/{userID}) Delete a user by id.
 func (s Server) DeleteAPIUsersUserID(w http.ResponseWriter, r *http.Request, userID uint32) {
+	loggerInUserID, _ := r.Context().Value(UserIDCtxKey{}).(uint32)
 	reqID, _ := r.Context().Value(RequestIDCtxKey{}).(string)
-	logger := s.Logger.With("request_id", reqID)
+
+	logger := s.Logger.With(zap.String("request_id", reqID), zap.Uint32("logged_in_user_id", loggerInUserID))
+
 	ctx, cancel := context.WithTimeout(r.Context(), database.DatabaseTimeout)
 
 	defer cancel()
@@ -163,8 +170,10 @@ func (s Server) DeleteAPIUsersUserID(w http.ResponseWriter, r *http.Request, use
 
 // (GET /users/{userID}) Get a user by id.
 func (s Server) GetAPIUsersUserID(w http.ResponseWriter, r *http.Request, userID uint32) {
+	loggedInUserID, _ := r.Context().Value(UserIDCtxKey{}).(uint32)
 	reqID, _ := r.Context().Value(RequestIDCtxKey{}).(string)
-	logger := s.Logger.With("request_id", reqID)
+
+	logger := s.Logger.With(zap.String("request_id", reqID), zap.Uint32("logged_in_user_id", loggedInUserID))
 
 	ctx, cancel := context.WithTimeout(r.Context(), database.DatabaseTimeout)
 	defer cancel()
@@ -205,35 +214,21 @@ func (s Server) GetAPIUsersUserID(w http.ResponseWriter, r *http.Request, userID
 
 // (GET /users/me).
 func (s Server) GetAPIUsersMe(w http.ResponseWriter, r *http.Request) {
-	reqID, _ := r.Context().Value(RequestIDCtxKey{}).(string)
-	logger := s.Logger.With("request_id", reqID)
-
-	userID, ok := r.Context().Value(UserIDCtxKey{}).(uint32)
-	if !ok {
-		logger.Error("failed to get userid from request context")
-		sendError(w, http.StatusUnauthorized, "Try again later.")
-		return
-	}
+	userID, _ := r.Context().Value(UserIDCtxKey{}).(uint32)
 
 	s.GetAPIUsersUserID(w, r, userID)
 }
 
 // (POST /users/logout).
 func (s Server) PostAPIUsersMeLogout(w http.ResponseWriter, r *http.Request) {
+	userID, _ := r.Context().Value(UserIDCtxKey{}).(uint32)
 	reqID, _ := r.Context().Value(RequestIDCtxKey{}).(string)
-	logger := s.Logger.With("request_id", reqID)
+
+	logger := s.Logger.With(zap.String("request_id", reqID), zap.Uint32("user_id", userID))
 
 	ctx, cancel := context.WithTimeout(r.Context(), database.DatabaseTimeout)
 	defer cancel()
 
-	userID, ok := r.Context().Value(UserIDCtxKey{}).(uint32)
-	if !ok {
-		logger.Error("failed to get userid from request context")
-		RemoveCookies(w)
-		// still logout successfully, dont return error on logout
-		SetHeaderAndWriteResponse(w, http.StatusOK, "Logging out")
-		return
-	}
 	// Remove refresh token from db
 	rowsDeleted, err := s.DB.DeleteRefreshTokenByUserID(ctx, userID)
 	if err != nil {
@@ -267,27 +262,24 @@ func (s Server) PostAPIUsersMeLogout(w http.ResponseWriter, r *http.Request) {
 
 // (GET /api/msft-users/).
 func (s Server) GetAPIMSFTUsers(w http.ResponseWriter, r *http.Request) {
+	userID, _ := r.Context().Value(UserIDCtxKey{}).(uint32)
+	reqID, _ := r.Context().Value(RequestIDCtxKey{}).(string)
+
+	logger := s.Logger.With(zap.String("request_id", reqID), zap.Uint32("user_id", userID))
+
 	ctx, cancel := context.WithTimeout(r.Context(), database.DatabaseTimeout)
 	defer cancel()
 
-	// Get userID from request
-	userID, ok := r.Context().Value(UserIDCtxKey{}).(uint32)
-	if !ok {
-		s.Logger.Error("failed to get userid from request context")
-		sendError(w, http.StatusUnauthorized, "Try again later.")
-		return
-	}
-
 	graph, err := CreateMSFTGraphClient(ctx, s.MSALClient, s.DB, userID)
 	if err != nil {
-		s.Logger.Error("failed to create msgraph client", zap.Error(err))
+		logger.Error("failed to create msgraph client", zap.Error(err))
 		sendError(w, http.StatusBadGateway, "Failed to connect to microsoft graph API")
 		return
 	}
 
 	groupable, err := graph.Users().Get(context.Background(), nil)
 	if err != nil {
-		s.Logger.Errorf("failed to get users from microsoft: %v", err)
+		logger.Errorf("failed to get users from microsoft: %v", err)
 		sendError(w, http.StatusNotFound, fmt.Sprintf("Failed to find users: %v", err))
 		return
 	}
@@ -299,7 +291,7 @@ func (s Server) GetAPIMSFTUsers(w http.ResponseWriter, r *http.Request) {
 			var user MSFTUser
 			user, err = UserableToMSFTUser(usr)
 			if err != nil {
-				s.Logger.Errorf("failed to convert userable to user: %v", err)
+				logger.Errorf("failed to convert userable to user: %v", err)
 				sendError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to convert userable to user: %v", err))
 				return
 			}
@@ -313,6 +305,11 @@ func (s Server) GetAPIMSFTUsers(w http.ResponseWriter, r *http.Request) {
 
 // if param is empty then calls GetAPIMSFTUsers.
 func (s Server) GetAPIMSFTUsersSearch(w http.ResponseWriter, r *http.Request, params GetAPIMSFTUsersSearchParams) {
+	userID, _ := r.Context().Value(UserIDCtxKey{}).(uint32)
+	reqID, _ := r.Context().Value(RequestIDCtxKey{}).(string)
+
+	logger := s.Logger.With(zap.String("request_id", reqID), zap.Uint32("user_id", userID))
+
 	if params.Search == nil {
 		s.GetAPIMSFTUsers(w, r)
 		return
@@ -321,17 +318,9 @@ func (s Server) GetAPIMSFTUsersSearch(w http.ResponseWriter, r *http.Request, pa
 	ctx, cancel := context.WithTimeout(r.Context(), database.DatabaseTimeout)
 	defer cancel()
 
-	// Get userID from request
-	userID, ok := r.Context().Value(UserIDCtxKey{}).(uint32)
-	if !ok {
-		s.Logger.Error("failed to get userid from request context")
-		sendError(w, http.StatusUnauthorized, "Try again later.")
-		return
-	}
-
 	graph, err := CreateMSFTGraphClient(ctx, s.MSALClient, s.DB, userID)
 	if err != nil {
-		s.Logger.Error("failed to create msgraph client", zap.Error(err))
+		logger.Error("failed to create msgraph client", zap.Error(err))
 		sendError(w, http.StatusBadGateway, "Failed to connect to microsoft graph API")
 		return
 	}
@@ -349,7 +338,7 @@ func (s Server) GetAPIMSFTUsersSearch(w http.ResponseWriter, r *http.Request, pa
 
 	groupable, err := graph.Me().People().Get(context.Background(), configuration)
 	if err != nil {
-		s.Logger.Error("failed to get persons from microsoft")
+		logger.Error("failed to get persons from microsoft")
 		sendError(w, http.StatusNotFound, "Failed to find group")
 		return
 	}
@@ -361,7 +350,7 @@ func (s Server) GetAPIMSFTUsersSearch(w http.ResponseWriter, r *http.Request, pa
 			var user MSFTUser
 			user, err = PersonableToMSFTUser(usr)
 			if err != nil {
-				s.Logger.Error("failed to convert userable to user")
+				logger.Error("failed to convert userable to user")
 				sendError(w, http.StatusInternalServerError, "Failed to convert userable to user")
 				return
 			}

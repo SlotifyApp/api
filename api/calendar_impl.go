@@ -3,7 +3,6 @@ package api
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"time"
@@ -17,19 +16,13 @@ import (
 
 // (GET /calendar/me).
 func (s Server) GetAPICalendarMe(w http.ResponseWriter, r *http.Request, params GetAPICalendarMeParams) {
+	userID, _ := r.Context().Value(UserIDCtxKey{}).(uint32)
 	reqID, _ := r.Context().Value(RequestIDCtxKey{}).(string)
-	logger := s.Logger.With("request_id", reqID)
+
+	logger := s.Logger.With(zap.String("request_id", reqID), zap.Uint32("user_id", userID))
 
 	ctx, cancel := context.WithTimeout(r.Context(), time.Minute)
 	defer cancel()
-
-	// Get userID from request
-	userID, ok := r.Context().Value(UserIDCtxKey{}).(uint32)
-	if !ok {
-		logger.Error("failed to get userid from request context")
-		sendError(w, http.StatusUnauthorized, "Try again later.")
-		return
-	}
 
 	graph, err := CreateMSFTGraphClient(ctx, s.MSALClient, s.DB, userID)
 	if err != nil {
@@ -51,18 +44,13 @@ func (s Server) GetAPICalendarMe(w http.ResponseWriter, r *http.Request, params 
 
 // (POST /calendar/event).
 func (s Server) PostAPICalendarMe(w http.ResponseWriter, r *http.Request) {
+	userID, _ := r.Context().Value(UserIDCtxKey{}).(uint32)
 	reqID, _ := r.Context().Value(RequestIDCtxKey{}).(string)
-	logger := s.Logger.With("request_id", reqID)
+
+	logger := s.Logger.With(zap.String("request_id", reqID), zap.Uint32("user_id", userID))
 
 	ctx, cancel := context.WithTimeout(r.Context(), time.Minute)
 	defer cancel()
-
-	userID, ok := r.Context().Value(UserIDCtxKey{}).(uint32)
-	if !ok {
-		logger.Error("failed to get userid from request context")
-		sendError(w, http.StatusUnauthorized, "Try again later.")
-		return
-	}
 
 	var eventRequest CalendarEvent
 	if err := json.NewDecoder(r.Body).Decode(&eventRequest); err != nil {

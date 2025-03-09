@@ -16,10 +16,10 @@ import (
 
 // (POST /api/invites) Create a new invite.
 func (s Server) PostAPIInvites(w http.ResponseWriter, r *http.Request) {
-	reqID, _ := r.Context().Value(RequestIDCtxKey{}).(string)
 	userID, _ := r.Context().Value(UserIDCtxKey{}).(uint32)
+	reqID, _ := r.Context().Value(RequestIDCtxKey{}).(string)
 
-	logger := s.Logger.With("request_id", reqID)
+	logger := s.Logger.With(zap.String("request_id", reqID), zap.Uint32("user_id", userID))
 
 	ctx, cancel := context.WithTimeout(r.Context(), 4*database.DatabaseTimeout)
 	defer cancel()
@@ -120,8 +120,10 @@ func (s Server) PostAPIInvites(w http.ResponseWriter, r *http.Request) {
 
 // (GET /api/invites/me Get all invites for logged in user.)
 func (s Server) GetAPIInvitesMe(w http.ResponseWriter, r *http.Request, params GetAPIInvitesMeParams) {
+	userID, _ := r.Context().Value(UserIDCtxKey{}).(uint32)
 	reqID, _ := r.Context().Value(RequestIDCtxKey{}).(string)
-	logger := s.Logger.With("request_id", reqID)
+
+	logger := s.Logger.With(zap.String("request_id", reqID), zap.Uint32("user_id", userID))
 
 	ctx, cancel := context.WithTimeout(r.Context(), 4*database.DatabaseTimeout)
 	defer cancel()
@@ -156,20 +158,16 @@ func (s Server) GetAPIInvitesMe(w http.ResponseWriter, r *http.Request, params G
 
 // (DELETE /api/invites/{inviteID} Delete an invite).
 func (s Server) DeleteAPIInvitesInviteID(w http.ResponseWriter, r *http.Request, inviteID uint32) {
+	userID, _ := r.Context().Value(UserIDCtxKey{}).(uint32)
 	reqID, _ := r.Context().Value(RequestIDCtxKey{}).(string)
-	logger := s.Logger.With("request_id", reqID)
+
+	logger := s.Logger.With(zap.String("request_id", reqID), zap.Uint32("user_id", userID))
 
 	ctx, cancel := context.WithTimeout(r.Context(), 2*database.DatabaseTimeout)
 	defer cancel()
 
-	userID, ok := r.Context().Value(UserIDCtxKey{}).(uint32)
-	if !ok {
-		logger.Error("failed to get userid from request context")
-		sendError(w, http.StatusUnauthorized, "Try again later.")
-		return
-	}
-
 	var invite database.Invite
+	var err error
 	if invite, err = s.DB.GetInviteByID(ctx, inviteID); err != nil {
 		logger.Error("failed to get invite by id", zap.Error(err))
 		sendError(w, http.StatusBadGateway, "Failed to get invite by id")
@@ -206,21 +204,16 @@ func (s Server) DeleteAPIInvitesInviteID(w http.ResponseWriter, r *http.Request,
 
 // (PATCH /api/invites/{inviteID} update a new invite with a new message).
 func (s Server) PatchAPIInvitesInviteID(w http.ResponseWriter, r *http.Request, inviteID uint32) {
+	userID, _ := r.Context().Value(UserIDCtxKey{}).(uint32)
 	reqID, _ := r.Context().Value(RequestIDCtxKey{}).(string)
-	logger := s.Logger.With("request_id", reqID)
+
+	logger := s.Logger.With(zap.String("request_id", reqID), zap.Uint32("user_id", userID))
 
 	ctx, cancel := context.WithTimeout(r.Context(), 2*database.DatabaseTimeout)
 	defer cancel()
 
-	userID, ok := r.Context().Value(UserIDCtxKey{}).(uint32)
-	if !ok {
-		logger.Error("failed to get userid from request context")
-		sendError(w, http.StatusUnauthorized, "Try again later.")
-		return
-	}
-
-	var err error
 	var body PatchAPIInvitesInviteIDJSONRequestBody
+	var err error
 	if err = json.NewDecoder(r.Body).Decode(&body); err != nil {
 		logger.Error(ErrUnmarshalBody, zap.Object("body", body), zap.Error(err))
 		sendError(w, http.StatusBadRequest, ErrUnmarshalBody.Error())
@@ -277,18 +270,13 @@ func (s Server) PatchAPIInvitesInviteID(w http.ResponseWriter, r *http.Request, 
 
 // (PATCH /api/invites/{inviteID}/decline Decline an invite).
 func (s Server) PatchAPIInvitesInviteIDDecline(w http.ResponseWriter, r *http.Request, inviteID uint32) {
+	userID, _ := r.Context().Value(UserIDCtxKey{}).(uint32)
 	reqID, _ := r.Context().Value(RequestIDCtxKey{}).(string)
-	logger := s.Logger.With("request_id", reqID)
+
+	logger := s.Logger.With(zap.String("request_id", reqID), zap.Uint32("user_id", userID))
 
 	ctx, cancel := context.WithTimeout(r.Context(), 2*database.DatabaseTimeout)
 	defer cancel()
-
-	userID, ok := r.Context().Value(UserIDCtxKey{}).(uint32)
-	if !ok {
-		logger.Error("failed to get userid from request context")
-		sendError(w, http.StatusUnauthorized, "Try again later.")
-		return
-	}
 
 	p := validateAndUpdateInviteStatusParams{
 		ctx:       ctx,
@@ -299,7 +287,8 @@ func (s Server) PatchAPIInvitesInviteIDDecline(w http.ResponseWriter, r *http.Re
 		newStatus: InviteStatusAccepted,
 	}
 
-	if _, err = validateAndUpdateInviteStatus(p); err != nil {
+	_, err := validateAndUpdateInviteStatus(p)
+	if err != nil {
 		logger.Error("failed to validate and update invite status", zap.Error(err))
 		sendError(w, http.StatusBadGateway, err.Error())
 		return
@@ -310,18 +299,13 @@ func (s Server) PatchAPIInvitesInviteIDDecline(w http.ResponseWriter, r *http.Re
 
 // (PATCH /api/invites/{inviteID}/accept Accept an invite).
 func (s Server) PatchAPIInvitesInviteIDAccept(w http.ResponseWriter, r *http.Request, inviteID uint32) {
+	userID, _ := r.Context().Value(UserIDCtxKey{}).(uint32)
 	reqID, _ := r.Context().Value(RequestIDCtxKey{}).(string)
-	logger := s.Logger.With("request_id", reqID)
+
+	logger := s.Logger.With(zap.String("request_id", reqID), zap.Uint32("user_id", userID))
 
 	ctx, cancel := context.WithTimeout(r.Context(), 2*database.DatabaseTimeout)
 	defer cancel()
-
-	userID, ok := r.Context().Value(UserIDCtxKey{}).(uint32)
-	if !ok {
-		logger.Error("failed to get userid from request context")
-		sendError(w, http.StatusUnauthorized, "Try again later.")
-		return
-	}
 
 	tx, err := s.DB.DB.Begin()
 	if err != nil {
@@ -385,23 +369,13 @@ func (s Server) PatchAPIInvitesInviteIDAccept(w http.ResponseWriter, r *http.Req
 func (s Server) GetAPISlotifyGroupsSlotifyGroupIDInvites(w http.ResponseWriter,
 	r *http.Request, slotifyGroupID uint32, params GetAPISlotifyGroupsSlotifyGroupIDInvitesParams,
 ) {
+	userID, _ := r.Context().Value(UserIDCtxKey{}).(uint32)
 	reqID, _ := r.Context().Value(RequestIDCtxKey{}).(string)
-	logger := s.Logger.With("request_id", reqID)
+
+	logger := s.Logger.With(zap.String("request_id", reqID), zap.Uint32("user_id", userID))
 
 	ctx, cancel := context.WithTimeout(r.Context(), 2*database.DatabaseTimeout)
 	defer cancel()
-
-	reqID, _, err := GetCtxValues(r)
-	if err != nil {
-		if errors.Is(err, ErrRequestIDNotFound) {
-			s.Logger.Error(err)
-			sendError(w, http.StatusInternalServerError, "Try again later.")
-		} else if errors.Is(err, ErrUserIDNotFound) {
-			s.Logger.Error(err)
-			sendError(w, http.StatusUnauthorized, "Try again later.")
-		}
-		return
-	}
 
 	invites, err := s.DB.ListInvitesByGroup(ctx,
 		database.ListInvitesByGroupParams{
