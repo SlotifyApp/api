@@ -42,7 +42,7 @@ func SetHeaderAndWriteResponse(w http.ResponseWriter, code int, encode any) {
 // (GET /healthcheck).
 func (s Server) GetAPIHealthcheck(w http.ResponseWriter, r *http.Request) {
 	reqID, _ := r.Context().Value(RequestIDCtxKey{}).(string)
-	logger := s.Logger.With("request_id", reqID)
+	logger := s.Logger.With(zap.String("request_id", reqID))
 
 	resp := "Healthcheck Successful!"
 	w.WriteHeader(http.StatusOK)
