@@ -120,6 +120,8 @@ func TestSlotifyGroup_DeleteSlotifyGroupsSlotifyGroupID(t *testing.T) {
 	})
 
 	slotifyGroupInserted := testutil.InsertSlotifyGroup(t, db)
+	u := testutil.InsertUser(t, db)
+	testutil.AddUserToSlotifyGroup(t, db, u.Id, slotifyGroupInserted.Id)
 
 	tests := map[string]struct {
 		expectedRespBody any
@@ -128,7 +130,7 @@ func TestSlotifyGroup_DeleteSlotifyGroupsSlotifyGroupID(t *testing.T) {
 		testMsg          string
 	}{
 		"deleting slotifyGroup that doesn't exist": {
-			expectedRespBody: "slotifyGroup api: incorrect slotifyGroup id",
+			expectedRespBody: "You are not a member of the group, you cannot delete it.",
 			httpStatus:       http.StatusBadRequest,
 			slotifyGroupID:   10000,
 			testMsg:          "slotifyGroup that doesn't exist, returns client error",
@@ -148,6 +150,9 @@ func TestSlotifyGroup_DeleteSlotifyGroupsSlotifyGroupID(t *testing.T) {
 			req := httptest.NewRequest(http.MethodDelete, fmt.Sprintf("/api/slotify-groups/%d", tt.slotifyGroupID), nil)
 
 			req.Header.Set(api.ReqHeader, uuid.NewString())
+			ctx := context.WithValue(req.Context(), api.UserIDCtxKey{}, u.Id)
+
+			req = req.WithContext(ctx)
 
 			server.DeleteAPISlotifyGroupsSlotifyGroupID(rr, req, tt.slotifyGroupID)
 
