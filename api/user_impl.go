@@ -299,8 +299,8 @@ func (s Server) GetAPIMSFTUsers(w http.ResponseWriter, r *http.Request) {
 			var user MSFTGroupUser
 			user, err = UserableToMSFTGroupUser(usr)
 			if err != nil {
-				s.Logger.Error("failed to convert userable to user")
-				sendError(w, http.StatusInternalServerError, "Failed to convert userable to user")
+				s.Logger.Errorf("failed to convert userable to user: %v", err)
+				sendError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to convert userable to user: %v", err))
 				return
 			}
 			users = append(users, user)
