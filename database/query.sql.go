@@ -345,7 +345,7 @@ const createReschedulingRequest = `-- name: CreateReschedulingRequest :execlasti
 INSERT INTO ReschedulingRequest (old_meeting_id) VALUES (?)
 `
 
-func (q *Queries) CreateReschedulingRequest(ctx context.Context, oldMeetingID int32) (int64, error) {
+func (q *Queries) CreateReschedulingRequest(ctx context.Context, oldMeetingID uint32) (int64, error) {
 	result, err := q.exec(ctx, q.createReschedulingRequestStmt, createReschedulingRequest, oldMeetingID)
 	if err != nil {
 		return 0, err

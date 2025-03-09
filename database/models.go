@@ -156,7 +156,7 @@ type RefreshToken struct {
 
 type Reschedulingrequest struct {
 	RequestID    uint32                    `json:"requestId"`
-	OldMeetingID int32                     `json:"oldMeetingId"`
+	OldMeetingID uint32                    `json:"oldMeetingId"`
 	Status       ReschedulingrequestStatus `json:"status"`
 	CreatedAt    time.Time                 `json:"createdAt"`
 }
