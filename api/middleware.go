@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net/http"
 	"time"
@@ -16,7 +17,11 @@ import (
 
 const (
 	requestLimit = 100
+	ReqHeader    = "X-Request-ID"
 )
+
+// RequestIDCtxKey is the key in context value for the request id.
+type RequestIDCtxKey struct{}
 
 // RefreshTokenCtxKey is the key in context value for the refresh token value.
 type RefreshTokenCtxKey struct{}
@@ -75,6 +80,21 @@ func AuthMiddleware(next http.Handler) http.Handler {
 	})
 }
 
+func RequestIDMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		reqID := r.Header.Get(ReqHeader)
+		if reqID == "" {
+			sendError(w, http.StatusInternalServerError,
+				fmt.Sprintf("failed to get %s header", ReqHeader))
+			return
+		}
+
+		ctx := context.WithValue(r.Context(), RequestIDCtxKey{}, reqID)
+
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
 // JWTMiddleware parses and validates the access token, and stores the userID in the request context.
 func JWTMiddleware(next http.Handler) http.Handler {
 	excludedPaths := map[string]bool{
@@ -108,6 +128,9 @@ func JWTMiddleware(next http.Handler) http.Handler {
 // ApplyMiddlewares applies all the middleware functions for the server.
 func ApplyMiddlewares(r *mux.Router, swagger *openapi3.T) {
 	middlewares := []mux.MiddlewareFunc{
+		// Adds request id to the request context
+		RequestIDMiddleware,
+
 		AuthMiddleware,
 
 		// makes sure that requests and responses follow openapischema

@@ -10,9 +10,12 @@ import (
 
 // (GET /api/events), HTTP SSE route.
 func (s Server) RenderEvent(w http.ResponseWriter, r *http.Request) {
+	reqID, _ := r.Context().Value(RequestIDCtxKey{}).(string)
+	logger := s.Logger.With("request_id", reqID)
+
 	userID, ok := r.Context().Value(UserIDCtxKey{}).(uint32)
 	if !ok {
-		s.Logger.Error("failed to get userid from request context")
+		logger.Error("failed to get userid from request context")
 		sendError(w, http.StatusUnauthorized, "Try again later.")
 		return
 	}
@@ -26,7 +29,7 @@ func (s Server) RenderEvent(w http.ResponseWriter, r *http.Request) {
 	f, ok := w.(http.Flusher)
 
 	if !ok {
-		s.Logger.Error("failed to flush event stream headers, responsewriter did not implement Flusher interface")
+		logger.Error("failed to flush event stream headers, responsewriter did not implement Flusher interface")
 		sendError(w, http.StatusInternalServerError, "failed to flush event stream headers")
 		return
 	}
@@ -34,7 +37,7 @@ func (s Server) RenderEvent(w http.ResponseWriter, r *http.Request) {
 	f.Flush()
 
 	if err := s.NotificationService.RegisterUserClient(s.Logger, userID, w); err != nil {
-		s.Logger.Errorf("failed to register user client", zap.Error(err))
+		logger.Errorf("failed to register user client", zap.Error(err))
 		sendError(w, http.StatusUnauthorized, "failed to register user client")
 		return
 	}
@@ -42,18 +45,21 @@ func (s Server) RenderEvent(w http.ResponseWriter, r *http.Request) {
 	// Block until the request is 'done', eg. client navigates away
 	<-r.Context().Done()
 
-	s.Logger.Infof("userID %d disconnected", userID)
+	logger.Infof("userID %d disconnected", userID)
 	s.NotificationService.DeleteUserConn(s.Logger, userID, w)
 }
 
 // (PATCH /api/notifications/{notificationID}/read). Mark notifications as being read.
 func (s Server) PatchAPINotificationsNotificationIDRead(w http.ResponseWriter, r *http.Request, notificationID uint32) {
+	reqID, _ := r.Context().Value(RequestIDCtxKey{}).(string)
+	logger := s.Logger.With("request_id", reqID)
+
 	ctx, cancel := context.WithTimeout(r.Context(), database.DatabaseTimeout)
 	defer cancel()
 
 	userID, ok := r.Context().Value(UserIDCtxKey{}).(uint32)
 	if !ok {
-		s.Logger.Error("failed to get userid from request context")
+		logger.Error("failed to get userid from request context")
 		sendError(w, http.StatusUnauthorized, "Try again later.")
 		return
 	}
@@ -65,7 +71,7 @@ func (s Server) PatchAPINotificationsNotificationIDRead(w http.ResponseWriter, r
 
 	rowsAffected, err := s.DB.MarkNotificationAsRead(ctx, dbParams)
 	if err != nil {
-		s.Logger.Error("failed to mark notification as read", zap.Error(err))
+		logger.Error("failed to mark notification as read", zap.Error(err))
 		sendError(w, http.StatusInternalServerError, "Failed to mark notification as read.")
 		return
 	}
@@ -75,7 +81,7 @@ func (s Server) PatchAPINotificationsNotificationIDRead(w http.ResponseWriter, r
 			ActualRows:   rowsAffected,
 			ExpectedRows: []int64{1},
 		}
-		s.Logger.Error("failed to mark notification as read", zap.Error(err))
+		logger.Error("failed to mark notification as read", zap.Error(err))
 		sendError(w, http.StatusBadRequest, "Failed to mark notification as read.")
 		return
 	}
@@ -85,19 +91,22 @@ func (s Server) PatchAPINotificationsNotificationIDRead(w http.ResponseWriter, r
 
 // (GET /api/notifications/{notificationID}/read).
 func (s Server) GetAPIUsersMeNotifications(w http.ResponseWriter, r *http.Request) {
+	reqID, _ := r.Context().Value(RequestIDCtxKey{}).(string)
+	logger := s.Logger.With("request_id", reqID)
+
 	ctx, cancel := context.WithTimeout(r.Context(), database.DatabaseTimeout)
 	defer cancel()
 
 	userID, ok := r.Context().Value(UserIDCtxKey{}).(uint32)
 	if !ok {
-		s.Logger.Error("failed to get userid from request context")
+		logger.Error("failed to get userid from request context")
 		sendError(w, http.StatusUnauthorized, "Try again later.")
 		return
 	}
 
 	notifs, err := s.DB.GetUnreadUserNotifications(ctx, userID)
 	if err != nil {
-		s.Logger.Error("failed to get unread user notifications")
+		logger.Error("failed to get unread user notifications")
 		sendError(w, http.StatusInternalServerError, "failed to get unread user notifications from db")
 		return
 	}

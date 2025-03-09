@@ -13,6 +13,7 @@ import (
 
 	"github.com/SlotifyApp/slotify-backend/api"
 	"github.com/brianvoe/gofakeit/v7"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 
 	"github.com/SlotifyApp/slotify-backend/testutil"
@@ -58,6 +59,9 @@ func TestUser_GetUsersUserID(t *testing.T) {
 
 			rr := httptest.NewRecorder()
 			req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/users/%d", tt.userID), nil)
+
+			req.Header.Set(api.ReqHeader, uuid.NewString())
+
 			server.GetAPIUsersUserID(rr, req, tt.userID)
 
 			if tt.httpStatus == http.StatusOK {
@@ -130,6 +134,8 @@ func TestUser_PostUsers(t *testing.T) {
 
 			req := httptest.NewRequest(http.MethodPost, "/api/users", bytes.NewReader(body))
 			req.Header.Add("Content-Type", "application/json")
+
+			req.Header.Set(api.ReqHeader, uuid.NewString())
 
 			server.PostAPIUsers(rr, req)
 			// Reset the request body for openapi validate
@@ -225,6 +231,8 @@ func TestUser_GetUsers(t *testing.T) {
 			req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/users?%s", tt.route), nil)
 			req.Header.Add("Content-Type", "application/json")
 
+			req.Header.Set(api.ReqHeader, uuid.NewString())
+
 			server.GetAPIUsers(rr, req, tt.params)
 
 			testutil.OpenAPIValidateTest(t, rr, req)
@@ -311,6 +319,8 @@ func TestUser_DeleteUsersUserID(t *testing.T) {
 
 			rr := httptest.NewRecorder()
 			req := httptest.NewRequest(http.MethodDelete, fmt.Sprintf("/api/users/%d", tt.userID), nil)
+
+			req.Header.Set(api.ReqHeader, uuid.NewString())
 			req.Header.Add("Content-Type", "application/json")
 
 			oldCount := testutil.GetCount(t, db, "User")

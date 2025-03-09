@@ -40,11 +40,14 @@ func SetHeaderAndWriteResponse(w http.ResponseWriter, code int, encode any) {
 }
 
 // (GET /healthcheck).
-func (s Server) GetAPIHealthcheck(w http.ResponseWriter, _ *http.Request) {
+func (s Server) GetAPIHealthcheck(w http.ResponseWriter, r *http.Request) {
+	reqID, _ := r.Context().Value(RequestIDCtxKey{}).(string)
+	logger := s.Logger.With("request_id", reqID)
+
 	resp := "Healthcheck Successful!"
 	w.WriteHeader(http.StatusOK)
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
-		s.Logger.Error("Failed to encode JSON", zap.String("body", resp))
+		logger.Error("Failed to encode JSON", zap.String("body", resp))
 		sendError(w, http.StatusInternalServerError, "Failed to encode JSON")
 		return
 	}

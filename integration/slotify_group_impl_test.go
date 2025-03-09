@@ -14,6 +14,7 @@ import (
 	"github.com/SlotifyApp/slotify-backend/mocks"
 	"github.com/SlotifyApp/slotify-backend/testutil"
 	"github.com/brianvoe/gofakeit/v7"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 )
@@ -81,6 +82,8 @@ func TestSlotifyGroup_PostSlotifyGroups(t *testing.T) {
 			ctx := context.WithValue(req.Context(), api.UserIDCtxKey{}, user.Id)
 			req = req.WithContext(ctx)
 
+			req.Header.Set(api.ReqHeader, uuid.NewString())
+
 			server.PostAPISlotifyGroups(rr, req)
 
 			if tt.httpStatus == http.StatusCreated {
@@ -143,6 +146,8 @@ func TestSlotifyGroup_DeleteSlotifyGroupsSlotifyGroupID(t *testing.T) {
 			rr := httptest.NewRecorder()
 			req := httptest.NewRequest(http.MethodDelete, fmt.Sprintf("/api/slotify-groups/%d", tt.slotifyGroupID), nil)
 
+			req.Header.Set(api.ReqHeader, uuid.NewString())
+
 			server.DeleteAPISlotifyGroupsSlotifyGroupID(rr, req, tt.slotifyGroupID)
 
 			testutil.OpenAPIValidateTest(t, rr, req)
@@ -193,6 +198,8 @@ func TestSlotifyGroup_GetSlotifyGroupsSlotifyGroupID(t *testing.T) {
 
 			rr := httptest.NewRecorder()
 			req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/slotify-groups/%d", tt.slotifyGroupID), nil)
+
+			req.Header.Set(api.ReqHeader, uuid.NewString())
 
 			server.GetAPISlotifyGroupsSlotifyGroupID(rr, req, tt.slotifyGroupID)
 
@@ -258,6 +265,8 @@ func TestSlotifyGroup_GetSlotifyGroupsSlotifyGroupIDUsers(t *testing.T) {
 
 			rr := httptest.NewRecorder()
 			req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/slotify-groups/%d/users", tt.slotifyGroupID), nil)
+
+			req.Header.Set(api.ReqHeader, uuid.NewString())
 
 			server.GetAPISlotifyGroupsSlotifyGroupIDUsers(rr, req, tt.slotifyGroupID)
 
@@ -327,6 +336,8 @@ func TestSlotifyGroup_GetAPISlotifyGroupsMe(t *testing.T) {
 
 			ctx := context.WithValue(req.Context(), api.UserIDCtxKey{}, tt.userID)
 			req = req.WithContext(ctx)
+
+			req.Header.Set(api.ReqHeader, uuid.NewString())
 
 			server.GetAPISlotifyGroupsMe(rr, req)
 

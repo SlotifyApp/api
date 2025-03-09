@@ -13,6 +13,7 @@ import (
 	"github.com/SlotifyApp/slotify-backend/api"
 	"github.com/SlotifyApp/slotify-backend/mocks"
 	"github.com/SlotifyApp/slotify-backend/testutil"
+	"github.com/google/uuid"
 	openapi_types "github.com/oapi-codegen/runtime/types"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
@@ -95,6 +96,7 @@ func TestInvites_PostInvites(t *testing.T) {
 
 			ctx := context.WithValue(req.Context(), api.UserIDCtxKey{}, fromUser.Id)
 			req = req.WithContext(ctx)
+			req.Header.Set(api.ReqHeader, uuid.NewString())
 
 			server.PostAPIInvites(rr, req)
 
