@@ -188,3 +188,11 @@ LIMIT ?;
 -- name: CountWeekOldInvites :one
 SELECT COUNT(*) FROM Invite
 WHERE DATE(created_at) <= CURDATE() - INTERVAL 1 WEEK;
+
+-- name: GetMeetingByID :one
+SELECT * FROM Meeting
+WHERE id=?;
+
+-- name: GetMeetingPreferences :one
+SELECT * FROM MeetingPreferences
+WHERE id=?;

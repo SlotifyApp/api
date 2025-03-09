@@ -99,6 +99,12 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.getInviteByIDStmt, err = db.PrepareContext(ctx, getInviteByID); err != nil {
 		return nil, fmt.Errorf("error preparing query GetInviteByID: %w", err)
 	}
+	if q.getMeetingByIDStmt, err = db.PrepareContext(ctx, getMeetingByID); err != nil {
+		return nil, fmt.Errorf("error preparing query GetMeetingByID: %w", err)
+	}
+	if q.getMeetingPreferencesStmt, err = db.PrepareContext(ctx, getMeetingPreferences); err != nil {
+		return nil, fmt.Errorf("error preparing query GetMeetingPreferences: %w", err)
+	}
 	if q.getRefreshTokenByUserIDStmt, err = db.PrepareContext(ctx, getRefreshTokenByUserID); err != nil {
 		return nil, fmt.Errorf("error preparing query GetRefreshTokenByUserID: %w", err)
 	}
@@ -283,6 +289,16 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing getInviteByIDStmt: %w", cerr)
 		}
 	}
+	if q.getMeetingByIDStmt != nil {
+		if cerr := q.getMeetingByIDStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getMeetingByIDStmt: %w", cerr)
+		}
+	}
+	if q.getMeetingPreferencesStmt != nil {
+		if cerr := q.getMeetingPreferencesStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getMeetingPreferencesStmt: %w", cerr)
+		}
+	}
 	if q.getRefreshTokenByUserIDStmt != nil {
 		if cerr := q.getRefreshTokenByUserIDStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing getRefreshTokenByUserIDStmt: %w", cerr)
@@ -437,6 +453,8 @@ type Queries struct {
 	getAllSlotifyGroupMembersStmt       *sql.Stmt
 	getAllSlotifyGroupMembersExceptStmt *sql.Stmt
 	getInviteByIDStmt                   *sql.Stmt
+	getMeetingByIDStmt                  *sql.Stmt
+	getMeetingPreferencesStmt           *sql.Stmt
 	getRefreshTokenByUserIDStmt         *sql.Stmt
 	getSlotifyGroupByIDStmt             *sql.Stmt
 	getUnreadUserNotificationsStmt      *sql.Stmt
@@ -486,6 +504,8 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		getAllSlotifyGroupMembersStmt:       q.getAllSlotifyGroupMembersStmt,
 		getAllSlotifyGroupMembersExceptStmt: q.getAllSlotifyGroupMembersExceptStmt,
 		getInviteByIDStmt:                   q.getInviteByIDStmt,
+		getMeetingByIDStmt:                  q.getMeetingByIDStmt,
+		getMeetingPreferencesStmt:           q.getMeetingPreferencesStmt,
 		getRefreshTokenByUserIDStmt:         q.getRefreshTokenByUserIDStmt,
 		getSlotifyGroupByIDStmt:             q.getSlotifyGroupByIDStmt,
 		getUnreadUserNotificationsStmt:      q.getUnreadUserNotificationsStmt,
