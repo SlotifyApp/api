@@ -9,8 +9,8 @@ import (
 	"go.uber.org/zap"
 )
 
-// (POST /api/scheduling/free).
-func (s Server) PostAPISchedulingFree(w http.ResponseWriter, r *http.Request) {
+// (POST /api/scheduling/slots).
+func (s Server) PostAPISchedulingSlots(w http.ResponseWriter, r *http.Request) {
 	reqID, _ := r.Context().Value(RequestIDCtxKey{}).(string)
 	logger := s.Logger.With("request_id", reqID)
 

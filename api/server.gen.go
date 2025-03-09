@@ -398,8 +398,8 @@ type PostAPIInvitesJSONRequestBody = InviteCreate
 // PatchAPIInvitesInviteIDJSONRequestBody defines body for PatchAPIInvitesInviteID for application/json ContentType.
 type PatchAPIInvitesInviteIDJSONRequestBody PatchAPIInvitesInviteIDJSONBody
 
-// PostAPISchedulingFreeJSONRequestBody defines body for PostAPISchedulingFree for application/json ContentType.
-type PostAPISchedulingFreeJSONRequestBody = SchedulingSlotsBodySchema
+// PostAPISchedulingSlotsJSONRequestBody defines body for PostAPISchedulingSlots for application/json ContentType.
+type PostAPISchedulingSlotsJSONRequestBody = SchedulingSlotsBodySchema
 
 // PostAPISlotifyGroupsJSONRequestBody defines body for PostAPISlotifyGroups for application/json ContentType.
 type PostAPISlotifyGroupsJSONRequestBody = SlotifyGroupCreate
@@ -462,7 +462,7 @@ type ServerInterface interface {
 	PostAPIRefresh(w http.ResponseWriter, r *http.Request)
 	// Idempotent route, just returns appropriate time slots along with their respective ratings.
 	// (POST /api/scheduling/slots)
-	PostAPISchedulingFree(w http.ResponseWriter, r *http.Request)
+	PostAPISchedulingSlots(w http.ResponseWriter, r *http.Request)
 	// Create a new slotifyGroup.
 	// (POST /api/slotify-groups)
 	PostAPISlotifyGroups(w http.ResponseWriter, r *http.Request)
@@ -927,11 +927,11 @@ func (siw *ServerInterfaceWrapper) PostAPIRefresh(w http.ResponseWriter, r *http
 	handler.ServeHTTP(w, r)
 }
 
-// PostAPISchedulingFree operation middleware
-func (siw *ServerInterfaceWrapper) PostAPISchedulingFree(w http.ResponseWriter, r *http.Request) {
+// PostAPISchedulingSlots operation middleware
+func (siw *ServerInterfaceWrapper) PostAPISchedulingSlots(w http.ResponseWriter, r *http.Request) {
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.PostAPISchedulingFree(w, r)
+		siw.Handler.PostAPISchedulingSlots(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1393,7 +1393,7 @@ func HandlerWithOptions(si ServerInterface, options GorillaServerOptions) http.H
 
 	r.HandleFunc(options.BaseURL+"/api/refresh", wrapper.PostAPIRefresh).Methods("POST")
 
-	r.HandleFunc(options.BaseURL+"/api/scheduling/slots", wrapper.PostAPISchedulingFree).Methods("POST")
+	r.HandleFunc(options.BaseURL+"/api/scheduling/slots", wrapper.PostAPISchedulingSlots).Methods("POST")
 
 	r.HandleFunc(options.BaseURL+"/api/slotify-groups", wrapper.PostAPISlotifyGroups).Methods("POST")
 
@@ -1492,19 +1492,19 @@ var swaggerSpec = []string{
 	"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",
-	"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",
+	"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",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file
