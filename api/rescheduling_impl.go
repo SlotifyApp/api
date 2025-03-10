@@ -107,13 +107,6 @@ func (s Server) PostAPIRescheduleRequestReplace(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	// graph, err := CreateMSFTGraphClient(ctx, s.MSALClient, s.DB, userID)
-	// if err != nil {
-	// 	s.Logger.Error("failed to create msgraph client", zap.Error(err))
-	// 	sendError(w, http.StatusBadGateway, "Failed to connect to microsoft graph API")
-	// 	return
-	// }
-
 	// Create Rescheduling Request
 	var requestId int64
 	err = retry.Do(func() error {
