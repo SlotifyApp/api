@@ -12,7 +12,7 @@ import (
 
 func createSchedulingRequest(body ReschedulingCheckBodySchema,
 	meetingPref database.Meetingpreferences,
-) (SchedulingSlotsBodySchema, error) {
+) SchedulingSlotsBodySchema {
 	// Create request body for scheduling slots api call
 	newReqBody := SchedulingSlotsBodySchema{}
 
@@ -53,7 +53,7 @@ func createSchedulingRequest(body ReschedulingCheckBodySchema,
 
 	timeConstraint.SetTimeSlots(timeSlots)
 
-	return newReqBody, nil
+	return newReqBody
 }
 
 func checkValidReschedulingSlotExists(ctx context.Context,
@@ -62,11 +62,7 @@ func checkValidReschedulingSlotExists(ctx context.Context,
 	meetingPref database.Meetingpreferences,
 ) (bool, error) {
 	// Call scheduling function to check for valid slots
-	newRequest, err := createSchedulingRequest(body, meetingPref)
-	if err != nil {
-		return false,
-			fmt.Errorf("failed in creating find meeting time request body: %w", err)
-	}
+	newRequest := createSchedulingRequest(body, meetingPref)
 
 	res, err := makeFindMeetingTimesAPICall(ctx, graph, newRequest)
 	if err != nil {
