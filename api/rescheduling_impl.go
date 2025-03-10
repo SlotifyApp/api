@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -45,21 +46,32 @@ func (s Server) PostAPIRescheduleCheck(w http.ResponseWriter, r *http.Request) {
 	var meeting database.Meeting
 	meeting, err = s.DB.GetMeetingByID(ctx, uint32(*body.OldMeeting.MeetingID))
 
-	if err != nil {
+	var meetingFound bool
+
+	if err == sql.ErrNoRows {
+		// Meeting Not Found
+		meetingFound = false
+	} else if err != nil {
 		s.Logger.Error("failed to search meeting table in db", zap.Error(err))
 		sendError(w, http.StatusBadGateway, "Failed to process db request")
 		return
 	}
 
-	// TODO: Add check for if no meeting is found
-
 	var meetingPref database.Meetingpreferences
-	meetingPref, err = s.DB.GetMeetingPreferences(ctx, meeting.MeetingPrefID)
-
-	if err != nil {
-		s.Logger.Error("failed to search meeting table in db", zap.Error(err))
-		sendError(w, http.StatusBadGateway, "Failed to process db request")
-		return
+	if meetingFound {
+		// Get meeting preferences if data exists
+		meetingPref, err = s.DB.GetMeetingPreferences(ctx, meeting.MeetingPrefID)
+		if err != nil {
+			s.Logger.Error("failed to search meeting table in db", zap.Error(err))
+			sendError(w, http.StatusBadGateway, "Failed to process db request")
+			return
+		}
+	} else {
+		// Create temp meeting preferences if data doesn't exist
+		meetingPref = database.Meetingpreferences{
+			StartDateRange: time.Now(),
+			EndDateRange:   body.OldMeeting.StartTime.Add(time.Hour * 24 * 7), // Give a week extra from the start of the meeting
+		}
 	}
 
 	respBody, err := performReschedulingCheckProcess(ctx, graph, body, meetingPref)
@@ -94,17 +106,10 @@ func (s Server) PostAPIRescheduleRequestReplace(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	// graph, err := CreateMSFTGraphClient(ctx, s.MSALClient, s.DB, userID)
-	// if err != nil {
-	// 	s.Logger.Error("failed to create msgraph client", zap.Error(err))
-	// 	sendError(w, http.StatusBadGateway, "Failed to connect to microsoft graph API")
-	// 	return
-	// }
-
 	// Create Rescheduling Request
-	var requestId int64
+	var requestID int64
 	err = retry.Do(func() error {
-		if requestId, err = s.DB.CreateReschedulingRequest(ctx, userID); err != nil {
+		if requestID, err = s.DB.CreateReschedulingRequest(ctx, userID); err != nil {
 			return fmt.Errorf("failed to create reschedling requested by user: %w", err)
 		}
 		return nil
@@ -116,7 +121,6 @@ func (s Server) PostAPIRescheduleRequestReplace(w http.ResponseWriter, r *http.R
 		var meeting database.Meeting
 		// Get data from db to validate meeting id
 		meeting, err = s.DB.GetMeetingByID(ctx, uint32(*body.OldMeeting.MeetingID))
-
 		if err != nil {
 			s.Logger.Error("failed to get data from db.Meeting", zap.Error(err))
 			sendError(w, http.StatusBadGateway, "Failed to get data from db.Meeting")
@@ -125,7 +129,7 @@ func (s Server) PostAPIRescheduleRequestReplace(w http.ResponseWriter, r *http.R
 
 		// Create request to meeting
 		requestToMeetingParams := database.CreateRequestToMeetingParams{
-			RequestID: uint32(requestId),
+			RequestID: uint32(requestID),
 			MeetingID: meeting.ID,
 		}
 
@@ -139,7 +143,7 @@ func (s Server) PostAPIRescheduleRequestReplace(w http.ResponseWriter, r *http.R
 
 	// Create Placeholder meeting info
 	placeholderParams := database.CreatePlaceholderMeetingParams{
-		RequestID:      uint32(requestId),
+		RequestID:      uint32(requestID),
 		Title:          *body.NewMeeting.Title,
 		StartTime:      *body.NewMeeting.StartTime,
 		EndTime:        *body.NewMeeting.EndTime,
@@ -173,5 +177,5 @@ func (s Server) PostAPIRescheduleRequestReplace(w http.ResponseWriter, r *http.R
 	}
 
 	// NOtify user of the request
-	SetHeaderAndWriteResponse(w, http.StatusOK, requestId)
+	SetHeaderAndWriteResponse(w, http.StatusOK, requestID)
 }

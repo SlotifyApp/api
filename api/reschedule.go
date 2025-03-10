@@ -74,10 +74,11 @@ func checkValidReschedulingSlotExists(ctx context.Context,
 			fmt.Errorf("failed in calling fine meeting times api: %w", err)
 	}
 
+	// Check if valid slots exist
 	if len(*res.MeetingTimeSuggestions) > 0 {
 		return true, nil
 	}
-	// Check if res has non-empty array
+
 	return false, nil
 }
 
