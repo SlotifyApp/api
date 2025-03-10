@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -45,21 +46,33 @@ func (s Server) PostAPIRescheduleCheck(w http.ResponseWriter, r *http.Request) {
 	var meeting database.Meeting
 	meeting, err = s.DB.GetMeetingByID(ctx, uint32(*body.OldMeeting.MeetingID))
 
-	if err != nil {
+	var meetingFound bool
+
+	if err == sql.ErrNoRows {
+		// Meeting Not Found
+		meetingFound = false
+	} else if err != nil {
 		s.Logger.Error("failed to search meeting table in db", zap.Error(err))
 		sendError(w, http.StatusBadGateway, "Failed to process db request")
 		return
 	}
 
-	// TODO: Add check for if no meeting is found
-
 	var meetingPref database.Meetingpreferences
-	meetingPref, err = s.DB.GetMeetingPreferences(ctx, meeting.MeetingPrefID)
+	if meetingFound {
+		// Get meeting preferences if data exists
+		meetingPref, err = s.DB.GetMeetingPreferences(ctx, meeting.MeetingPrefID)
 
-	if err != nil {
-		s.Logger.Error("failed to search meeting table in db", zap.Error(err))
-		sendError(w, http.StatusBadGateway, "Failed to process db request")
-		return
+		if err != nil {
+			s.Logger.Error("failed to search meeting table in db", zap.Error(err))
+			sendError(w, http.StatusBadGateway, "Failed to process db request")
+			return
+		}
+	} else {
+		// Create temp meeting preferences if data doesn't exist
+		meetingPref = database.Meetingpreferences{
+			StartDateRange: time.Now(),
+			EndDateRange:   body.OldMeeting.StartTime.Add(time.Hour * 24 * 7), // Give a week extra from the start of the meeting
+		}
 	}
 
 	respBody, err := performReschedulingCheckProcess(ctx, graph, body, meetingPref)
