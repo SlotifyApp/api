@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/SlotifyApp/slotify-backend/database"
+	"github.com/avast/retry-go"
 	msgraphsdkgo "github.com/microsoftgraph/msgraph-sdk-go"
 	graphmodels "github.com/microsoftgraph/msgraph-sdk-go/models"
 )
@@ -101,4 +102,55 @@ func performReschedulingCheckProcess(ctx context.Context,
 	}
 
 	return response, nil
+}
+
+func createNewMeetingsAndPrefs(ctx context.Context,
+	body ReschedulingRequestBodySchema,
+	s Server,
+) (database.Meeting, error) {
+	// Meeting Info does not exist so create a new one
+	meetingPrefParams := database.CreateMeetingPreferencesParams{
+		MeetingStartTime: *body.OldMeeting.MeetingStartTime,
+		StartDateRange:   time.Now(),
+		EndDateRange:     body.OldMeeting.MeetingStartTime.Add(time.Hour * hoursInAWeek), // 1 week : 24 * 7
+	}
+
+	var meetingPrefID int64
+	var err error
+	err = retry.Do(func() error {
+		if meetingPrefID, err = s.DB.CreateMeetingPreferences(ctx, meetingPrefParams); err != nil {
+			return fmt.Errorf("failed to create meeting preference: %w", err)
+		}
+		return nil
+	}, retry.Attempts(3), retry.Delay(time.Millisecond*500))
+	if err != nil {
+		return database.Meeting{}, err
+	}
+
+	// Create Meeting
+	meetingParams := database.CreateMeetingParams{
+		//nolint: gosec // id is unsigned 32 bit int
+		MeetingPrefID: uint32(meetingPrefID),
+		//nolint: gosec // id is unsigned 32 bit int
+		OwnerID:       uint32(*body.OldMeeting.MeetingOwner),
+		Msftmeetingid: *body.OldMeeting.MeetingID,
+	}
+
+	err = retry.Do(func() error {
+		if _, err = s.DB.CreateMeeting(ctx, meetingParams); err != nil {
+			return fmt.Errorf("failed to create meeting: %w", err)
+		}
+		return nil
+	}, retry.Attempts(3), retry.Delay(time.Millisecond*500))
+	if err != nil {
+		return database.Meeting{}, err
+	}
+
+	var meeting database.Meeting
+	meeting, err = s.DB.GetMeetingByMSFTID(ctx, *body.OldMeeting.MeetingID)
+	if err != nil {
+		return database.Meeting{}, err
+	}
+
+	return meeting, nil
 }
