@@ -107,9 +107,9 @@ func (s Server) PostAPIRescheduleRequestReplace(w http.ResponseWriter, r *http.R
 	}
 
 	// Create Rescheduling Request
-	var requestId int64
+	var requestID int64
 	err = retry.Do(func() error {
-		if requestId, err = s.DB.CreateReschedulingRequest(ctx, userID); err != nil {
+		if requestID, err = s.DB.CreateReschedulingRequest(ctx, userID); err != nil {
 			return fmt.Errorf("failed to create reschedling requested by user: %w", err)
 		}
 		return nil
@@ -129,7 +129,7 @@ func (s Server) PostAPIRescheduleRequestReplace(w http.ResponseWriter, r *http.R
 
 		// Create request to meeting
 		requestToMeetingParams := database.CreateRequestToMeetingParams{
-			RequestID: uint32(requestId),
+			RequestID: uint32(requestID),
 			MeetingID: meeting.ID,
 		}
 
@@ -143,7 +143,7 @@ func (s Server) PostAPIRescheduleRequestReplace(w http.ResponseWriter, r *http.R
 
 	// Create Placeholder meeting info
 	placeholderParams := database.CreatePlaceholderMeetingParams{
-		RequestID:      uint32(requestId),
+		RequestID:      uint32(requestID),
 		Title:          *body.NewMeeting.Title,
 		StartTime:      *body.NewMeeting.StartTime,
 		EndTime:        *body.NewMeeting.EndTime,
@@ -177,5 +177,5 @@ func (s Server) PostAPIRescheduleRequestReplace(w http.ResponseWriter, r *http.R
 	}
 
 	// NOtify user of the request
-	SetHeaderAndWriteResponse(w, http.StatusOK, requestId)
+	SetHeaderAndWriteResponse(w, http.StatusOK, requestID)
 }
