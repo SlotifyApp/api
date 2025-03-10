@@ -61,7 +61,6 @@ func (s Server) PostAPIRescheduleCheck(w http.ResponseWriter, r *http.Request) {
 	if meetingFound {
 		// Get meeting preferences if data exists
 		meetingPref, err = s.DB.GetMeetingPreferences(ctx, meeting.MeetingPrefID)
-
 		if err != nil {
 			s.Logger.Error("failed to search meeting table in db", zap.Error(err))
 			sendError(w, http.StatusBadGateway, "Failed to process db request")
@@ -122,7 +121,6 @@ func (s Server) PostAPIRescheduleRequestReplace(w http.ResponseWriter, r *http.R
 		var meeting database.Meeting
 		// Get data from db to validate meeting id
 		meeting, err = s.DB.GetMeetingByID(ctx, uint32(*body.OldMeeting.MeetingID))
-
 		if err != nil {
 			s.Logger.Error("failed to get data from db.Meeting", zap.Error(err))
 			sendError(w, http.StatusBadGateway, "Failed to get data from db.Meeting")
