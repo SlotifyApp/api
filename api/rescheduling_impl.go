@@ -72,8 +72,8 @@ func (s Server) PostAPIRescheduleCheck(w http.ResponseWriter, r *http.Request) {
 	SetHeaderAndWriteResponse(w, http.StatusOK, respBody)
 }
 
-// (POST /api/reschedule/request).
-func (s Server) PostAPIRescheduleRequest(w http.ResponseWriter, r *http.Request) {
+// (POST /api/reschedule/request/replace).
+func (s Server) PostAPIRescheduleRequestReplace(w http.ResponseWriter, r *http.Request) {
 	// Get userid from access token
 	ctx, cancel := context.WithTimeout(r.Context(), time.Minute*3)
 	defer cancel()
@@ -101,47 +101,50 @@ func (s Server) PostAPIRescheduleRequest(w http.ResponseWriter, r *http.Request)
 	// 	return
 	// }
 
-	// Get data from db
-	var meeting database.Meeting
-	meeting, err = s.DB.GetMeetingByID(ctx, uint32(*body.OldMeeting.MeetingID))
-
-	if err != nil {
-		s.Logger.Error("failed to get data from db.Meeting", zap.Error(err))
-		sendError(w, http.StatusBadGateway, "Failed to get data from db.Meeting")
-		return
-	}
-
 	// Create Rescheduling Request
 	var requestId int64
 	err = retry.Do(func() error {
-		if requestId, err = s.DB.CreateReschedulingRequest(ctx, meeting.ID); err != nil {
-			return fmt.Errorf("Failed to create reschedling requested by user: %w", err)
+		if requestId, err = s.DB.CreateReschedulingRequest(ctx, userID); err != nil {
+			return fmt.Errorf("failed to create reschedling requested by user: %w", err)
 		}
 		return nil
 	}, retry.Attempts(3), retry.Delay(time.Millisecond*500))
 
-	//Create requested by time
-	params := database.CreateReschedulingRequestedByUserParams{
-		RequestID: uint32(requestId),
-		UserID:    userID,
+	// Attach meeting preferences info to request if it exists
+	if body.OldMeeting.MeetingID != nil {
+		// Link request to old meeting
+		var meeting database.Meeting
+		// Get data from db to validate meeting id
+		meeting, err = s.DB.GetMeetingByID(ctx, uint32(*body.OldMeeting.MeetingID))
+
+		if err != nil {
+			s.Logger.Error("failed to get data from db.Meeting", zap.Error(err))
+			sendError(w, http.StatusBadGateway, "Failed to get data from db.Meeting")
+			return
+		}
+
+		// Create request to meeting
+		requestToMeetingParams := database.CreateRequestToMeetingParams{
+			RequestID: uint32(requestId),
+			MeetingID: meeting.ID,
+		}
+
+		err = retry.Do(func() error {
+			if _, err = s.DB.CreateRequestToMeeting(ctx, requestToMeetingParams); err != nil {
+				return fmt.Errorf("failed to create request to meeting link: %w", err)
+			}
+			return nil
+		}, retry.Attempts(3), retry.Delay(time.Millisecond*500))
 	}
-
-	err = retry.Do(func() error {
-		if _, err = s.DB.CreateReschedulingRequestedByUser(ctx, params); err != nil {
-			return fmt.Errorf("Failed to create reschedling requested by user: %w", err)
-		}
-		return nil
-	}, retry.Attempts(3), retry.Delay(time.Millisecond*500))
 
 	// Create Placeholder meeting info
 	placeholderParams := database.CreatePlaceholderMeetingParams{
 		RequestID:      uint32(requestId),
 		Title:          *body.NewMeeting.Title,
-		OwnerID:        userID,
 		StartTime:      *body.NewMeeting.StartTime,
 		EndTime:        *body.NewMeeting.EndTime,
 		Location:       *body.NewMeeting.Location,
-		Duration:       int32(*body.NewMeeting.Duration),
+		Duration:       uint32(*body.NewMeeting.Duration),
 		StartDateRange: *body.NewMeeting.StartRangeTime,
 		EndDateRange:   *body.NewMeeting.EndRangeTime,
 	}
@@ -149,7 +152,7 @@ func (s Server) PostAPIRescheduleRequest(w http.ResponseWriter, r *http.Request)
 	var placeholderMeeting int64
 	err = retry.Do(func() error {
 		if placeholderMeeting, err = s.DB.CreatePlaceholderMeeting(ctx, placeholderParams); err != nil {
-			return fmt.Errorf("Failed to create placeholder meeting: %w", err)
+			return fmt.Errorf("failed to create placeholder meeting: %w", err)
 		}
 		return nil
 	}, retry.Attempts(3), retry.Delay(time.Millisecond*500))
@@ -157,25 +160,18 @@ func (s Server) PostAPIRescheduleRequest(w http.ResponseWriter, r *http.Request)
 	// For each attendee, create placeholder attendee row
 	for _, attendee := range *body.NewMeeting.Attendees {
 		attendeeParams := database.CreatePlaceholderMeetingAttendeeParams{
-			MeetingID: int32(placeholderMeeting),
+			MeetingID: uint32(placeholderMeeting),
 			UserID:    uint32(len(attendee.EmailAddress.Address)), // TODO: Fix this
 		}
 
 		err = retry.Do(func() error {
 			if _, err = s.DB.CreatePlaceholderMeetingAttendee(ctx, attendeeParams); err != nil {
-				return fmt.Errorf("Failed to create placeholder meeting attendee: %w", err)
+				return fmt.Errorf("failed to create placeholder meeting attendee: %w", err)
 			}
 			return nil
 		}, retry.Attempts(3), retry.Delay(time.Millisecond*500))
 	}
 
 	// NOtify user of the request
-
-	if err != nil {
-		s.Logger.Error("failed to create request", zap.Error(err))
-		sendError(w, http.StatusBadGateway, "Failed to create request")
-		return
-	}
-
-	SetHeaderAndWriteResponse(w, http.StatusOK, "Created")
+	SetHeaderAndWriteResponse(w, http.StatusOK, requestId)
 }
