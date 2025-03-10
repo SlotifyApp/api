@@ -283,7 +283,7 @@ type CreatePlaceholderMeetingParams struct {
 	StartTime      time.Time `json:"startTime"`
 	EndTime        time.Time `json:"endTime"`
 	Location       string    `json:"location"`
-	Duration       uint32    `json:"duration"`
+	Duration       time.Time `json:"duration"`
 	StartDateRange time.Time `json:"startDateRange"`
 	EndDateRange   time.Time `json:"endDateRange"`
 }
@@ -556,6 +556,23 @@ WHERE id=?
 
 func (q *Queries) GetMeetingByID(ctx context.Context, id uint32) (Meeting, error) {
 	row := q.queryRow(ctx, q.getMeetingByIDStmt, getMeetingByID, id)
+	var i Meeting
+	err := row.Scan(
+		&i.ID,
+		&i.MeetingPrefID,
+		&i.OwnerID,
+		&i.Msftmeetingid,
+	)
+	return i, err
+}
+
+const getMeetingByMSFTID = `-- name: GetMeetingByMSFTID :one
+SELECT id, meeting_pref_id, owner_id, msftmeetingid FROM Meeting
+WHERE msftMeetingID=?
+`
+
+func (q *Queries) GetMeetingByMSFTID(ctx context.Context, msftmeetingid string) (Meeting, error) {
+	row := q.queryRow(ctx, q.getMeetingByMSFTIDStmt, getMeetingByMSFTID, msftmeetingid)
 	var i Meeting
 	err := row.Scan(
 		&i.ID,

@@ -196,6 +196,10 @@ WHERE DATE(created_at) <= CURDATE() - INTERVAL 1 WEEK;
 SELECT * FROM Meeting
 WHERE id=?;
 
+-- name: GetMeetingByMSFTID :one
+SELECT * FROM Meeting
+WHERE msftMeetingID=?;
+
 -- name: GetMeetingPreferences :one
 SELECT * FROM MeetingPreferences
 WHERE id=?;

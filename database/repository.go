@@ -120,6 +120,9 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.getMeetingByIDStmt, err = db.PrepareContext(ctx, getMeetingByID); err != nil {
 		return nil, fmt.Errorf("error preparing query GetMeetingByID: %w", err)
 	}
+	if q.getMeetingByMSFTIDStmt, err = db.PrepareContext(ctx, getMeetingByMSFTID); err != nil {
+		return nil, fmt.Errorf("error preparing query GetMeetingByMSFTID: %w", err)
+	}
 	if q.getMeetingPreferencesStmt, err = db.PrepareContext(ctx, getMeetingPreferences); err != nil {
 		return nil, fmt.Errorf("error preparing query GetMeetingPreferences: %w", err)
 	}
@@ -342,6 +345,11 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing getMeetingByIDStmt: %w", cerr)
 		}
 	}
+	if q.getMeetingByMSFTIDStmt != nil {
+		if cerr := q.getMeetingByMSFTIDStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getMeetingByMSFTIDStmt: %w", cerr)
+		}
+	}
 	if q.getMeetingPreferencesStmt != nil {
 		if cerr := q.getMeetingPreferencesStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing getMeetingPreferencesStmt: %w", cerr)
@@ -508,6 +516,7 @@ type Queries struct {
 	getAllSlotifyGroupMembersExceptStmt  *sql.Stmt
 	getInviteByIDStmt                    *sql.Stmt
 	getMeetingByIDStmt                   *sql.Stmt
+	getMeetingByMSFTIDStmt               *sql.Stmt
 	getMeetingPreferencesStmt            *sql.Stmt
 	getRefreshTokenByUserIDStmt          *sql.Stmt
 	getSlotifyGroupByIDStmt              *sql.Stmt
@@ -565,6 +574,7 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		getAllSlotifyGroupMembersExceptStmt:  q.getAllSlotifyGroupMembersExceptStmt,
 		getInviteByIDStmt:                    q.getInviteByIDStmt,
 		getMeetingByIDStmt:                   q.getMeetingByIDStmt,
+		getMeetingByMSFTIDStmt:               q.getMeetingByMSFTIDStmt,
 		getMeetingPreferencesStmt:            q.getMeetingPreferencesStmt,
 		getRefreshTokenByUserIDStmt:          q.getRefreshTokenByUserIDStmt,
 		getSlotifyGroupByIDStmt:              q.getSlotifyGroupByIDStmt,

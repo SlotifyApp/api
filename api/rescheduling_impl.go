@@ -14,6 +14,8 @@ import (
 	"go.uber.org/zap"
 )
 
+const hoursInAWeek = 168
+
 // (POST /api/reschedule/check).
 func (s Server) PostAPIRescheduleCheck(w http.ResponseWriter, r *http.Request) {
 	// Get userid from access token
@@ -70,7 +72,7 @@ func (s Server) PostAPIRescheduleCheck(w http.ResponseWriter, r *http.Request) {
 		}
 	} else {
 		// Create temp meeting preferences if data doesn't exist
-		const hoursInAWeek = 168
+
 		dayTime := time.Hour * hoursInAWeek // 1 week : 24 * 7
 		meetingPref = database.Meetingpreferences{
 			StartDateRange: time.Now(),
@@ -89,6 +91,7 @@ func (s Server) PostAPIRescheduleCheck(w http.ResponseWriter, r *http.Request) {
 }
 
 // (POST /api/reschedule/request/replace).
+// nolint: funlen // 20 lines too long
 func (s Server) PostAPIRescheduleRequestReplace(w http.ResponseWriter, r *http.Request) {
 	// Get userid from access token
 	ctx, cancel := context.WithTimeout(r.Context(), time.Minute*3)
@@ -120,34 +123,53 @@ func (s Server) PostAPIRescheduleRequestReplace(w http.ResponseWriter, r *http.R
 	}, retry.Attempts(3), retry.Delay(time.Millisecond*500))
 
 	// Attach meeting preferences info to request if it exists
-	if body.OldMeeting.MeetingID != nil {
-		// Link request to old meeting
-		var meeting database.Meeting
-		// Get data from db to validate meeting id
-		//nolint: gosec // id is unsigned 32 bit int
-		meeting, err = s.DB.GetMeetingByID(ctx, uint32(*body.OldMeeting.MeetingID))
+
+	// Link request to old meeting
+	var meeting database.Meeting
+	// Get data from db to validate meeting id
+
+	meeting, err = s.DB.GetMeetingByMSFTID(ctx, *body.OldMeeting.MeetingID)
+
+	if errors.Is(err, sql.ErrNoRows) {
+		meeting, err = createNewMeetingsAndPrefs(ctx, body, s)
 		if err != nil {
-			s.Logger.Error("failed to get data from db.Meeting", zap.Error(err))
-			sendError(w, http.StatusBadGateway, "Failed to get data from db.Meeting")
+			s.Logger.Error("failed to get data from new db.Meeting", zap.Error(err))
+			sendError(w, http.StatusBadGateway, "Failed to get data from new db.Meeting")
 			return
 		}
+	} else if err != nil {
+		s.Logger.Error("failed to get data from db.Meeting", zap.Error(err))
+		sendError(w, http.StatusBadGateway, "Failed to get data from db.Meeting")
+		return
+	}
 
-		// Create request to meeting
-		requestToMeetingParams := database.CreateRequestToMeetingParams{
-			//nolint: gosec // id is unsigned 32 bit int
-			RequestID: uint32(requestID),
-			MeetingID: meeting.ID,
+	// Create request to meeting
+	requestToMeetingParams := database.CreateRequestToMeetingParams{
+		//nolint: gosec // id is unsigned 32 bit int
+		RequestID: uint32(requestID),
+		MeetingID: meeting.ID,
+	}
+
+	err = retry.Do(func() error {
+		if _, err = s.DB.CreateRequestToMeeting(ctx, requestToMeetingParams); err != nil {
+			return fmt.Errorf("failed to create request to meeting link: %w", err)
 		}
-
-		err = retry.Do(func() error {
-			if _, err = s.DB.CreateRequestToMeeting(ctx, requestToMeetingParams); err != nil {
-				return fmt.Errorf("failed to create request to meeting link: %w", err)
-			}
-			return nil
-		}, retry.Attempts(3), retry.Delay(time.Millisecond*500))
+		return nil
+	}, retry.Attempts(3), retry.Delay(time.Millisecond*500))
+	if err != nil {
+		s.Logger.Error("DB Creation Error: ", zap.Error(err))
+		sendError(w, http.StatusBadGateway, "Failed to create request to meeting link")
+		return
 	}
 
 	// Create Placeholder meeting info
+	parsedTime, err := time.Parse(time.RFC3339Nano, *body.NewMeeting.MeetingDuration)
+	if err != nil {
+		s.Logger.Error("failed to parse time", zap.Error(err))
+		sendError(w, http.StatusBadGateway, "Failed to parse time")
+		return
+	}
+
 	placeholderParams := database.CreatePlaceholderMeetingParams{
 		//nolint: gosec // id is unsigned 32 bit int
 		RequestID: uint32(requestID),
@@ -155,8 +177,8 @@ func (s Server) PostAPIRescheduleRequestReplace(w http.ResponseWriter, r *http.R
 		StartTime: *body.NewMeeting.StartTime,
 		EndTime:   *body.NewMeeting.EndTime,
 		Location:  *body.NewMeeting.Location,
-		//nolint: gosec // id is unsigned 32 bit int
-		Duration:       uint32(*body.NewMeeting.Duration),
+
+		Duration:       parsedTime,
 		StartDateRange: *body.NewMeeting.StartRangeTime,
 		EndDateRange:   *body.NewMeeting.EndRangeTime,
 	}
@@ -168,6 +190,11 @@ func (s Server) PostAPIRescheduleRequestReplace(w http.ResponseWriter, r *http.R
 		}
 		return nil
 	}, retry.Attempts(3), retry.Delay(time.Millisecond*500))
+	if err != nil {
+		s.Logger.Error("DB Creation Error: ", zap.Error(err))
+		sendError(w, http.StatusBadGateway, "Failed to create placeholder meeting")
+		return
+	}
 
 	// For each attendee, create placeholder attendee row
 	for _, attendee := range *body.NewMeeting.Attendees {
@@ -175,7 +202,7 @@ func (s Server) PostAPIRescheduleRequestReplace(w http.ResponseWriter, r *http.R
 			//nolint: gosec // id is unsigned 32 bit int
 			MeetingID: uint32(placeholderMeeting),
 			//nolint: gosec // id is unsigned 32 bit int
-			UserID: uint32(len(attendee.EmailAddress.Address)), // TODO: Change to actual user id
+			UserID: uint32(attendee),
 		}
 
 		err = retry.Do(func() error {
