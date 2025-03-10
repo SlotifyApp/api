@@ -84,11 +84,11 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.createRefreshTokenStmt, err = db.PrepareContext(ctx, createRefreshToken); err != nil {
 		return nil, fmt.Errorf("error preparing query CreateRefreshToken: %w", err)
 	}
+	if q.createRequestToMeetingStmt, err = db.PrepareContext(ctx, createRequestToMeeting); err != nil {
+		return nil, fmt.Errorf("error preparing query CreateRequestToMeeting: %w", err)
+	}
 	if q.createReschedulingRequestStmt, err = db.PrepareContext(ctx, createReschedulingRequest); err != nil {
 		return nil, fmt.Errorf("error preparing query CreateReschedulingRequest: %w", err)
-	}
-	if q.createReschedulingRequestedByUserStmt, err = db.PrepareContext(ctx, createReschedulingRequestedByUser); err != nil {
-		return nil, fmt.Errorf("error preparing query CreateReschedulingRequestedByUser: %w", err)
 	}
 	if q.createUserStmt, err = db.PrepareContext(ctx, createUser); err != nil {
 		return nil, fmt.Errorf("error preparing query CreateUser: %w", err)
@@ -282,14 +282,14 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing createRefreshTokenStmt: %w", cerr)
 		}
 	}
+	if q.createRequestToMeetingStmt != nil {
+		if cerr := q.createRequestToMeetingStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing createRequestToMeetingStmt: %w", cerr)
+		}
+	}
 	if q.createReschedulingRequestStmt != nil {
 		if cerr := q.createReschedulingRequestStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing createReschedulingRequestStmt: %w", cerr)
-		}
-	}
-	if q.createReschedulingRequestedByUserStmt != nil {
-		if cerr := q.createReschedulingRequestedByUserStmt.Close(); cerr != nil {
-			err = fmt.Errorf("error closing createReschedulingRequestedByUserStmt: %w", cerr)
 		}
 	}
 	if q.createUserStmt != nil {
@@ -474,115 +474,115 @@ func (q *Queries) queryRow(ctx context.Context, stmt *sql.Stmt, query string, ar
 }
 
 type Queries struct {
-	db                                    DBTX
-	tx                                    *sql.Tx
-	addSlotifyGroupStmt                   *sql.Stmt
-	addUserToSlotifyGroupStmt             *sql.Stmt
-	batchDeleteWeekOldInvitesStmt         *sql.Stmt
-	batchDeleteWeekOldNotificationsStmt   *sql.Stmt
-	batchExpireInvitesStmt                *sql.Stmt
-	checkMemberInSlotifyGroupStmt         *sql.Stmt
-	countExpiredInvitesStmt               *sql.Stmt
-	countSlotifyGroupByIDStmt             *sql.Stmt
-	countSlotifyGroupMembersStmt          *sql.Stmt
-	countUserByEmailStmt                  *sql.Stmt
-	countUserByIDStmt                     *sql.Stmt
-	countWeekOldInvitesStmt               *sql.Stmt
-	countWeekOldNotificationsStmt         *sql.Stmt
-	createInviteStmt                      *sql.Stmt
-	createMeetingStmt                     *sql.Stmt
-	createMeetingPreferencesStmt          *sql.Stmt
-	createNotificationStmt                *sql.Stmt
-	createPlaceholderMeetingStmt          *sql.Stmt
-	createPlaceholderMeetingAttendeeStmt  *sql.Stmt
-	createRefreshTokenStmt                *sql.Stmt
-	createReschedulingRequestStmt         *sql.Stmt
-	createReschedulingRequestedByUserStmt *sql.Stmt
-	createUserStmt                        *sql.Stmt
-	createUserNotificationStmt            *sql.Stmt
-	deleteInviteByIDStmt                  *sql.Stmt
-	deleteRefreshTokenByUserIDStmt        *sql.Stmt
-	deleteSlotifyGroupByIDStmt            *sql.Stmt
-	deleteUserByIDStmt                    *sql.Stmt
-	getAllSlotifyGroupMembersStmt         *sql.Stmt
-	getAllSlotifyGroupMembersExceptStmt   *sql.Stmt
-	getInviteByIDStmt                     *sql.Stmt
-	getMeetingByIDStmt                    *sql.Stmt
-	getMeetingPreferencesStmt             *sql.Stmt
-	getRefreshTokenByUserIDStmt           *sql.Stmt
-	getSlotifyGroupByIDStmt               *sql.Stmt
-	getUnreadUserNotificationsStmt        *sql.Stmt
-	getUserByEmailStmt                    *sql.Stmt
-	getUserByIDStmt                       *sql.Stmt
-	getUsersSlotifyGroupsStmt             *sql.Stmt
-	listInvitesByGroupStmt                *sql.Stmt
-	listInvitesMeStmt                     *sql.Stmt
-	listSlotifyGroupsStmt                 *sql.Stmt
-	listUsersStmt                         *sql.Stmt
-	markNotificationAsReadStmt            *sql.Stmt
-	removeSlotifyGroupStmt                *sql.Stmt
-	removeSlotifyGroupMemberStmt          *sql.Stmt
-	searchUsersByEmailStmt                *sql.Stmt
-	searchUsersByNameStmt                 *sql.Stmt
-	updateInviteMessageStmt               *sql.Stmt
-	updateInviteStatusStmt                *sql.Stmt
-	updateUserHomeAccountIDStmt           *sql.Stmt
+	db                                   DBTX
+	tx                                   *sql.Tx
+	addSlotifyGroupStmt                  *sql.Stmt
+	addUserToSlotifyGroupStmt            *sql.Stmt
+	batchDeleteWeekOldInvitesStmt        *sql.Stmt
+	batchDeleteWeekOldNotificationsStmt  *sql.Stmt
+	batchExpireInvitesStmt               *sql.Stmt
+	checkMemberInSlotifyGroupStmt        *sql.Stmt
+	countExpiredInvitesStmt              *sql.Stmt
+	countSlotifyGroupByIDStmt            *sql.Stmt
+	countSlotifyGroupMembersStmt         *sql.Stmt
+	countUserByEmailStmt                 *sql.Stmt
+	countUserByIDStmt                    *sql.Stmt
+	countWeekOldInvitesStmt              *sql.Stmt
+	countWeekOldNotificationsStmt        *sql.Stmt
+	createInviteStmt                     *sql.Stmt
+	createMeetingStmt                    *sql.Stmt
+	createMeetingPreferencesStmt         *sql.Stmt
+	createNotificationStmt               *sql.Stmt
+	createPlaceholderMeetingStmt         *sql.Stmt
+	createPlaceholderMeetingAttendeeStmt *sql.Stmt
+	createRefreshTokenStmt               *sql.Stmt
+	createRequestToMeetingStmt           *sql.Stmt
+	createReschedulingRequestStmt        *sql.Stmt
+	createUserStmt                       *sql.Stmt
+	createUserNotificationStmt           *sql.Stmt
+	deleteInviteByIDStmt                 *sql.Stmt
+	deleteRefreshTokenByUserIDStmt       *sql.Stmt
+	deleteSlotifyGroupByIDStmt           *sql.Stmt
+	deleteUserByIDStmt                   *sql.Stmt
+	getAllSlotifyGroupMembersStmt        *sql.Stmt
+	getAllSlotifyGroupMembersExceptStmt  *sql.Stmt
+	getInviteByIDStmt                    *sql.Stmt
+	getMeetingByIDStmt                   *sql.Stmt
+	getMeetingPreferencesStmt            *sql.Stmt
+	getRefreshTokenByUserIDStmt          *sql.Stmt
+	getSlotifyGroupByIDStmt              *sql.Stmt
+	getUnreadUserNotificationsStmt       *sql.Stmt
+	getUserByEmailStmt                   *sql.Stmt
+	getUserByIDStmt                      *sql.Stmt
+	getUsersSlotifyGroupsStmt            *sql.Stmt
+	listInvitesByGroupStmt               *sql.Stmt
+	listInvitesMeStmt                    *sql.Stmt
+	listSlotifyGroupsStmt                *sql.Stmt
+	listUsersStmt                        *sql.Stmt
+	markNotificationAsReadStmt           *sql.Stmt
+	removeSlotifyGroupStmt               *sql.Stmt
+	removeSlotifyGroupMemberStmt         *sql.Stmt
+	searchUsersByEmailStmt               *sql.Stmt
+	searchUsersByNameStmt                *sql.Stmt
+	updateInviteMessageStmt              *sql.Stmt
+	updateInviteStatusStmt               *sql.Stmt
+	updateUserHomeAccountIDStmt          *sql.Stmt
 }
 
 func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 	return &Queries{
-		db:                                    tx,
-		tx:                                    tx,
-		addSlotifyGroupStmt:                   q.addSlotifyGroupStmt,
-		addUserToSlotifyGroupStmt:             q.addUserToSlotifyGroupStmt,
-		batchDeleteWeekOldInvitesStmt:         q.batchDeleteWeekOldInvitesStmt,
-		batchDeleteWeekOldNotificationsStmt:   q.batchDeleteWeekOldNotificationsStmt,
-		batchExpireInvitesStmt:                q.batchExpireInvitesStmt,
-		checkMemberInSlotifyGroupStmt:         q.checkMemberInSlotifyGroupStmt,
-		countExpiredInvitesStmt:               q.countExpiredInvitesStmt,
-		countSlotifyGroupByIDStmt:             q.countSlotifyGroupByIDStmt,
-		countSlotifyGroupMembersStmt:          q.countSlotifyGroupMembersStmt,
-		countUserByEmailStmt:                  q.countUserByEmailStmt,
-		countUserByIDStmt:                     q.countUserByIDStmt,
-		countWeekOldInvitesStmt:               q.countWeekOldInvitesStmt,
-		countWeekOldNotificationsStmt:         q.countWeekOldNotificationsStmt,
-		createInviteStmt:                      q.createInviteStmt,
-		createMeetingStmt:                     q.createMeetingStmt,
-		createMeetingPreferencesStmt:          q.createMeetingPreferencesStmt,
-		createNotificationStmt:                q.createNotificationStmt,
-		createPlaceholderMeetingStmt:          q.createPlaceholderMeetingStmt,
-		createPlaceholderMeetingAttendeeStmt:  q.createPlaceholderMeetingAttendeeStmt,
-		createRefreshTokenStmt:                q.createRefreshTokenStmt,
-		createReschedulingRequestStmt:         q.createReschedulingRequestStmt,
-		createReschedulingRequestedByUserStmt: q.createReschedulingRequestedByUserStmt,
-		createUserStmt:                        q.createUserStmt,
-		createUserNotificationStmt:            q.createUserNotificationStmt,
-		deleteInviteByIDStmt:                  q.deleteInviteByIDStmt,
-		deleteRefreshTokenByUserIDStmt:        q.deleteRefreshTokenByUserIDStmt,
-		deleteSlotifyGroupByIDStmt:            q.deleteSlotifyGroupByIDStmt,
-		deleteUserByIDStmt:                    q.deleteUserByIDStmt,
-		getAllSlotifyGroupMembersStmt:         q.getAllSlotifyGroupMembersStmt,
-		getAllSlotifyGroupMembersExceptStmt:   q.getAllSlotifyGroupMembersExceptStmt,
-		getInviteByIDStmt:                     q.getInviteByIDStmt,
-		getMeetingByIDStmt:                    q.getMeetingByIDStmt,
-		getMeetingPreferencesStmt:             q.getMeetingPreferencesStmt,
-		getRefreshTokenByUserIDStmt:           q.getRefreshTokenByUserIDStmt,
-		getSlotifyGroupByIDStmt:               q.getSlotifyGroupByIDStmt,
-		getUnreadUserNotificationsStmt:        q.getUnreadUserNotificationsStmt,
-		getUserByEmailStmt:                    q.getUserByEmailStmt,
-		getUserByIDStmt:                       q.getUserByIDStmt,
-		getUsersSlotifyGroupsStmt:             q.getUsersSlotifyGroupsStmt,
-		listInvitesByGroupStmt:                q.listInvitesByGroupStmt,
-		listInvitesMeStmt:                     q.listInvitesMeStmt,
-		listSlotifyGroupsStmt:                 q.listSlotifyGroupsStmt,
-		listUsersStmt:                         q.listUsersStmt,
-		markNotificationAsReadStmt:            q.markNotificationAsReadStmt,
-		removeSlotifyGroupStmt:                q.removeSlotifyGroupStmt,
-		removeSlotifyGroupMemberStmt:          q.removeSlotifyGroupMemberStmt,
-		searchUsersByEmailStmt:                q.searchUsersByEmailStmt,
-		searchUsersByNameStmt:                 q.searchUsersByNameStmt,
-		updateInviteMessageStmt:               q.updateInviteMessageStmt,
-		updateInviteStatusStmt:                q.updateInviteStatusStmt,
-		updateUserHomeAccountIDStmt:           q.updateUserHomeAccountIDStmt,
+		db:                                   tx,
+		tx:                                   tx,
+		addSlotifyGroupStmt:                  q.addSlotifyGroupStmt,
+		addUserToSlotifyGroupStmt:            q.addUserToSlotifyGroupStmt,
+		batchDeleteWeekOldInvitesStmt:        q.batchDeleteWeekOldInvitesStmt,
+		batchDeleteWeekOldNotificationsStmt:  q.batchDeleteWeekOldNotificationsStmt,
+		batchExpireInvitesStmt:               q.batchExpireInvitesStmt,
+		checkMemberInSlotifyGroupStmt:        q.checkMemberInSlotifyGroupStmt,
+		countExpiredInvitesStmt:              q.countExpiredInvitesStmt,
+		countSlotifyGroupByIDStmt:            q.countSlotifyGroupByIDStmt,
+		countSlotifyGroupMembersStmt:         q.countSlotifyGroupMembersStmt,
+		countUserByEmailStmt:                 q.countUserByEmailStmt,
+		countUserByIDStmt:                    q.countUserByIDStmt,
+		countWeekOldInvitesStmt:              q.countWeekOldInvitesStmt,
+		countWeekOldNotificationsStmt:        q.countWeekOldNotificationsStmt,
+		createInviteStmt:                     q.createInviteStmt,
+		createMeetingStmt:                    q.createMeetingStmt,
+		createMeetingPreferencesStmt:         q.createMeetingPreferencesStmt,
+		createNotificationStmt:               q.createNotificationStmt,
+		createPlaceholderMeetingStmt:         q.createPlaceholderMeetingStmt,
+		createPlaceholderMeetingAttendeeStmt: q.createPlaceholderMeetingAttendeeStmt,
+		createRefreshTokenStmt:               q.createRefreshTokenStmt,
+		createRequestToMeetingStmt:           q.createRequestToMeetingStmt,
+		createReschedulingRequestStmt:        q.createReschedulingRequestStmt,
+		createUserStmt:                       q.createUserStmt,
+		createUserNotificationStmt:           q.createUserNotificationStmt,
+		deleteInviteByIDStmt:                 q.deleteInviteByIDStmt,
+		deleteRefreshTokenByUserIDStmt:       q.deleteRefreshTokenByUserIDStmt,
+		deleteSlotifyGroupByIDStmt:           q.deleteSlotifyGroupByIDStmt,
+		deleteUserByIDStmt:                   q.deleteUserByIDStmt,
+		getAllSlotifyGroupMembersStmt:        q.getAllSlotifyGroupMembersStmt,
+		getAllSlotifyGroupMembersExceptStmt:  q.getAllSlotifyGroupMembersExceptStmt,
+		getInviteByIDStmt:                    q.getInviteByIDStmt,
+		getMeetingByIDStmt:                   q.getMeetingByIDStmt,
+		getMeetingPreferencesStmt:            q.getMeetingPreferencesStmt,
+		getRefreshTokenByUserIDStmt:          q.getRefreshTokenByUserIDStmt,
+		getSlotifyGroupByIDStmt:              q.getSlotifyGroupByIDStmt,
+		getUnreadUserNotificationsStmt:       q.getUnreadUserNotificationsStmt,
+		getUserByEmailStmt:                   q.getUserByEmailStmt,
+		getUserByIDStmt:                      q.getUserByIDStmt,
+		getUsersSlotifyGroupsStmt:            q.getUsersSlotifyGroupsStmt,
+		listInvitesByGroupStmt:               q.listInvitesByGroupStmt,
+		listInvitesMeStmt:                    q.listInvitesMeStmt,
+		listSlotifyGroupsStmt:                q.listSlotifyGroupsStmt,
+		listUsersStmt:                        q.listUsersStmt,
+		markNotificationAsReadStmt:           q.markNotificationAsReadStmt,
+		removeSlotifyGroupStmt:               q.removeSlotifyGroupStmt,
+		removeSlotifyGroupMemberStmt:         q.removeSlotifyGroupMemberStmt,
+		searchUsersByEmailStmt:               q.searchUsersByEmailStmt,
+		searchUsersByNameStmt:                q.searchUsersByNameStmt,
+		updateInviteMessageStmt:              q.updateInviteMessageStmt,
+		updateInviteStatusStmt:               q.updateInviteStatusStmt,
+		updateUserHomeAccountIDStmt:          q.updateUserHomeAccountIDStmt,
 	}
 }

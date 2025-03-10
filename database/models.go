@@ -133,17 +133,16 @@ type Placeholdermeeting struct {
 	MeetingID      uint32    `json:"meetingId"`
 	RequestID      uint32    `json:"requestId"`
 	Title          string    `json:"title"`
-	OwnerID        uint32    `json:"ownerId"`
 	StartTime      time.Time `json:"startTime"`
 	EndTime        time.Time `json:"endTime"`
 	Location       string    `json:"location"`
-	Duration       int32     `json:"duration"`
+	Duration       uint32    `json:"duration"`
 	StartDateRange time.Time `json:"startDateRange"`
 	EndDateRange   time.Time `json:"endDateRange"`
 }
 
 type Placeholdermeetingattendee struct {
-	MeetingID int32  `json:"meetingId"`
+	MeetingID uint32 `json:"meetingId"`
 	UserID    uint32 `json:"userId"`
 }
 
@@ -154,16 +153,16 @@ type RefreshToken struct {
 	Revoked bool   `json:"revoked"`
 }
 
-type Reschedulingrequest struct {
-	RequestID    uint32                    `json:"requestId"`
-	OldMeetingID uint32                    `json:"oldMeetingId"`
-	Status       ReschedulingrequestStatus `json:"status"`
-	CreatedAt    time.Time                 `json:"createdAt"`
+type Requesttomeeting struct {
+	RequestID uint32 `json:"requestId"`
+	MeetingID uint32 `json:"meetingId"`
 }
 
-type Reschedulingrequestedbyuser struct {
-	RequestID uint32 `json:"requestId"`
-	UserID    uint32 `json:"userId"`
+type Reschedulingrequest struct {
+	RequestID   uint32                    `json:"requestId"`
+	RequestedBy uint32                    `json:"requestedBy"`
+	Status      ReschedulingrequestStatus `json:"status"`
+	CreatedAt   time.Time                 `json:"createdAt"`
 }
 
 type SlotifyGroup struct {

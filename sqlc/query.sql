@@ -207,13 +207,13 @@ INSERT INTO MeetingPreferences (meeting_start_time, start_date_range, end_date_r
 INSERT INTO Meeting (meeting_pref_id, owner_id, msftMeetingID) VALUES (?,?,?);
 
 -- name: CreateReschedulingRequest :execlastid
-INSERT INTO ReschedulingRequest (old_meeting_id) VALUES (?);
-
--- name: CreateReschedulingRequestedByUser :execlastid
-INSERT INTO ReschedulingRequestedByUser (request_id, user_id) VALUES (?,?);
+INSERT INTO ReschedulingRequest (requested_by) VALUES (?);
 
 -- name: CreatePlaceholderMeeting :execlastid
-INSERT INTO PlaceholderMeeting (request_id, title, owner_id, start_time, end_time, location, duration, start_date_range, end_date_range) VALUES (?,?,?,?,?,?,?,?,?);
+INSERT INTO PlaceholderMeeting (request_id, title, start_time, end_time, location, duration, start_date_range, end_date_range) VALUES (?,?,?,?,?,?,?,?);
 
 -- name: CreatePlaceholderMeetingAttendee :execlastid
 INSERT INTO PlaceholderMeetingAttendee (meeting_id, user_id) VALUES (?,?);
+
+-- name: CreateRequestToMeeting :execlastid
+INSERT INTO RequestToMeeting (request_id, meeting_id) VALUES (?,?);
