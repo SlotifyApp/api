@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
@@ -44,11 +45,12 @@ func (s Server) PostAPIRescheduleCheck(w http.ResponseWriter, r *http.Request) {
 
 	// Get data from db
 	var meeting database.Meeting
+	//nolint: gosec // id is unsigned 32 bit int
 	meeting, err = s.DB.GetMeetingByID(ctx, uint32(*body.OldMeeting.MeetingID))
 
 	var meetingFound bool
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		// Meeting Not Found
 		meetingFound = false
 	} else if err != nil {
@@ -68,9 +70,11 @@ func (s Server) PostAPIRescheduleCheck(w http.ResponseWriter, r *http.Request) {
 		}
 	} else {
 		// Create temp meeting preferences if data doesn't exist
+		const hoursInAWeek = 168
+		dayTime := time.Hour * hoursInAWeek // 1 week : 24 * 7
 		meetingPref = database.Meetingpreferences{
 			StartDateRange: time.Now(),
-			EndDateRange:   body.OldMeeting.StartTime.Add(time.Hour * 24 * 7), // Give a week extra from the start of the meeting
+			EndDateRange:   body.OldMeeting.StartTime.Add(dayTime), // Give a week extra from the start of the meeting
 		}
 	}
 
@@ -120,6 +124,7 @@ func (s Server) PostAPIRescheduleRequestReplace(w http.ResponseWriter, r *http.R
 		// Link request to old meeting
 		var meeting database.Meeting
 		// Get data from db to validate meeting id
+		//nolint: gosec // id is unsigned 32 bit int
 		meeting, err = s.DB.GetMeetingByID(ctx, uint32(*body.OldMeeting.MeetingID))
 		if err != nil {
 			s.Logger.Error("failed to get data from db.Meeting", zap.Error(err))
@@ -129,6 +134,7 @@ func (s Server) PostAPIRescheduleRequestReplace(w http.ResponseWriter, r *http.R
 
 		// Create request to meeting
 		requestToMeetingParams := database.CreateRequestToMeetingParams{
+			//nolint: gosec // id is unsigned 32 bit int
 			RequestID: uint32(requestID),
 			MeetingID: meeting.ID,
 		}
@@ -143,11 +149,13 @@ func (s Server) PostAPIRescheduleRequestReplace(w http.ResponseWriter, r *http.R
 
 	// Create Placeholder meeting info
 	placeholderParams := database.CreatePlaceholderMeetingParams{
-		RequestID:      uint32(requestID),
-		Title:          *body.NewMeeting.Title,
-		StartTime:      *body.NewMeeting.StartTime,
-		EndTime:        *body.NewMeeting.EndTime,
-		Location:       *body.NewMeeting.Location,
+		//nolint: gosec // id is unsigned 32 bit int
+		RequestID: uint32(requestID),
+		Title:     *body.NewMeeting.Title,
+		StartTime: *body.NewMeeting.StartTime,
+		EndTime:   *body.NewMeeting.EndTime,
+		Location:  *body.NewMeeting.Location,
+		//nolint: gosec // id is unsigned 32 bit int
 		Duration:       uint32(*body.NewMeeting.Duration),
 		StartDateRange: *body.NewMeeting.StartRangeTime,
 		EndDateRange:   *body.NewMeeting.EndRangeTime,
@@ -164,8 +172,10 @@ func (s Server) PostAPIRescheduleRequestReplace(w http.ResponseWriter, r *http.R
 	// For each attendee, create placeholder attendee row
 	for _, attendee := range *body.NewMeeting.Attendees {
 		attendeeParams := database.CreatePlaceholderMeetingAttendeeParams{
+			//nolint: gosec // id is unsigned 32 bit int
 			MeetingID: uint32(placeholderMeeting),
-			UserID:    uint32(len(attendee.EmailAddress.Address)), // TODO: Fix this
+			//nolint: gosec // id is unsigned 32 bit int
+			UserID: uint32(len(attendee.EmailAddress.Address)), // TODO: Change to actual user id
 		}
 
 		err = retry.Do(func() error {
