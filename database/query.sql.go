@@ -274,17 +274,16 @@ func (q *Queries) CreateNotification(ctx context.Context, arg CreateNotification
 }
 
 const createPlaceholderMeeting = `-- name: CreatePlaceholderMeeting :execlastid
-INSERT INTO PlaceholderMeeting (request_id, title, owner_id, start_time, end_time, location, duration, start_date_range, end_date_range) VALUES (?,?,?,?,?,?,?,?,?)
+INSERT INTO PlaceholderMeeting (request_id, title, start_time, end_time, location, duration, start_date_range, end_date_range) VALUES (?,?,?,?,?,?,?,?)
 `
 
 type CreatePlaceholderMeetingParams struct {
 	RequestID      uint32    `json:"requestId"`
 	Title          string    `json:"title"`
-	OwnerID        uint32    `json:"ownerId"`
 	StartTime      time.Time `json:"startTime"`
 	EndTime        time.Time `json:"endTime"`
 	Location       string    `json:"location"`
-	Duration       int32     `json:"duration"`
+	Duration       uint32    `json:"duration"`
 	StartDateRange time.Time `json:"startDateRange"`
 	EndDateRange   time.Time `json:"endDateRange"`
 }
@@ -293,7 +292,6 @@ func (q *Queries) CreatePlaceholderMeeting(ctx context.Context, arg CreatePlaceh
 	result, err := q.exec(ctx, q.createPlaceholderMeetingStmt, createPlaceholderMeeting,
 		arg.RequestID,
 		arg.Title,
-		arg.OwnerID,
 		arg.StartTime,
 		arg.EndTime,
 		arg.Location,
@@ -312,7 +310,7 @@ INSERT INTO PlaceholderMeetingAttendee (meeting_id, user_id) VALUES (?,?)
 `
 
 type CreatePlaceholderMeetingAttendeeParams struct {
-	MeetingID int32  `json:"meetingId"`
+	MeetingID uint32 `json:"meetingId"`
 	UserID    uint32 `json:"userId"`
 }
 
@@ -341,29 +339,29 @@ func (q *Queries) CreateRefreshToken(ctx context.Context, arg CreateRefreshToken
 	return result.RowsAffected()
 }
 
-const createReschedulingRequest = `-- name: CreateReschedulingRequest :execlastid
-INSERT INTO ReschedulingRequest (old_meeting_id) VALUES (?)
+const createRequestToMeeting = `-- name: CreateRequestToMeeting :execlastid
+INSERT INTO RequestToMeeting (request_id, meeting_id) VALUES (?,?)
 `
 
-func (q *Queries) CreateReschedulingRequest(ctx context.Context, oldMeetingID uint32) (int64, error) {
-	result, err := q.exec(ctx, q.createReschedulingRequestStmt, createReschedulingRequest, oldMeetingID)
+type CreateRequestToMeetingParams struct {
+	RequestID uint32 `json:"requestId"`
+	MeetingID uint32 `json:"meetingId"`
+}
+
+func (q *Queries) CreateRequestToMeeting(ctx context.Context, arg CreateRequestToMeetingParams) (int64, error) {
+	result, err := q.exec(ctx, q.createRequestToMeetingStmt, createRequestToMeeting, arg.RequestID, arg.MeetingID)
 	if err != nil {
 		return 0, err
 	}
 	return result.LastInsertId()
 }
 
-const createReschedulingRequestedByUser = `-- name: CreateReschedulingRequestedByUser :execlastid
-INSERT INTO ReschedulingRequestedByUser (request_id, user_id) VALUES (?,?)
+const createReschedulingRequest = `-- name: CreateReschedulingRequest :execlastid
+INSERT INTO ReschedulingRequest (requested_by) VALUES (?)
 `
 
-type CreateReschedulingRequestedByUserParams struct {
-	RequestID uint32 `json:"requestId"`
-	UserID    uint32 `json:"userId"`
-}
-
-func (q *Queries) CreateReschedulingRequestedByUser(ctx context.Context, arg CreateReschedulingRequestedByUserParams) (int64, error) {
-	result, err := q.exec(ctx, q.createReschedulingRequestedByUserStmt, createReschedulingRequestedByUser, arg.RequestID, arg.UserID)
+func (q *Queries) CreateReschedulingRequest(ctx context.Context, requestedBy uint32) (int64, error) {
+	result, err := q.exec(ctx, q.createReschedulingRequestStmt, createReschedulingRequest, requestedBy)
 	if err != nil {
 		return 0, err
 	}
