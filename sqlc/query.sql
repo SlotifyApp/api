@@ -237,3 +237,8 @@ JOIN RequestToMeeting rtm ON rr.request_id = rtm.request_id
 JOIN Meeting m ON rtm.meeting_id = m.id 
 LEFT JOIN PlaceholderMeeting pm ON rr.request_id = pm.request_id 
 WHERE rr.request_id = ?;
+
+-- name: UpdateRequestStatusAsRejected :execrows
+UPDATE ReschedulingRequest rr SET status = 'rejected' WHERE rr.request_id IN (
+  SELECT request_id FROM RequestToMeeting WHERE meeting_id = ?
+)
