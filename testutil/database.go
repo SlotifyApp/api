@@ -12,11 +12,13 @@ import (
 	"log"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/SlotifyApp/slotify-backend/api"
 	"github.com/SlotifyApp/slotify-backend/database"
 	"github.com/SlotifyApp/slotify-backend/mocks"
 	"github.com/SlotifyApp/slotify-backend/notification"
+	"github.com/avast/retry-go"
 	"github.com/brianvoe/gofakeit/v7"
 	openapi_types "github.com/oapi-codegen/runtime/types"
 	"github.com/stretchr/testify/require"
@@ -129,7 +131,22 @@ func AddUserToSlotifyGroup(t *testing.T, db *sql.DB, userID uint32, slotifyGroup
 func InsertSlotifyGroup(t *testing.T, db *sql.DB) api.SlotifyGroup {
 	name := gofakeit.ProductName()
 
-	res, err := db.Exec("INSERT INTO SlotifyGroup (name) VALUES (?)", name)
+	var err error
+	var res sql.Result
+	// If deadlock sql error, retry upto 3 times, we had a few tests failing because of this.
+	err = retry.Do(func() error {
+		res, err = db.Exec("INSERT INTO SlotifyGroup (name) VALUES (?)", name)
+		if err != nil {
+			if database.IsDeadlockSQLError(err) {
+				return fmt.Errorf("deadlock attempting to insert slotify group: %w", err)
+			}
+
+			return retry.Unrecoverable(err)
+		}
+
+		return nil
+	}, retry.Attempts(3), retry.Delay(2*time.Second))
+
 	require.NoError(t, err, "db insert slotifyGroup failed")
 
 	rows, err := res.RowsAffected()

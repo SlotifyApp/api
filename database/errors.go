@@ -25,6 +25,12 @@ func (e WrongNumberSQLRowsError) Is(target error) bool {
 	return ok
 }
 
+// IsDeadlockSQLError refers to MySQL error 1213,
+// a 'Deadlock found' SQL error.
+func IsDeadlockSQLError(err error) bool {
+	return isSpecificMySQLError(err, mysqlerr.ER_LOCK_DEADLOCK)
+}
+
 // IsDuplicateEntrySQLError refers to MySQL error 1062,
 // a 'Duplicate entry' SQL error.
 func IsDuplicateEntrySQLError(err error) bool {
