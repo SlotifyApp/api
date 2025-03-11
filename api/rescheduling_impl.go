@@ -46,10 +46,17 @@ func (s Server) PostAPIRescheduleCheck(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Get old meeting data from microsoft
+	msftMeeting, err := graph.Me().Events().ByEventId(*body.OldMeeting.MsftMeetingID).Get(ctx, nil)
+	if err != nil {
+		s.Logger.Error("failed to get meeting data from microsoft", zap.Error(err))
+		sendError(w, http.StatusBadGateway, "Failed to get meeting data from microsoft")
+		return
+	}
+
 	// Get data from db
 	var meeting database.Meeting
-	//nolint: gosec // id is unsigned 32 bit int
-	meeting, err = s.DB.GetMeetingByID(ctx, uint32(*body.OldMeeting.MeetingID))
+	meeting, err = s.DB.GetMeetingByMSFTID(ctx, *body.OldMeeting.MsftMeetingID)
 
 	var meetingFound bool
 
@@ -75,13 +82,27 @@ func (s Server) PostAPIRescheduleCheck(w http.ResponseWriter, r *http.Request) {
 		// Create temp meeting preferences if data doesn't exist
 
 		dayTime := time.Hour * hoursInAWeek // 1 week : 24 * 7
+		loc, errr := time.LoadLocation(*msftMeeting.GetStart().GetTimeZone())
+		if errr != nil {
+			s.Logger.Error("failed to parse start time zone", zap.Error(err))
+			sendError(w, http.StatusBadGateway, "Failed to parse start time zone")
+			return
+		}
+
+		newStartTime, errr := time.ParseInLocation(time.RFC3339Nano, *msftMeeting.GetStart().GetDateTime()+"Z", loc)
+		if errr != nil {
+			s.Logger.Error("failed to parse start time", zap.Error(err))
+			sendError(w, http.StatusBadGateway, "Failed to parse start time")
+			return
+		}
+
 		meetingPref = database.Meetingpreferences{
 			StartDateRange: time.Now(),
-			EndDateRange:   body.OldMeeting.StartTime.Add(dayTime), // Give a week extra from the start of the meeting
+			EndDateRange:   newStartTime.Add(dayTime), // Give a week extra from the start of the meeting
 		}
 	}
 
-	respBody, err := performReschedulingCheckProcess(ctx, graph, body, meetingPref)
+	respBody, err := performReschedulingCheckProcess(ctx, graph, body, msftMeeting, meetingPref)
 	if err != nil {
 		s.Logger.Error("failed to make msgraph api call to findMeetings", zap.Error(err))
 		sendError(w, http.StatusBadGateway, "Failed to process/send microsoft graph API request for findMeeting")
