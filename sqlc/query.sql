@@ -198,7 +198,7 @@ WHERE id=?;
 
 -- name: GetMeetingByMSFTID :one
 SELECT * FROM Meeting
-WHERE msftMeetingID=?;
+WHERE msft_meeting_id=?;
 
 -- name: GetMeetingPreferences :one
 SELECT * FROM MeetingPreferences
@@ -208,7 +208,7 @@ WHERE id=?;
 INSERT INTO MeetingPreferences (meeting_start_time, start_date_range, end_date_range) VALUES (?,?,?);
 
 -- name: CreateMeeting :execlastid
-INSERT INTO Meeting (meeting_pref_id, owner_id, msftMeetingID) VALUES (?,?,?);
+INSERT INTO Meeting (meeting_pref_id, owner_id, msft_meeting_id) VALUES (?,?,?);
 
 -- name: CreateReschedulingRequest :execlastid
 INSERT INTO ReschedulingRequest (requested_by) VALUES (?);

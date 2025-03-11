@@ -113,7 +113,7 @@ type Meeting struct {
 	ID            uint32 `json:"id"`
 	MeetingPrefID uint32 `json:"meetingPrefId"`
 	OwnerID       uint32 `json:"ownerId"`
-	Msftmeetingid string `json:"msftmeetingid"`
+	MsftMeetingID string `json:"msftMeetingId"`
 }
 
 type Meetingpreferences struct {
