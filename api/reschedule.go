@@ -133,7 +133,7 @@ func createNewMeetingsAndPrefs(ctx context.Context,
 		MeetingPrefID: uint32(meetingPrefID),
 		//nolint: gosec // id is unsigned 32 bit int
 		OwnerID:       uint32(*body.OldMeeting.MeetingOwner),
-		Msftmeetingid: *body.OldMeeting.MeetingID,
+		MsftMeetingID: *body.OldMeeting.MeetingID,
 	}
 
 	err = retry.Do(func() error {

@@ -221,17 +221,17 @@ func (q *Queries) CreateInvite(ctx context.Context, arg CreateInviteParams) (int
 }
 
 const createMeeting = `-- name: CreateMeeting :execlastid
-INSERT INTO Meeting (meeting_pref_id, owner_id, msftMeetingID) VALUES (?,?,?)
+INSERT INTO Meeting (meeting_pref_id, owner_id, msft_meeting_id) VALUES (?,?,?)
 `
 
 type CreateMeetingParams struct {
 	MeetingPrefID uint32 `json:"meetingPrefId"`
 	OwnerID       uint32 `json:"ownerId"`
-	Msftmeetingid string `json:"msftmeetingid"`
+	MsftMeetingID string `json:"msftMeetingId"`
 }
 
 func (q *Queries) CreateMeeting(ctx context.Context, arg CreateMeetingParams) (int64, error) {
-	result, err := q.exec(ctx, q.createMeetingStmt, createMeeting, arg.MeetingPrefID, arg.OwnerID, arg.Msftmeetingid)
+	result, err := q.exec(ctx, q.createMeetingStmt, createMeeting, arg.MeetingPrefID, arg.OwnerID, arg.MsftMeetingID)
 	if err != nil {
 		return 0, err
 	}
@@ -550,7 +550,7 @@ func (q *Queries) GetInviteByID(ctx context.Context, id uint32) (Invite, error) 
 }
 
 const getMeetingByID = `-- name: GetMeetingByID :one
-SELECT id, meeting_pref_id, owner_id, msftmeetingid FROM Meeting
+SELECT id, meeting_pref_id, owner_id, msft_meeting_id FROM Meeting
 WHERE id=?
 `
 
@@ -561,24 +561,24 @@ func (q *Queries) GetMeetingByID(ctx context.Context, id uint32) (Meeting, error
 		&i.ID,
 		&i.MeetingPrefID,
 		&i.OwnerID,
-		&i.Msftmeetingid,
+		&i.MsftMeetingID,
 	)
 	return i, err
 }
 
 const getMeetingByMSFTID = `-- name: GetMeetingByMSFTID :one
-SELECT id, meeting_pref_id, owner_id, msftmeetingid FROM Meeting
-WHERE msftMeetingID=?
+SELECT id, meeting_pref_id, owner_id, msft_meeting_id FROM Meeting
+WHERE msft_meeting_id=?
 `
 
-func (q *Queries) GetMeetingByMSFTID(ctx context.Context, msftmeetingid string) (Meeting, error) {
-	row := q.queryRow(ctx, q.getMeetingByMSFTIDStmt, getMeetingByMSFTID, msftmeetingid)
+func (q *Queries) GetMeetingByMSFTID(ctx context.Context, msftMeetingID string) (Meeting, error) {
+	row := q.queryRow(ctx, q.getMeetingByMSFTIDStmt, getMeetingByMSFTID, msftMeetingID)
 	var i Meeting
 	err := row.Scan(
 		&i.ID,
 		&i.MeetingPrefID,
 		&i.OwnerID,
-		&i.Msftmeetingid,
+		&i.MsftMeetingID,
 	)
 	return i, err
 }
