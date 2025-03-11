@@ -183,6 +183,12 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.updateInviteStatusStmt, err = db.PrepareContext(ctx, updateInviteStatus); err != nil {
 		return nil, fmt.Errorf("error preparing query UpdateInviteStatus: %w", err)
 	}
+	if q.updateMeetingStartTimeStmt, err = db.PrepareContext(ctx, updateMeetingStartTime); err != nil {
+		return nil, fmt.Errorf("error preparing query UpdateMeetingStartTime: %w", err)
+	}
+	if q.updateRequestStatusAsAcceptedStmt, err = db.PrepareContext(ctx, updateRequestStatusAsAccepted); err != nil {
+		return nil, fmt.Errorf("error preparing query UpdateRequestStatusAsAccepted: %w", err)
+	}
 	if q.updateRequestStatusAsRejectedStmt, err = db.PrepareContext(ctx, updateRequestStatusAsRejected); err != nil {
 		return nil, fmt.Errorf("error preparing query UpdateRequestStatusAsRejected: %w", err)
 	}
@@ -459,6 +465,16 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing updateInviteStatusStmt: %w", cerr)
 		}
 	}
+	if q.updateMeetingStartTimeStmt != nil {
+		if cerr := q.updateMeetingStartTimeStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing updateMeetingStartTimeStmt: %w", cerr)
+		}
+	}
+	if q.updateRequestStatusAsAcceptedStmt != nil {
+		if cerr := q.updateRequestStatusAsAcceptedStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing updateRequestStatusAsAcceptedStmt: %w", cerr)
+		}
+	}
 	if q.updateRequestStatusAsRejectedStmt != nil {
 		if cerr := q.updateRequestStatusAsRejectedStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing updateRequestStatusAsRejectedStmt: %w", cerr)
@@ -561,6 +577,8 @@ type Queries struct {
 	searchUsersByNameStmt                *sql.Stmt
 	updateInviteMessageStmt              *sql.Stmt
 	updateInviteStatusStmt               *sql.Stmt
+	updateMeetingStartTimeStmt           *sql.Stmt
+	updateRequestStatusAsAcceptedStmt    *sql.Stmt
 	updateRequestStatusAsRejectedStmt    *sql.Stmt
 	updateUserHomeAccountIDStmt          *sql.Stmt
 }
@@ -622,6 +640,8 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		searchUsersByNameStmt:                q.searchUsersByNameStmt,
 		updateInviteMessageStmt:              q.updateInviteMessageStmt,
 		updateInviteStatusStmt:               q.updateInviteStatusStmt,
+		updateMeetingStartTimeStmt:           q.updateMeetingStartTimeStmt,
+		updateRequestStatusAsAcceptedStmt:    q.updateRequestStatusAsAcceptedStmt,
 		updateRequestStatusAsRejectedStmt:    q.updateRequestStatusAsRejectedStmt,
 		updateUserHomeAccountIDStmt:          q.updateUserHomeAccountIDStmt,
 	}
