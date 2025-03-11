@@ -183,6 +183,9 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.updateInviteStatusStmt, err = db.PrepareContext(ctx, updateInviteStatus); err != nil {
 		return nil, fmt.Errorf("error preparing query UpdateInviteStatus: %w", err)
 	}
+	if q.updateRequestStatusAsRejectedStmt, err = db.PrepareContext(ctx, updateRequestStatusAsRejected); err != nil {
+		return nil, fmt.Errorf("error preparing query UpdateRequestStatusAsRejected: %w", err)
+	}
 	if q.updateUserHomeAccountIDStmt, err = db.PrepareContext(ctx, updateUserHomeAccountID); err != nil {
 		return nil, fmt.Errorf("error preparing query UpdateUserHomeAccountID: %w", err)
 	}
@@ -456,6 +459,11 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing updateInviteStatusStmt: %w", cerr)
 		}
 	}
+	if q.updateRequestStatusAsRejectedStmt != nil {
+		if cerr := q.updateRequestStatusAsRejectedStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing updateRequestStatusAsRejectedStmt: %w", cerr)
+		}
+	}
 	if q.updateUserHomeAccountIDStmt != nil {
 		if cerr := q.updateUserHomeAccountIDStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing updateUserHomeAccountIDStmt: %w", cerr)
@@ -553,6 +561,7 @@ type Queries struct {
 	searchUsersByNameStmt                *sql.Stmt
 	updateInviteMessageStmt              *sql.Stmt
 	updateInviteStatusStmt               *sql.Stmt
+	updateRequestStatusAsRejectedStmt    *sql.Stmt
 	updateUserHomeAccountIDStmt          *sql.Stmt
 }
 
@@ -613,6 +622,7 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		searchUsersByNameStmt:                q.searchUsersByNameStmt,
 		updateInviteMessageStmt:              q.updateInviteMessageStmt,
 		updateInviteStatusStmt:               q.updateInviteStatusStmt,
+		updateRequestStatusAsRejectedStmt:    q.updateRequestStatusAsRejectedStmt,
 		updateUserHomeAccountIDStmt:          q.updateUserHomeAccountIDStmt,
 	}
 }

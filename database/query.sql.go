@@ -1190,6 +1190,20 @@ func (q *Queries) UpdateInviteStatus(ctx context.Context, arg UpdateInviteStatus
 	return result.RowsAffected()
 }
 
+const updateRequestStatusAsRejected = `-- name: UpdateRequestStatusAsRejected :execrows
+UPDATE ReschedulingRequest rr SET status = 'rejected' WHERE rr.request_id IN (
+  SELECT request_id FROM RequestToMeeting WHERE meeting_id = ?
+)
+`
+
+func (q *Queries) UpdateRequestStatusAsRejected(ctx context.Context, meetingID uint32) (int64, error) {
+	result, err := q.exec(ctx, q.updateRequestStatusAsRejectedStmt, updateRequestStatusAsRejected, meetingID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
 const updateUserHomeAccountID = `-- name: UpdateUserHomeAccountID :execrows
 UPDATE User SET msft_home_account_id=? WHERE id=?
 `

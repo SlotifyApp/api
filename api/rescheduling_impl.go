@@ -423,3 +423,36 @@ func (s Server) GetAPIRescheduleRequestRequestID(w http.ResponseWriter, r *http.
 
 	SetHeaderAndWriteResponse(w, http.StatusOK, response)
 }
+
+// (PATCH /api/reschedule/request/{requestID}/reject).
+func (s Server) PatchAPIRescheduleRequestRequestIDReject(w http.ResponseWriter, r *http.Request, paramRequestID uint32) {
+	// Get userid from access token
+	ctx, cancel := context.WithTimeout(r.Context(), time.Minute*3)
+	defer cancel()
+
+	_, ok := r.Context().Value(UserIDCtxKey{}).(uint32)
+	if !ok {
+		s.Logger.Error("failed to get userid from request context")
+		sendError(w, http.StatusUnauthorized, "Try again later.")
+		return
+	}
+
+	// Get request for the user
+	req, err := s.DB.GetRequestByID(ctx, paramRequestID)
+	if err != nil {
+		s.Logger.Error("failed to get requests", zap.Error(err))
+		sendError(w, http.StatusBadGateway, "Failed to get requests")
+		return
+	}
+
+	// Update status of all requests with the same meeting ID
+	_, err = s.DB.UpdateRequestStatusAsRejected(ctx, uint32(req.MeetingID.Int32))
+
+	if err != nil {
+		s.Logger.Error("failed to update status of all the requests", zap.Error(err))
+		sendError(w, http.StatusBadGateway, "Failed to update status of all the requests")
+		return
+	}
+
+	SetHeaderAndWriteResponse(w, http.StatusOK, "Successfully declined rescheduling request")
+}
