@@ -451,6 +451,61 @@ func (q *Queries) DeleteUserByID(ctx context.Context, id uint32) (int64, error) 
 	return result.RowsAffected()
 }
 
+const getAllRequestsForUser = `-- name: GetAllRequestsForUser :many
+SELECT rr.request_id, rr.requested_by, rr.status, rr.created_at, m.msft_meeting_id, m.id, pm.meeting_id, pm.title, pm.start_time, pm.end_time, pm.duration, pm.location  FROM ReschedulingRequest rr JOIN RequestToMeeting rtm ON rr.request_id = rtm.request_id JOIN Meeting m ON rtm.meeting_id = m.id LEFT JOIN PlaceholderMeeting pm ON r.request_id = pm.request_id WHERE m.owner_id = ?
+`
+
+type GetAllRequestsForUserRow struct {
+	RequestID     uint32                    `json:"requestId"`
+	RequestedBy   uint32                    `json:"requestedBy"`
+	Status        ReschedulingrequestStatus `json:"status"`
+	CreatedAt     time.Time                 `json:"createdAt"`
+	MsftMeetingID string                    `json:"msftMeetingId"`
+	ID            uint32                    `json:"id"`
+	MeetingID     sql.NullInt32             `json:"meetingId"`
+	Title         sql.NullString            `json:"title"`
+	StartTime     sql.NullTime              `json:"startTime"`
+	EndTime       sql.NullTime              `json:"endTime"`
+	Duration      sql.NullTime              `json:"duration"`
+	Location      sql.NullString            `json:"location"`
+}
+
+func (q *Queries) GetAllRequestsForUser(ctx context.Context, ownerID uint32) ([]GetAllRequestsForUserRow, error) {
+	rows, err := q.query(ctx, q.getAllRequestsForUserStmt, getAllRequestsForUser, ownerID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetAllRequestsForUserRow{}
+	for rows.Next() {
+		var i GetAllRequestsForUserRow
+		if err := rows.Scan(
+			&i.RequestID,
+			&i.RequestedBy,
+			&i.Status,
+			&i.CreatedAt,
+			&i.MsftMeetingID,
+			&i.ID,
+			&i.MeetingID,
+			&i.Title,
+			&i.StartTime,
+			&i.EndTime,
+			&i.Duration,
+			&i.Location,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getAllSlotifyGroupMembers = `-- name: GetAllSlotifyGroupMembers :many
 SELECT u.id, u.email, u.first_name, u.last_name FROM SlotifyGroup sg
 JOIN UserToSlotifyGroup utsg ON sg.id=utsg.slotify_group_id

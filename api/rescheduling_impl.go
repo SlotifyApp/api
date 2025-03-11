@@ -304,3 +304,64 @@ func (s Server) PostAPIRescheduleRequestSingle(w http.ResponseWriter, r *http.Re
 
 	SetHeaderAndWriteResponse(w, http.StatusOK, requestID)
 }
+
+// (GET /api/reschedule/request).
+func (s Server) GetAPIRescheduleRequest(w http.ResponseWriter, r *http.Request) {
+	// Get userid from access token
+	ctx, cancel := context.WithTimeout(r.Context(), time.Minute*3)
+	defer cancel()
+
+	userID, ok := r.Context().Value(UserIDCtxKey{}).(uint32)
+	if !ok {
+		s.Logger.Error("failed to get userid from request context")
+		sendError(w, http.StatusUnauthorized, "Try again later.")
+		return
+	}
+
+	// Get all requests for the user
+	requests, err := s.DB.GetAllRequestsForUser(ctx, userID)
+	if err != nil {
+		s.Logger.Error("failed to get requests", zap.Error(err))
+		sendError(w, http.StatusBadGateway, "Failed to get requests")
+		return
+	}
+
+	// Parse results to response
+	response := []RescheduleRequest{}
+
+	for _, req := range requests {
+		requestID := int(req.RequestID)
+		requestBy := int(req.RequestedBy)
+
+		newMeeting := ReschedulingRequestNewMeeting{}
+
+		if req.MeetingID.Valid {
+			newMeeting.EndTime = &req.EndTime.Time
+			newMeeting.Location = &req.Location.String
+
+			dur := req.Duration.Time.Format(time.RFC3339Nano)
+			newMeeting.MeetingDuration = &dur
+
+			newMeeting.StartTime = &req.StartTime.Time
+			newMeeting.Title = &req.Title.String
+		}
+
+		meetingID := int(req.ID)
+
+		oldMeeting := ReschedulingRequestOldMeeting{
+			MeetingId:     &meetingID,
+			MsftMeetingID: &req.MsftMeetingID,
+		}
+
+		response = append(response, RescheduleRequest{
+			RequestId:   &requestID,
+			RequestedAt: &req.CreatedAt,
+			RequestedBy: &requestBy,
+			Status:      (*string)(&req.Status),
+			NewMeeting:  &newMeeting,
+			OldMeeting:  &oldMeeting,
+		})
+	}
+
+	SetHeaderAndWriteResponse(w, http.StatusOK, response)
+}
