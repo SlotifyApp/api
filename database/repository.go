@@ -108,6 +108,9 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.deleteUserByIDStmt, err = db.PrepareContext(ctx, deleteUserByID); err != nil {
 		return nil, fmt.Errorf("error preparing query DeleteUserByID: %w", err)
 	}
+	if q.getAllRequestsForUserStmt, err = db.PrepareContext(ctx, getAllRequestsForUser); err != nil {
+		return nil, fmt.Errorf("error preparing query GetAllRequestsForUser: %w", err)
+	}
 	if q.getAllSlotifyGroupMembersStmt, err = db.PrepareContext(ctx, getAllSlotifyGroupMembers); err != nil {
 		return nil, fmt.Errorf("error preparing query GetAllSlotifyGroupMembers: %w", err)
 	}
@@ -325,6 +328,11 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing deleteUserByIDStmt: %w", cerr)
 		}
 	}
+	if q.getAllRequestsForUserStmt != nil {
+		if cerr := q.getAllRequestsForUserStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getAllRequestsForUserStmt: %w", cerr)
+		}
+	}
 	if q.getAllSlotifyGroupMembersStmt != nil {
 		if cerr := q.getAllSlotifyGroupMembersStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing getAllSlotifyGroupMembersStmt: %w", cerr)
@@ -512,6 +520,7 @@ type Queries struct {
 	deleteRefreshTokenByUserIDStmt       *sql.Stmt
 	deleteSlotifyGroupByIDStmt           *sql.Stmt
 	deleteUserByIDStmt                   *sql.Stmt
+	getAllRequestsForUserStmt            *sql.Stmt
 	getAllSlotifyGroupMembersStmt        *sql.Stmt
 	getAllSlotifyGroupMembersExceptStmt  *sql.Stmt
 	getInviteByIDStmt                    *sql.Stmt
@@ -570,6 +579,7 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		deleteRefreshTokenByUserIDStmt:       q.deleteRefreshTokenByUserIDStmt,
 		deleteSlotifyGroupByIDStmt:           q.deleteSlotifyGroupByIDStmt,
 		deleteUserByIDStmt:                   q.deleteUserByIDStmt,
+		getAllRequestsForUserStmt:            q.getAllRequestsForUserStmt,
 		getAllSlotifyGroupMembersStmt:        q.getAllSlotifyGroupMembersStmt,
 		getAllSlotifyGroupMembersExceptStmt:  q.getAllSlotifyGroupMembersExceptStmt,
 		getInviteByIDStmt:                    q.getInviteByIDStmt,
