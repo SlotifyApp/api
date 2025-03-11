@@ -132,6 +132,9 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.getRefreshTokenByUserIDStmt, err = db.PrepareContext(ctx, getRefreshTokenByUserID); err != nil {
 		return nil, fmt.Errorf("error preparing query GetRefreshTokenByUserID: %w", err)
 	}
+	if q.getRequestByIDStmt, err = db.PrepareContext(ctx, getRequestByID); err != nil {
+		return nil, fmt.Errorf("error preparing query GetRequestByID: %w", err)
+	}
 	if q.getSlotifyGroupByIDStmt, err = db.PrepareContext(ctx, getSlotifyGroupByID); err != nil {
 		return nil, fmt.Errorf("error preparing query GetSlotifyGroupByID: %w", err)
 	}
@@ -368,6 +371,11 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing getRefreshTokenByUserIDStmt: %w", cerr)
 		}
 	}
+	if q.getRequestByIDStmt != nil {
+		if cerr := q.getRequestByIDStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getRequestByIDStmt: %w", cerr)
+		}
+	}
 	if q.getSlotifyGroupByIDStmt != nil {
 		if cerr := q.getSlotifyGroupByIDStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing getSlotifyGroupByIDStmt: %w", cerr)
@@ -528,6 +536,7 @@ type Queries struct {
 	getMeetingByMSFTIDStmt               *sql.Stmt
 	getMeetingPreferencesStmt            *sql.Stmt
 	getRefreshTokenByUserIDStmt          *sql.Stmt
+	getRequestByIDStmt                   *sql.Stmt
 	getSlotifyGroupByIDStmt              *sql.Stmt
 	getUnreadUserNotificationsStmt       *sql.Stmt
 	getUserByEmailStmt                   *sql.Stmt
@@ -587,6 +596,7 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		getMeetingByMSFTIDStmt:               q.getMeetingByMSFTIDStmt,
 		getMeetingPreferencesStmt:            q.getMeetingPreferencesStmt,
 		getRefreshTokenByUserIDStmt:          q.getRefreshTokenByUserIDStmt,
+		getRequestByIDStmt:                   q.getRequestByIDStmt,
 		getSlotifyGroupByIDStmt:              q.getSlotifyGroupByIDStmt,
 		getUnreadUserNotificationsStmt:       q.getUnreadUserNotificationsStmt,
 		getUserByEmailStmt:                   q.getUserByEmailStmt,

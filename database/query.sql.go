@@ -452,7 +452,12 @@ func (q *Queries) DeleteUserByID(ctx context.Context, id uint32) (int64, error) 
 }
 
 const getAllRequestsForUser = `-- name: GetAllRequestsForUser :many
-SELECT rr.request_id, rr.requested_by, rr.status, rr.created_at, m.msft_meeting_id, m.id, pm.meeting_id, pm.title, pm.start_time, pm.end_time, pm.duration, pm.location  FROM ReschedulingRequest rr JOIN RequestToMeeting rtm ON rr.request_id = rtm.request_id JOIN Meeting m ON rtm.meeting_id = m.id LEFT JOIN PlaceholderMeeting pm ON r.request_id = pm.request_id WHERE m.owner_id = ?
+SELECT rr.request_id, rr.requested_by, rr.status, rr.created_at, m.msft_meeting_id, m.id, pm.meeting_id, pm.title, pm.start_time, pm.end_time, pm.duration, pm.location  
+FROM ReschedulingRequest rr 
+JOIN RequestToMeeting rtm ON rr.request_id = rtm.request_id 
+JOIN Meeting m ON rtm.meeting_id = m.id 
+LEFT JOIN PlaceholderMeeting pm ON rr.request_id = pm.request_id 
+WHERE m.owner_id = ?
 `
 
 type GetAllRequestsForUserRow struct {
@@ -667,6 +672,50 @@ func (q *Queries) GetRefreshTokenByUserID(ctx context.Context, userID uint32) (R
 		&i.UserID,
 		&i.Token,
 		&i.Revoked,
+	)
+	return i, err
+}
+
+const getRequestByID = `-- name: GetRequestByID :one
+SELECT rr.request_id, rr.requested_by, rr.status, rr.created_at, m.msft_meeting_id, m.id, pm.meeting_id, pm.title, pm.start_time, pm.end_time, pm.duration, pm.location 
+FROM ReschedulingRequest rr 
+JOIN RequestToMeeting rtm ON rr.request_id = rtm.request_id 
+JOIN Meeting m ON rtm.meeting_id = m.id 
+LEFT JOIN PlaceholderMeeting pm ON rr.request_id = pm.request_id 
+WHERE rr.request_id = ?
+`
+
+type GetRequestByIDRow struct {
+	RequestID     uint32                    `json:"requestId"`
+	RequestedBy   uint32                    `json:"requestedBy"`
+	Status        ReschedulingrequestStatus `json:"status"`
+	CreatedAt     time.Time                 `json:"createdAt"`
+	MsftMeetingID string                    `json:"msftMeetingId"`
+	ID            uint32                    `json:"id"`
+	MeetingID     sql.NullInt32             `json:"meetingId"`
+	Title         sql.NullString            `json:"title"`
+	StartTime     sql.NullTime              `json:"startTime"`
+	EndTime       sql.NullTime              `json:"endTime"`
+	Duration      sql.NullTime              `json:"duration"`
+	Location      sql.NullString            `json:"location"`
+}
+
+func (q *Queries) GetRequestByID(ctx context.Context, requestID uint32) (GetRequestByIDRow, error) {
+	row := q.queryRow(ctx, q.getRequestByIDStmt, getRequestByID, requestID)
+	var i GetRequestByIDRow
+	err := row.Scan(
+		&i.RequestID,
+		&i.RequestedBy,
+		&i.Status,
+		&i.CreatedAt,
+		&i.MsftMeetingID,
+		&i.ID,
+		&i.MeetingID,
+		&i.Title,
+		&i.StartTime,
+		&i.EndTime,
+		&i.Duration,
+		&i.Location,
 	)
 	return i, err
 }
