@@ -104,15 +104,21 @@ func performReschedulingCheckProcess(ctx context.Context,
 	return response, nil
 }
 
+type NewMeetingAndPrefsParams struct {
+	MeetingStartTime time.Time
+	OwnerID          uint32
+	MsftMeetingID    string
+}
+
 func createNewMeetingsAndPrefs(ctx context.Context,
-	body ReschedulingRequestBodySchema,
+	body NewMeetingAndPrefsParams,
 	s Server,
 ) (database.Meeting, error) {
 	// Meeting Info does not exist so create a new one
 	meetingPrefParams := database.CreateMeetingPreferencesParams{
-		MeetingStartTime: *body.OldMeeting.MeetingStartTime,
+		MeetingStartTime: body.MeetingStartTime,
 		StartDateRange:   time.Now(),
-		EndDateRange:     body.OldMeeting.MeetingStartTime.Add(time.Hour * hoursInAWeek), // 1 week : 24 * 7
+		EndDateRange:     body.MeetingStartTime.Add(time.Hour * hoursInAWeek), // 1 week : 24 * 7
 	}
 
 	var meetingPrefID int64
@@ -131,9 +137,9 @@ func createNewMeetingsAndPrefs(ctx context.Context,
 	meetingParams := database.CreateMeetingParams{
 		//nolint: gosec // id is unsigned 32 bit int
 		MeetingPrefID: uint32(meetingPrefID),
-		//nolint: gosec // id is unsigned 32 bit int
-		OwnerID:       uint32(*body.OldMeeting.MeetingOwner),
-		MsftMeetingID: *body.OldMeeting.MeetingID,
+
+		OwnerID:       body.OwnerID,
+		MsftMeetingID: body.MsftMeetingID,
 	}
 
 	err = retry.Do(func() error {
@@ -147,7 +153,7 @@ func createNewMeetingsAndPrefs(ctx context.Context,
 	}
 
 	var meeting database.Meeting
-	meeting, err = s.DB.GetMeetingByMSFTID(ctx, *body.OldMeeting.MeetingID)
+	meeting, err = s.DB.GetMeetingByMSFTID(ctx, body.MsftMeetingID)
 	if err != nil {
 		return database.Meeting{}, err
 	}
