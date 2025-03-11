@@ -128,10 +128,17 @@ func (s Server) PostAPIRescheduleRequestReplace(w http.ResponseWriter, r *http.R
 	var meeting database.Meeting
 	// Get data from db to validate meeting id
 
-	meeting, err = s.DB.GetMeetingByMSFTID(ctx, *body.OldMeeting.MeetingID)
+	meeting, err = s.DB.GetMeetingByMSFTID(ctx, *body.OldMeeting.MsftMeetingID)
 
 	if errors.Is(err, sql.ErrNoRows) {
-		meeting, err = createNewMeetingsAndPrefs(ctx, body, s)
+		newMeetingParams := NewMeetingAndPrefsParams{
+			MeetingStartTime: *body.OldMeeting.MeetingStartTime,
+			//nolint: gosec // id is unsigned 32 bit int
+			OwnerID:       uint32(*body.OldMeeting.MeetingOwner),
+			MsftMeetingID: *body.OldMeeting.MsftMeetingID,
+		}
+
+		meeting, err = createNewMeetingsAndPrefs(ctx, newMeetingParams, s)
 		if err != nil {
 			s.Logger.Error("failed to get data from new db.Meeting", zap.Error(err))
 			sendError(w, http.StatusBadGateway, "Failed to get data from new db.Meeting")
@@ -214,5 +221,86 @@ func (s Server) PostAPIRescheduleRequestReplace(w http.ResponseWriter, r *http.R
 	}
 
 	// NOtify user of the request
+	SetHeaderAndWriteResponse(w, http.StatusOK, requestID)
+}
+
+// (POST /api/reschedule/request/single).
+func (s Server) PostAPIRescheduleRequestSingle(w http.ResponseWriter, r *http.Request) {
+	// Get userid from access token
+	ctx, cancel := context.WithTimeout(r.Context(), time.Minute*3)
+	defer cancel()
+
+	userID, ok := r.Context().Value(UserIDCtxKey{}).(uint32)
+	if !ok {
+		s.Logger.Error("failed to get userid from request context")
+		sendError(w, http.StatusUnauthorized, "Try again later.")
+		return
+	}
+
+	var body ReschedulingRequestSingleBodySchema
+	var err error
+	if err = json.NewDecoder(r.Body).Decode(&body); err != nil {
+		// TODO: Add zap log for body
+		s.Logger.Error(ErrUnmarshalBody, zap.Error(err))
+		sendError(w, http.StatusBadRequest, ErrUnmarshalBody.Error())
+		return
+	}
+
+	// Create Rescheduling Request
+	var requestID int64
+	err = retry.Do(func() error {
+		if requestID, err = s.DB.CreateReschedulingRequest(ctx, userID); err != nil {
+			return fmt.Errorf("failed to create reschedling requested by user: %w", err)
+		}
+		return nil
+	}, retry.Attempts(3), retry.Delay(time.Millisecond*500))
+
+	// Attach meeting preferences info to request if it exists
+
+	// Link request to old meeting
+	var meeting database.Meeting
+	// Get data from db to validate meeting id
+
+	meeting, err = s.DB.GetMeetingByMSFTID(ctx, *body.OldMeeting.MsftMeetingID)
+
+	if errors.Is(err, sql.ErrNoRows) {
+		newMeetingParams := NewMeetingAndPrefsParams{
+			MeetingStartTime: *body.OldMeeting.MeetingStartTime,
+			//nolint: gosec // id is unsigned 32 bit int
+			OwnerID:       uint32(*body.OldMeeting.MeetingOwner),
+			MsftMeetingID: *body.OldMeeting.MsftMeetingID,
+		}
+
+		meeting, err = createNewMeetingsAndPrefs(ctx, newMeetingParams, s)
+		if err != nil {
+			s.Logger.Error("failed to get data from new db.Meeting", zap.Error(err))
+			sendError(w, http.StatusBadGateway, "Failed to get data from new db.Meeting")
+			return
+		}
+	} else if err != nil {
+		s.Logger.Error("failed to get data from db.Meeting", zap.Error(err))
+		sendError(w, http.StatusBadGateway, "Failed to get data from db.Meeting")
+		return
+	}
+
+	// Create request to meeting
+	requestToMeetingParams := database.CreateRequestToMeetingParams{
+		//nolint: gosec // id is unsigned 32 bit int
+		RequestID: uint32(requestID),
+		MeetingID: meeting.ID,
+	}
+
+	err = retry.Do(func() error {
+		if _, err = s.DB.CreateRequestToMeeting(ctx, requestToMeetingParams); err != nil {
+			return fmt.Errorf("failed to create request to meeting link: %w", err)
+		}
+		return nil
+	}, retry.Attempts(3), retry.Delay(time.Millisecond*500))
+	if err != nil {
+		s.Logger.Error("DB Creation Error: ", zap.Error(err))
+		sendError(w, http.StatusBadGateway, "Failed to create request to meeting link")
+		return
+	}
+
 	SetHeaderAndWriteResponse(w, http.StatusOK, requestID)
 }
