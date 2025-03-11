@@ -239,6 +239,17 @@ LEFT JOIN PlaceholderMeeting pm ON rr.request_id = pm.request_id
 WHERE rr.request_id = ?;
 
 -- name: UpdateRequestStatusAsRejected :execrows
-UPDATE ReschedulingRequest rr SET status = 'rejected' WHERE rr.request_id IN (
+UPDATE ReschedulingRequest rr SET status = 'declined' WHERE rr.request_id IN (
   SELECT request_id FROM RequestToMeeting WHERE meeting_id = ?
-)
+);
+
+-- name: UpdateRequestStatusAsAccepted :execrows
+UPDATE ReschedulingRequest rr SET status = 'accepted' WHERE rr.request_id IN (
+  SELECT request_id FROM RequestToMeeting WHERE meeting_id = ?
+);
+
+-- name: UpdateMeetingStartTime :execlastid
+UPDATE MeetingPreferences mp SET mp.meeting_start_time=?
+WHERE mp.id IN (
+  SELECT m.meeting_pref_id FROM Meeting m WHERE m.id = ?
+);

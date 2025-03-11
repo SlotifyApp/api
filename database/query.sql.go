@@ -1190,8 +1190,42 @@ func (q *Queries) UpdateInviteStatus(ctx context.Context, arg UpdateInviteStatus
 	return result.RowsAffected()
 }
 
+const updateMeetingStartTime = `-- name: UpdateMeetingStartTime :execlastid
+UPDATE MeetingPreferences mp SET mp.meeting_start_time=?
+WHERE mp.id IN (
+  SELECT m.meeting_pref_id FROM Meeting m WHERE m.id = ?
+)
+`
+
+type UpdateMeetingStartTimeParams struct {
+	MeetingStartTime time.Time `json:"meetingStartTime"`
+	ID               uint32    `json:"id"`
+}
+
+func (q *Queries) UpdateMeetingStartTime(ctx context.Context, arg UpdateMeetingStartTimeParams) (int64, error) {
+	result, err := q.exec(ctx, q.updateMeetingStartTimeStmt, updateMeetingStartTime, arg.MeetingStartTime, arg.ID)
+	if err != nil {
+		return 0, err
+	}
+	return result.LastInsertId()
+}
+
+const updateRequestStatusAsAccepted = `-- name: UpdateRequestStatusAsAccepted :execrows
+UPDATE ReschedulingRequest rr SET status = 'accepted' WHERE rr.request_id IN (
+  SELECT request_id FROM RequestToMeeting WHERE meeting_id = ?
+)
+`
+
+func (q *Queries) UpdateRequestStatusAsAccepted(ctx context.Context, meetingID uint32) (int64, error) {
+	result, err := q.exec(ctx, q.updateRequestStatusAsAcceptedStmt, updateRequestStatusAsAccepted, meetingID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
 const updateRequestStatusAsRejected = `-- name: UpdateRequestStatusAsRejected :execrows
-UPDATE ReschedulingRequest rr SET status = 'rejected' WHERE rr.request_id IN (
+UPDATE ReschedulingRequest rr SET status = 'declined' WHERE rr.request_id IN (
   SELECT request_id FROM RequestToMeeting WHERE meeting_id = ?
 )
 `

@@ -11,6 +11,7 @@ import (
 
 	"github.com/SlotifyApp/slotify-backend/database"
 	"github.com/avast/retry-go"
+	graphmodels "github.com/microsoftgraph/msgraph-sdk-go/models"
 	"go.uber.org/zap"
 )
 
@@ -425,7 +426,9 @@ func (s Server) GetAPIRescheduleRequestRequestID(w http.ResponseWriter, r *http.
 }
 
 // (PATCH /api/reschedule/request/{requestID}/reject).
-func (s Server) PatchAPIRescheduleRequestRequestIDReject(w http.ResponseWriter, r *http.Request, paramRequestID uint32) {
+func (s Server) PatchAPIRescheduleRequestRequestIDReject(w http.ResponseWriter,
+	r *http.Request, paramRequestID uint32,
+) {
 	// Get userid from access token
 	ctx, cancel := context.WithTimeout(r.Context(), time.Minute*3)
 	defer cancel()
@@ -446,13 +449,99 @@ func (s Server) PatchAPIRescheduleRequestRequestIDReject(w http.ResponseWriter, 
 	}
 
 	// Update status of all requests with the same meeting ID
+	//nolint: gosec // integer overflow conversion
 	_, err = s.DB.UpdateRequestStatusAsRejected(ctx, uint32(req.MeetingID.Int32))
-
 	if err != nil {
-		s.Logger.Error("failed to update status of all the requests", zap.Error(err))
-		sendError(w, http.StatusBadGateway, "Failed to update status of all the requests")
+		s.Logger.Error("failed to update status of all the requests to declined", zap.Error(err))
+		sendError(w, http.StatusBadGateway, "Failed to update status of all the requests to declined")
 		return
 	}
 
 	SetHeaderAndWriteResponse(w, http.StatusOK, "Successfully declined rescheduling request")
+}
+
+// (PATCH /api/reschedule/request/{requestID}/accept).
+// nolint: funlen // 1 statement too long
+func (s Server) PatchAPIRescheduleRequestRequestIDAccept(w http.ResponseWriter, r *http.Request, parRequestID uint32) {
+	// Get userid from access token
+	ctx, cancel := context.WithTimeout(r.Context(), time.Minute*3)
+	defer cancel()
+
+	userID, ok := r.Context().Value(UserIDCtxKey{}).(uint32)
+	if !ok {
+		s.Logger.Error("failed to get userid from request context")
+		sendError(w, http.StatusUnauthorized, "Try again later.")
+		return
+	}
+
+	var body ReschedulingRequestAcceptBodySchema
+	var err error
+	if err = json.NewDecoder(r.Body).Decode(&body); err != nil {
+		// TODO: Add zap log for body
+		s.Logger.Error(ErrUnmarshalBody, zap.Error(err))
+		sendError(w, http.StatusBadRequest, ErrUnmarshalBody.Error())
+		return
+	}
+
+	graph, err := CreateMSFTGraphClient(ctx, s.MSALClient, s.DB, userID)
+	if err != nil {
+		s.Logger.Error("failed to create msgraph client", zap.Error(err))
+		sendError(w, http.StatusBadGateway, "Failed to connect to microsoft graph API")
+		return
+	}
+
+	// Get request for the user
+	req, err := s.DB.GetRequestByID(ctx, parRequestID)
+	if err != nil {
+		s.Logger.Error("failed to get requests", zap.Error(err))
+		sendError(w, http.StatusBadGateway, "Failed to get requests")
+		return
+	}
+
+	// Update time of calendar event in microsoft
+	requestBody := graphmodels.NewEvent()
+
+	timeZone := "UTC"
+
+	start := graphmodels.NewDateTimeTimeZone()
+	startTime := body.NewStartTime.Format(time.RFC3339Nano)
+	start.SetDateTime(&startTime)
+	start.SetTimeZone(&timeZone)
+	requestBody.SetStart(start)
+
+	end := graphmodels.NewDateTimeTimeZone()
+	endTime := body.NewEndTime.Format(time.RFC3339Nano)
+	end.SetDateTime(&endTime)
+	end.SetTimeZone(&timeZone)
+	requestBody.SetStart(end)
+
+	// Make the microsoft API call
+	_, err = graph.Me().Events().ByEventId(req.MsftMeetingID).Patch(ctx, requestBody, nil)
+	if err != nil {
+		s.Logger.Error("failed to update event in microsoft", zap.Error(err))
+		sendError(w, http.StatusBadGateway, "Failed to update event in microsoft")
+		return
+	}
+
+	// Update time in meeting db
+	_, err = s.DB.UpdateMeetingStartTime(ctx, database.UpdateMeetingStartTimeParams{
+		MeetingStartTime: *body.NewStartTime,
+		ID:               req.ID,
+	})
+	if err != nil {
+		s.Logger.Error("failed to update new start time of meeting", zap.Error(err))
+		sendError(w, http.StatusBadGateway, "Failed to update new start time of meeting")
+		return
+	}
+
+	// Update status of all requests with the same meeting ID
+	//nolint: gosec // integer overflow conversion
+	_, err = s.DB.UpdateRequestStatusAsAccepted(ctx, uint32(req.MeetingID.Int32))
+	if err != nil {
+		s.Logger.Error("failed to update status of all the requests to accepted", zap.Error(err))
+		sendError(w, http.StatusBadGateway, "Failed to update status of all the requests to accepted")
+		return
+	}
+
+	SetHeaderAndWriteResponse(w, http.StatusOK, "Successfully accepted rescheduling request")
 }
