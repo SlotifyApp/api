@@ -9,22 +9,74 @@ import (
 	"github.com/avast/retry-go"
 	msgraphsdkgo "github.com/microsoftgraph/msgraph-sdk-go"
 	graphmodels "github.com/microsoftgraph/msgraph-sdk-go/models"
+	"github.com/oapi-codegen/runtime/types"
 )
+
+func durationToISO(duration time.Duration) string {
+	hours := int(duration.Hours())
+	//nolint: mnd // Magic Number 60
+	minutes := int(duration.Minutes()) % 60
+	//nolint: mnd // Magic Number 60
+	seconds := int(duration.Seconds()) % 60
+
+	isoFormat := "P"
+	if hours > 0 || minutes > 0 || seconds > 0 {
+		isoFormat += "T"
+	}
+
+	if hours > 0 {
+		isoFormat += fmt.Sprintf("%dH", hours)
+	}
+	if minutes > 0 {
+		isoFormat += fmt.Sprintf("%dM", minutes)
+	}
+	if seconds > 0 {
+		isoFormat += fmt.Sprintf("%dS", seconds)
+	}
+
+	return isoFormat
+}
 
 func createSchedulingRequest(body ReschedulingCheckBodySchema,
 	meetingPref database.Meetingpreferences,
+	msftMeeting graphmodels.Eventable,
 ) SchedulingSlotsBodySchema {
 	// Create request body for scheduling slots api call
 	newReqBody := SchedulingSlotsBodySchema{}
 
-	newReqBody.Attendees = *body.OldMeeting.Attendees
 	newReqBody.IsOrganizerOptional = *body.OldMeeting.IsOrganizerOptional
-	newReqBody.MeetingName = *body.OldMeeting.Title
-	newReqBody.MeetingDuration = *body.OldMeeting.MeetingDuration
+	newReqBody.MeetingName = *msftMeeting.GetSubject()
 
 	minimum := 100.0
 	newReqBody.MinimumAttendeePercentage = &minimum
-	newReqBody.LocationConstraint = *body.OldMeeting.LocationConstraint
+	newReqBody.Attendees = []AttendeeBase{}
+
+	// parse each attendee to attendeeBase
+	for _, attendee := range msftMeeting.GetAttendees() {
+		attendeeType := *attendee.GetTypeEscaped()
+
+		newReqBody.Attendees = append(newReqBody.Attendees, AttendeeBase{
+			AttendeeType: AttendeeType(attendeeType.String()),
+			EmailAddress: EmailAddress{
+				Name:    *attendee.GetEmailAddress().GetName(),
+				Address: types.Email(*attendee.GetEmailAddress().GetAddress()),
+			},
+		})
+	}
+
+	// Caluclate duration
+	var duration time.Duration
+
+	startTime, errOne := time.Parse(time.RFC3339Nano, *msftMeeting.GetStart().GetDateTime()+"Z")
+	endTime, errTwo := time.Parse(time.RFC3339Nano, *msftMeeting.GetEnd().GetDateTime()+"Z")
+
+	if errOne != nil || errTwo != nil {
+		duration, _ = time.ParseDuration("1h")
+	} else {
+		duration = endTime.Sub(startTime)
+	}
+
+	newReqBody.MeetingDuration = durationToISO(duration)
 
 	// Add time contraints
 	timeConstraint := graphmodels.NewTimeConstraint()
@@ -60,10 +112,11 @@ func createSchedulingRequest(body ReschedulingCheckBodySchema,
 func checkValidReschedulingSlotExists(ctx context.Context,
 	graph *msgraphsdkgo.GraphServiceClient,
 	body ReschedulingCheckBodySchema,
+	msftMeeting graphmodels.Eventable,
 	meetingPref database.Meetingpreferences,
 ) (bool, error) {
 	// Call scheduling function to check for valid slots
-	newRequest := createSchedulingRequest(body, meetingPref)
+	newRequest := createSchedulingRequest(body, meetingPref, msftMeeting)
 
 	res, err := makeFindMeetingTimesAPICall(ctx, graph, newRequest)
 	if err != nil {
@@ -82,11 +135,12 @@ func checkValidReschedulingSlotExists(ctx context.Context,
 func performReschedulingCheckProcess(ctx context.Context,
 	graph *msgraphsdkgo.GraphServiceClient,
 	body ReschedulingCheckBodySchema,
+	msftMeeting graphmodels.Eventable,
 	meetingPref database.Meetingpreferences,
 ) (map[string]bool, error) {
 	// Check if the old meeting has valid rescheduling slots
 
-	validSlots, err := checkValidReschedulingSlotExists(ctx, graph, body, meetingPref)
+	validSlots, err := checkValidReschedulingSlotExists(ctx, graph, body, msftMeeting, meetingPref)
 	if err != nil {
 		return nil,
 			fmt.Errorf("failed to check valid rescheduling slots exists: %w", err)
