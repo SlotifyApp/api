@@ -145,7 +145,10 @@ func (s Server) PostAPIRescheduleRequestReplace(w http.ResponseWriter, r *http.R
 	// Create Rescheduling Request
 	var requestID int64
 	err = retry.Do(func() error {
-		if requestID, err = s.DB.CreateReschedulingRequest(ctx, userID); err != nil {
+		if requestID, err = s.DB.CreateReschedulingRequest(ctx, database.CreateReschedulingRequestParams{
+			RequestedBy: userID,
+			CreatedAt:   time.Now(),
+		}); err != nil {
 			return fmt.Errorf("failed to create reschedling requested by user: %w", err)
 		}
 		return nil
@@ -161,33 +164,10 @@ func (s Server) PostAPIRescheduleRequestReplace(w http.ResponseWriter, r *http.R
 
 	if errors.Is(err, sql.ErrNoRows) {
 		// Meeting info not in db, so create new meeting info
-
-		//Fetch meeting data from microsft
-		msftMeeting, err := graph.Me().Events().ByEventId(*body.OldMeeting.MsftMeetingID).Get(ctx, nil)
+		meeting, err = processNewMeetingInfo(ctx, graph, s, *body.OldMeeting.MsftMeetingID)
 		if err != nil {
-			s.Logger.Error("failed to get meeting data from microsoft", zap.Error(err))
-			sendError(w, http.StatusBadGateway, "Failed to get meeting data from microsoft")
-			return
-		}
-
-		startTime, errOne := time.Parse(time.RFC3339Nano, *msftMeeting.GetStart().GetDateTime()+"Z")
-		if errOne != nil {
-			s.Logger.Error("failed to get parse start time", zap.Error(err))
-			sendError(w, http.StatusBadGateway, "Failed to parse start time")
-			return
-		}
-
-		newMeetingParams := NewMeetingAndPrefsParams{
-			MeetingStartTime: startTime,
-			//nolint: gosec // id is unsigned 32 bit int
-			OwnerEmail:    *msftMeeting.GetOrganizer().GetEmailAddress().GetAddress(),
-			MsftMeetingID: *body.OldMeeting.MsftMeetingID,
-		}
-
-		meeting, err = createNewMeetingsAndPrefs(ctx, newMeetingParams, s)
-		if err != nil {
-			s.Logger.Error("failed to get data from new db.Meeting", zap.Error(err))
-			sendError(w, http.StatusBadGateway, "Failed to get data from new db.Meeting")
+			s.Logger.Error("DB Creation Error: ", zap.Error(err))
+			sendError(w, http.StatusBadGateway, "Failed to create New Meeting Info")
 			return
 		}
 	} else if err != nil {
@@ -266,11 +246,28 @@ func (s Server) PostAPIRescheduleRequestReplace(w http.ResponseWriter, r *http.R
 		}, retry.Attempts(3), retry.Delay(time.Millisecond*500))
 	}
 
-	// NOtify user of the request
+	// Notify user of the request
+	notifParam := database.CreateNotificationParams{
+		Message: "Reschedule request for meeting for a new meeting",
+		Created: time.Now(),
+	}
+
+	// Get Owner ID
+	ownerObj, err := s.DB.GetUserByEmail(ctx, meeting.OwnerEmail)
+	if err != nil {
+		s.Logger.Error("Failed to get owner user obj: ", zap.Error(err))
+	}
+
+	err = s.NotificationService.SendNotification(ctx, s.Logger, s.DB, []uint32{ownerObj.ID}, notifParam)
+	if err != nil {
+		s.Logger.Error("Failed to send notification for reschedule request: ", zap.Error(err))
+	}
+
 	SetHeaderAndWriteResponse(w, http.StatusOK, requestID)
 }
 
 // (POST /api/reschedule/request/single).
+// nolint: funlen // 1 line too long
 func (s Server) PostAPIRescheduleRequestSingle(w http.ResponseWriter, r *http.Request) {
 	// Get userid from access token
 	ctx, cancel := context.WithTimeout(r.Context(), time.Minute*3)
@@ -302,46 +299,31 @@ func (s Server) PostAPIRescheduleRequestSingle(w http.ResponseWriter, r *http.Re
 	// Create Rescheduling Request
 	var requestID int64
 	err = retry.Do(func() error {
-		if requestID, err = s.DB.CreateReschedulingRequest(ctx, userID); err != nil {
+		if requestID, err = s.DB.CreateReschedulingRequest(ctx, database.CreateReschedulingRequestParams{
+			RequestedBy: userID,
+			CreatedAt:   time.Now(),
+		}); err != nil {
 			return fmt.Errorf("failed to create reschedling requested by user: %w", err)
 		}
 		return nil
 	}, retry.Attempts(3), retry.Delay(time.Millisecond*500))
-
-	// Attach meeting preferences info to request if it exists
+	if err != nil {
+		s.Logger.Error("failed to make reschedule request", zap.Error(err))
+		sendError(w, http.StatusBadGateway, "Failed to make rescheduling request")
+		return
+	}
 
 	// Link request to old meeting
 	var meeting database.Meeting
-	// Get data from db to validate meeting id
 
-	meeting, err = s.DB.GetMeetingByMSFTID(ctx, *body.OldMeeting.MsftMeetingID)
+	// Get data from db to validate meeting id
+	meeting, err = s.DB.GetMeetingByMSFTID(ctx, *body.MsftMeetingID)
 
 	if errors.Is(err, sql.ErrNoRows) {
-		//Fetch meeting data from microsft
-		msftMeeting, err := graph.Me().Events().ByEventId(*body.OldMeeting.MsftMeetingID).Get(ctx, nil)
+		meeting, err = processNewMeetingInfo(ctx, graph, s, *body.MsftMeetingID)
 		if err != nil {
-			s.Logger.Error("failed to get meeting data from microsoft", zap.Error(err))
-			sendError(w, http.StatusBadGateway, "Failed to get meeting data from microsoft")
-			return
-		}
-
-		startTime, errOne := time.Parse(time.RFC3339Nano, *msftMeeting.GetStart().GetDateTime()+"Z")
-		if errOne != nil {
-			s.Logger.Error("failed to get parse start time", zap.Error(err))
-			sendError(w, http.StatusBadGateway, "Failed to parse start time")
-			return
-		}
-
-		newMeetingParams := NewMeetingAndPrefsParams{
-			MeetingStartTime: startTime,
-			OwnerEmail:       *msftMeeting.GetOrganizer().GetEmailAddress().GetAddress(),
-			MsftMeetingID:    *body.OldMeeting.MsftMeetingID,
-		}
-
-		meeting, err = createNewMeetingsAndPrefs(ctx, newMeetingParams, s)
-		if err != nil {
-			s.Logger.Error("failed to get data from new db.Meeting", zap.Error(err))
-			sendError(w, http.StatusBadGateway, "Failed to get data from new db.Meeting")
+			s.Logger.Error("failed to make new meeting info", zap.Error(err))
+			sendError(w, http.StatusBadGateway, "Failed to make new meeting info")
 			return
 		}
 	} else if err != nil {
@@ -369,6 +351,23 @@ func (s Server) PostAPIRescheduleRequestSingle(w http.ResponseWriter, r *http.Re
 		return
 	}
 
+	// Notify user of the request
+	notifParam := database.CreateNotificationParams{
+		Message: "Reschedule request for meeting",
+		Created: time.Now(),
+	}
+
+	// Get Owner ID
+	ownerObj, err := s.DB.GetUserByEmail(ctx, meeting.OwnerEmail)
+	if err != nil {
+		s.Logger.Error("Failed to get owner user obj: ", zap.Error(err))
+	}
+
+	err = s.NotificationService.SendNotification(ctx, s.Logger, s.DB, []uint32{ownerObj.ID}, notifParam)
+	if err != nil {
+		s.Logger.Error("Failed to send notification for reschedule request: ", zap.Error(err))
+	}
+
 	SetHeaderAndWriteResponse(w, http.StatusOK, requestID)
 }
 
@@ -387,7 +386,6 @@ func (s Server) GetAPIRescheduleRequest(w http.ResponseWriter, r *http.Request) 
 
 	// Get all requests for the user
 	userObj, err := s.DB.GetUserByID(ctx, userID)
-
 	if err != nil {
 		s.Logger.Error("failed to get user data from db", zap.Error(err))
 		sendError(w, http.StatusBadGateway, "failed to get user data from db")
@@ -507,7 +505,7 @@ func (s Server) PatchAPIRescheduleRequestRequestIDReject(w http.ResponseWriter,
 	ctx, cancel := context.WithTimeout(r.Context(), time.Minute*3)
 	defer cancel()
 
-	_, ok := r.Context().Value(UserIDCtxKey{}).(uint32)
+	userID, ok := r.Context().Value(UserIDCtxKey{}).(uint32)
 	if !ok {
 		s.Logger.Error("failed to get userid from request context")
 		sendError(w, http.StatusUnauthorized, "Try again later.")
@@ -515,7 +513,7 @@ func (s Server) PatchAPIRescheduleRequestRequestIDReject(w http.ResponseWriter,
 	}
 
 	// Get request for the user
-	req, err := s.DB.GetRequestByID(ctx, paramRequestID)
+	req, err := s.DB.GetMeetingIDFromRequestID(ctx, paramRequestID)
 	if err != nil {
 		s.Logger.Error("failed to get requests", zap.Error(err))
 		sendError(w, http.StatusBadGateway, "Failed to get requests")
@@ -523,12 +521,34 @@ func (s Server) PatchAPIRescheduleRequestRequestIDReject(w http.ResponseWriter,
 	}
 
 	// Update status of all requests with the same meeting ID
-	//nolint: gosec // integer overflow conversion
-	_, err = s.DB.UpdateRequestStatusAsRejected(ctx, uint32(req.MeetingID.Int32))
+
+	_, err = s.DB.UpdateRequestStatusAsRejected(ctx, req.MeetingID)
 	if err != nil {
 		s.Logger.Error("failed to update status of all the requests to declined", zap.Error(err))
 		sendError(w, http.StatusBadGateway, "Failed to update status of all the requests to declined")
 		return
+	}
+
+	// Notify user of the request
+	notifParam := database.CreateNotificationParams{
+		Message: "Reschedule request rejected",
+		Created: time.Now(),
+	}
+
+	// Get request owner
+	requester, err := s.DB.GetOnlyRequestByID(ctx, req.RequestID)
+	if err != nil {
+		s.Logger.Error("Failed to get requester user: ", zap.Error(err))
+	}
+
+	err = s.NotificationService.SendNotification(ctx, s.Logger, s.DB, []uint32{requester.RequestedBy}, notifParam)
+	if err != nil {
+		s.Logger.Error("Failed to send notification to requester: ", zap.Error(err))
+	}
+
+	err = s.NotificationService.SendNotification(ctx, s.Logger, s.DB, []uint32{userID}, notifParam)
+	if err != nil {
+		s.Logger.Error("Failed to send notification to requester: ", zap.Error(err))
 	}
 
 	SetHeaderAndWriteResponse(w, http.StatusOK, "Successfully declined rescheduling request")
@@ -575,7 +595,7 @@ func (s Server) PatchAPIRescheduleRequestRequestIDAccept(w http.ResponseWriter, 
 	// Update time of calendar event in microsoft
 	requestBody := graphmodels.NewEvent()
 
-	timeZone := "UTC"
+	timeZone := "GMT Standard Time"
 
 	start := graphmodels.NewDateTimeTimeZone()
 	startTime := body.NewStartTime.Format(time.RFC3339Nano)
@@ -587,7 +607,7 @@ func (s Server) PatchAPIRescheduleRequestRequestIDAccept(w http.ResponseWriter, 
 	endTime := body.NewEndTime.Format(time.RFC3339Nano)
 	end.SetDateTime(&endTime)
 	end.SetTimeZone(&timeZone)
-	requestBody.SetStart(end)
+	requestBody.SetEnd(end)
 
 	// Make the microsoft API call
 	_, err = graph.Me().Events().ByEventId(req.MsftMeetingID).Patch(ctx, requestBody, nil)
@@ -609,12 +629,59 @@ func (s Server) PatchAPIRescheduleRequestRequestIDAccept(w http.ResponseWriter, 
 	}
 
 	// Update status of all requests with the same meeting ID
-	//nolint: gosec // integer overflow conversion
-	_, err = s.DB.UpdateRequestStatusAsAccepted(ctx, uint32(req.MeetingID.Int32))
+
+	rows, err := s.DB.UpdateRequestStatusAsAccepted(ctx, req.ID)
 	if err != nil {
 		s.Logger.Error("failed to update status of all the requests to accepted", zap.Error(err))
 		sendError(w, http.StatusBadGateway, "Failed to update status of all the requests to accepted")
 		return
+	}
+
+	// At least 1 row has to be updated
+	if rows == 0 {
+		s.Logger.Error("failed to update a request invite as accepted",
+			zap.Error(database.WrongNumberSQLRowsError{ActualRows: rows, ExpectedRows: []int64{1}}))
+		sendError(w, http.StatusBadGateway, "Failed to update invite message")
+		return
+	}
+
+	notifparam := database.CreateNotificationParams{
+		Message: "You have successfully rescheduled",
+		Created: time.Now(),
+	}
+
+	// Notify Owner
+	err = s.NotificationService.SendNotification(ctx, s.Logger, s.DB, []uint32{userID}, notifparam)
+	if err != nil {
+		s.Logger.Error("failed to send accepted request notification to owner", zap.Error(err))
+	}
+
+	// Notify all attendees
+
+	meetingData, err := graph.Me().Events().ByEventId(req.MsftMeetingID).Get(ctx, nil)
+	if err != nil {
+		s.Logger.Error("failed to get meeting data from microsoft", zap.Error(err))
+	}
+
+	attendeeUsers := []uint32{}
+
+	for _, attendee := range meetingData.GetAttendees() {
+		attendeeData, errOne := s.DB.GetUserByEmail(ctx, *attendee.GetEmailAddress().GetAddress())
+		if errOne != nil {
+			s.Logger.Error("failed to get user id for email address:", *attendee.GetEmailAddress().GetAddress())
+		}
+
+		attendeeUsers = append(attendeeUsers, attendeeData.ID)
+	}
+
+	newNotifparam := database.CreateNotificationParams{
+		Message: "Meeting x has been rescheduled",
+		Created: time.Now(),
+	}
+
+	err = s.NotificationService.SendNotification(ctx, s.Logger, s.DB, attendeeUsers, newNotifparam)
+	if err != nil {
+		s.Logger.Error("failed to send accepted request notification to all attendees", zap.Error(err))
 	}
 
 	SetHeaderAndWriteResponse(w, http.StatusOK, "Successfully accepted rescheduling request")

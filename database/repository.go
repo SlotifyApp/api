@@ -126,8 +126,14 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.getMeetingByMSFTIDStmt, err = db.PrepareContext(ctx, getMeetingByMSFTID); err != nil {
 		return nil, fmt.Errorf("error preparing query GetMeetingByMSFTID: %w", err)
 	}
+	if q.getMeetingIDFromRequestIDStmt, err = db.PrepareContext(ctx, getMeetingIDFromRequestID); err != nil {
+		return nil, fmt.Errorf("error preparing query GetMeetingIDFromRequestID: %w", err)
+	}
 	if q.getMeetingPreferencesStmt, err = db.PrepareContext(ctx, getMeetingPreferences); err != nil {
 		return nil, fmt.Errorf("error preparing query GetMeetingPreferences: %w", err)
+	}
+	if q.getOnlyRequestByIDStmt, err = db.PrepareContext(ctx, getOnlyRequestByID); err != nil {
+		return nil, fmt.Errorf("error preparing query GetOnlyRequestByID: %w", err)
 	}
 	if q.getRefreshTokenByUserIDStmt, err = db.PrepareContext(ctx, getRefreshTokenByUserID); err != nil {
 		return nil, fmt.Errorf("error preparing query GetRefreshTokenByUserID: %w", err)
@@ -370,9 +376,19 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing getMeetingByMSFTIDStmt: %w", cerr)
 		}
 	}
+	if q.getMeetingIDFromRequestIDStmt != nil {
+		if cerr := q.getMeetingIDFromRequestIDStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getMeetingIDFromRequestIDStmt: %w", cerr)
+		}
+	}
 	if q.getMeetingPreferencesStmt != nil {
 		if cerr := q.getMeetingPreferencesStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing getMeetingPreferencesStmt: %w", cerr)
+		}
+	}
+	if q.getOnlyRequestByIDStmt != nil {
+		if cerr := q.getOnlyRequestByIDStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getOnlyRequestByIDStmt: %w", cerr)
 		}
 	}
 	if q.getRefreshTokenByUserIDStmt != nil {
@@ -558,7 +574,9 @@ type Queries struct {
 	getInviteByIDStmt                    *sql.Stmt
 	getMeetingByIDStmt                   *sql.Stmt
 	getMeetingByMSFTIDStmt               *sql.Stmt
+	getMeetingIDFromRequestIDStmt        *sql.Stmt
 	getMeetingPreferencesStmt            *sql.Stmt
+	getOnlyRequestByIDStmt               *sql.Stmt
 	getRefreshTokenByUserIDStmt          *sql.Stmt
 	getRequestByIDStmt                   *sql.Stmt
 	getSlotifyGroupByIDStmt              *sql.Stmt
@@ -621,7 +639,9 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		getInviteByIDStmt:                    q.getInviteByIDStmt,
 		getMeetingByIDStmt:                   q.getMeetingByIDStmt,
 		getMeetingByMSFTIDStmt:               q.getMeetingByMSFTIDStmt,
+		getMeetingIDFromRequestIDStmt:        q.getMeetingIDFromRequestIDStmt,
 		getMeetingPreferencesStmt:            q.getMeetingPreferencesStmt,
+		getOnlyRequestByIDStmt:               q.getOnlyRequestByIDStmt,
 		getRefreshTokenByUserIDStmt:          q.getRefreshTokenByUserIDStmt,
 		getRequestByIDStmt:                   q.getRequestByIDStmt,
 		getSlotifyGroupByIDStmt:              q.getSlotifyGroupByIDStmt,
