@@ -135,6 +135,13 @@ func (s Server) PostAPIRescheduleRequestReplace(w http.ResponseWriter, r *http.R
 		return
 	}
 
+	graph, err := CreateMSFTGraphClient(ctx, s.MSALClient, s.DB, userID)
+	if err != nil {
+		s.Logger.Error("failed to create msgraph client", zap.Error(err))
+		sendError(w, http.StatusBadGateway, "Failed to connect to microsoft graph API")
+		return
+	}
+
 	// Create Rescheduling Request
 	var requestID int64
 	err = retry.Do(func() error {
@@ -153,10 +160,27 @@ func (s Server) PostAPIRescheduleRequestReplace(w http.ResponseWriter, r *http.R
 	meeting, err = s.DB.GetMeetingByMSFTID(ctx, *body.OldMeeting.MsftMeetingID)
 
 	if errors.Is(err, sql.ErrNoRows) {
+		// Meeting info not in db, so create new meeting info
+
+		//Fetch meeting data from microsft
+		msftMeeting, err := graph.Me().Events().ByEventId(*body.OldMeeting.MsftMeetingID).Get(ctx, nil)
+		if err != nil {
+			s.Logger.Error("failed to get meeting data from microsoft", zap.Error(err))
+			sendError(w, http.StatusBadGateway, "Failed to get meeting data from microsoft")
+			return
+		}
+
+		startTime, errOne := time.Parse(time.RFC3339Nano, *msftMeeting.GetStart().GetDateTime()+"Z")
+		if errOne != nil {
+			s.Logger.Error("failed to get parse start time", zap.Error(err))
+			sendError(w, http.StatusBadGateway, "Failed to parse start time")
+			return
+		}
+
 		newMeetingParams := NewMeetingAndPrefsParams{
-			MeetingStartTime: *body.OldMeeting.MeetingStartTime,
+			MeetingStartTime: startTime,
 			//nolint: gosec // id is unsigned 32 bit int
-			OwnerID:       uint32(*body.OldMeeting.MeetingOwner),
+			OwnerEmail:    *msftMeeting.GetOrganizer().GetEmailAddress().GetAddress(),
 			MsftMeetingID: *body.OldMeeting.MsftMeetingID,
 		}
 
@@ -268,6 +292,13 @@ func (s Server) PostAPIRescheduleRequestSingle(w http.ResponseWriter, r *http.Re
 		return
 	}
 
+	graph, err := CreateMSFTGraphClient(ctx, s.MSALClient, s.DB, userID)
+	if err != nil {
+		s.Logger.Error("failed to create msgraph client", zap.Error(err))
+		sendError(w, http.StatusBadGateway, "Failed to connect to microsoft graph API")
+		return
+	}
+
 	// Create Rescheduling Request
 	var requestID int64
 	err = retry.Do(func() error {
@@ -286,11 +317,25 @@ func (s Server) PostAPIRescheduleRequestSingle(w http.ResponseWriter, r *http.Re
 	meeting, err = s.DB.GetMeetingByMSFTID(ctx, *body.OldMeeting.MsftMeetingID)
 
 	if errors.Is(err, sql.ErrNoRows) {
+		//Fetch meeting data from microsft
+		msftMeeting, err := graph.Me().Events().ByEventId(*body.OldMeeting.MsftMeetingID).Get(ctx, nil)
+		if err != nil {
+			s.Logger.Error("failed to get meeting data from microsoft", zap.Error(err))
+			sendError(w, http.StatusBadGateway, "Failed to get meeting data from microsoft")
+			return
+		}
+
+		startTime, errOne := time.Parse(time.RFC3339Nano, *msftMeeting.GetStart().GetDateTime()+"Z")
+		if errOne != nil {
+			s.Logger.Error("failed to get parse start time", zap.Error(err))
+			sendError(w, http.StatusBadGateway, "Failed to parse start time")
+			return
+		}
+
 		newMeetingParams := NewMeetingAndPrefsParams{
-			MeetingStartTime: *body.OldMeeting.MeetingStartTime,
-			//nolint: gosec // id is unsigned 32 bit int
-			OwnerID:       uint32(*body.OldMeeting.MeetingOwner),
-			MsftMeetingID: *body.OldMeeting.MsftMeetingID,
+			MeetingStartTime: startTime,
+			OwnerEmail:       *msftMeeting.GetOrganizer().GetEmailAddress().GetAddress(),
+			MsftMeetingID:    *body.OldMeeting.MsftMeetingID,
 		}
 
 		meeting, err = createNewMeetingsAndPrefs(ctx, newMeetingParams, s)
@@ -341,7 +386,15 @@ func (s Server) GetAPIRescheduleRequest(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// Get all requests for the user
-	requests, err := s.DB.GetAllRequestsForUser(ctx, userID)
+	userObj, err := s.DB.GetUserByID(ctx, userID)
+
+	if err != nil {
+		s.Logger.Error("failed to get user data from db", zap.Error(err))
+		sendError(w, http.StatusBadGateway, "failed to get user data from db")
+		return
+	}
+
+	requests, err := s.DB.GetAllRequestsForUser(ctx, userObj.Email)
 	if err != nil {
 		s.Logger.Error("failed to get requests", zap.Error(err))
 		sendError(w, http.StatusBadGateway, "Failed to get requests")

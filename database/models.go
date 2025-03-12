@@ -112,7 +112,7 @@ type Invite struct {
 type Meeting struct {
 	ID            uint32 `json:"id"`
 	MeetingPrefID uint32 `json:"meetingPrefId"`
-	OwnerID       uint32 `json:"ownerId"`
+	OwnerEmail    string `json:"ownerEmail"`
 	MsftMeetingID string `json:"msftMeetingId"`
 }
 
