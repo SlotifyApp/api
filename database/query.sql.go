@@ -357,11 +357,16 @@ func (q *Queries) CreateRequestToMeeting(ctx context.Context, arg CreateRequestT
 }
 
 const createReschedulingRequest = `-- name: CreateReschedulingRequest :execlastid
-INSERT INTO ReschedulingRequest (requested_by) VALUES (?)
+INSERT INTO ReschedulingRequest (requested_by, created_at) VALUES (?, ?)
 `
 
-func (q *Queries) CreateReschedulingRequest(ctx context.Context, requestedBy uint32) (int64, error) {
-	result, err := q.exec(ctx, q.createReschedulingRequestStmt, createReschedulingRequest, requestedBy)
+type CreateReschedulingRequestParams struct {
+	RequestedBy uint32    `json:"requestedBy"`
+	CreatedAt   time.Time `json:"createdAt"`
+}
+
+func (q *Queries) CreateReschedulingRequest(ctx context.Context, arg CreateReschedulingRequestParams) (int64, error) {
+	result, err := q.exec(ctx, q.createReschedulingRequestStmt, createReschedulingRequest, arg.RequestedBy, arg.CreatedAt)
 	if err != nil {
 		return 0, err
 	}
@@ -643,6 +648,18 @@ func (q *Queries) GetMeetingByMSFTID(ctx context.Context, msftMeetingID string) 
 	return i, err
 }
 
+const getMeetingIDFromRequestID = `-- name: GetMeetingIDFromRequestID :one
+SELECT request_id, meeting_id FROM RequestToMeeting
+WHERE request_id=?
+`
+
+func (q *Queries) GetMeetingIDFromRequestID(ctx context.Context, requestID uint32) (Requesttomeeting, error) {
+	row := q.queryRow(ctx, q.getMeetingIDFromRequestIDStmt, getMeetingIDFromRequestID, requestID)
+	var i Requesttomeeting
+	err := row.Scan(&i.RequestID, &i.MeetingID)
+	return i, err
+}
+
 const getMeetingPreferences = `-- name: GetMeetingPreferences :one
 SELECT id, meeting_start_time, start_date_range, end_date_range FROM MeetingPreferences
 WHERE id=?
@@ -656,6 +673,23 @@ func (q *Queries) GetMeetingPreferences(ctx context.Context, id uint32) (Meeting
 		&i.MeetingStartTime,
 		&i.StartDateRange,
 		&i.EndDateRange,
+	)
+	return i, err
+}
+
+const getOnlyRequestByID = `-- name: GetOnlyRequestByID :one
+SELECT request_id, requested_by, status, created_at FROM ReschedulingRequest
+WHERE request_id=?
+`
+
+func (q *Queries) GetOnlyRequestByID(ctx context.Context, requestID uint32) (Reschedulingrequest, error) {
+	row := q.queryRow(ctx, q.getOnlyRequestByIDStmt, getOnlyRequestByID, requestID)
+	var i Reschedulingrequest
+	err := row.Scan(
+		&i.RequestID,
+		&i.RequestedBy,
+		&i.Status,
+		&i.CreatedAt,
 	)
 	return i, err
 }
@@ -1211,8 +1245,8 @@ func (q *Queries) UpdateMeetingStartTime(ctx context.Context, arg UpdateMeetingS
 }
 
 const updateRequestStatusAsAccepted = `-- name: UpdateRequestStatusAsAccepted :execrows
-UPDATE ReschedulingRequest rr SET status = 'accepted' WHERE rr.request_id IN (
-  SELECT request_id FROM RequestToMeeting WHERE meeting_id = ?
+UPDATE ReschedulingRequest rr SET rr.status = 'accepted' WHERE rr.request_id IN (
+  SELECT rtm.request_id FROM RequestToMeeting rtm WHERE rtm.meeting_id = ?
 )
 `
 
@@ -1225,8 +1259,8 @@ func (q *Queries) UpdateRequestStatusAsAccepted(ctx context.Context, meetingID u
 }
 
 const updateRequestStatusAsRejected = `-- name: UpdateRequestStatusAsRejected :execrows
-UPDATE ReschedulingRequest rr SET status = 'declined' WHERE rr.request_id IN (
-  SELECT request_id FROM RequestToMeeting WHERE meeting_id = ?
+UPDATE ReschedulingRequest rr SET rr.status = 'declined' WHERE rr.request_id IN (
+  SELECT rtm.request_id FROM RequestToMeeting rtm WHERE rtm.meeting_id = ?
 )
 `
 

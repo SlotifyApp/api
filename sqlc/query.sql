@@ -204,6 +204,14 @@ WHERE msft_meeting_id=?;
 SELECT * FROM MeetingPreferences
 WHERE id=?;
 
+-- name: GetMeetingIDFromRequestID :one
+SELECT * FROM RequestToMeeting
+WHERE request_id=?;
+
+-- name: GetOnlyRequestByID :one
+SELECT * FROM ReschedulingRequest
+WHERE request_id=?;
+
 -- name: CreateMeetingPreferences :execlastid
 INSERT INTO MeetingPreferences (meeting_start_time, start_date_range, end_date_range) VALUES (?,?,?);
 
@@ -211,7 +219,7 @@ INSERT INTO MeetingPreferences (meeting_start_time, start_date_range, end_date_r
 INSERT INTO Meeting (meeting_pref_id, owner_email, msft_meeting_id) VALUES (?,?,?);
 
 -- name: CreateReschedulingRequest :execlastid
-INSERT INTO ReschedulingRequest (requested_by) VALUES (?);
+INSERT INTO ReschedulingRequest (requested_by, created_at) VALUES (?, ?);
 
 -- name: CreatePlaceholderMeeting :execlastid
 INSERT INTO PlaceholderMeeting (request_id, title, start_time, end_time, location, duration, start_date_range, end_date_range) VALUES (?,?,?,?,?,?,?,?);
@@ -239,13 +247,13 @@ LEFT JOIN PlaceholderMeeting pm ON rr.request_id = pm.request_id
 WHERE rr.request_id = ?;
 
 -- name: UpdateRequestStatusAsRejected :execrows
-UPDATE ReschedulingRequest rr SET status = 'declined' WHERE rr.request_id IN (
-  SELECT request_id FROM RequestToMeeting WHERE meeting_id = ?
+UPDATE ReschedulingRequest rr SET rr.status = 'declined' WHERE rr.request_id IN (
+  SELECT rtm.request_id FROM RequestToMeeting rtm WHERE rtm.meeting_id = ?
 );
 
 -- name: UpdateRequestStatusAsAccepted :execrows
-UPDATE ReschedulingRequest rr SET status = 'accepted' WHERE rr.request_id IN (
-  SELECT request_id FROM RequestToMeeting WHERE meeting_id = ?
+UPDATE ReschedulingRequest rr SET rr.status = 'accepted' WHERE rr.request_id IN (
+  SELECT rtm.request_id FROM RequestToMeeting rtm WHERE rtm.meeting_id = ?
 );
 
 -- name: UpdateMeetingStartTime :execlastid
