@@ -10,6 +10,7 @@ import (
 	msgraphsdkgo "github.com/microsoftgraph/msgraph-sdk-go"
 	graphmodels "github.com/microsoftgraph/msgraph-sdk-go/models"
 	"github.com/oapi-codegen/runtime/types"
+	"go.uber.org/zap"
 )
 
 func durationToISO(duration time.Duration) string {
@@ -86,6 +87,7 @@ func createSchedulingRequest(body ReschedulingCheckBodySchema,
 	timeSlots := []graphmodels.TimeSlotable{}
 
 	timeSlot := graphmodels.NewTimeSlot()
+	//nolint: goconst // To make it a constant
 	timeZone := "GMT Standard Time"
 
 	startTimeFormatted := meetingPref.StartDateRange.Format(time.RFC3339Nano)
@@ -210,6 +212,39 @@ func createNewMeetingsAndPrefs(ctx context.Context,
 	var meeting database.Meeting
 	meeting, err = s.DB.GetMeetingByMSFTID(ctx, body.MsftMeetingID)
 	if err != nil {
+		return database.Meeting{}, err
+	}
+
+	return meeting, nil
+}
+
+func processNewMeetingInfo(ctx context.Context,
+	graph *msgraphsdkgo.GraphServiceClient,
+	s Server,
+	msftMeetingID string,
+) (database.Meeting, error) {
+	// Fetch meeting data from microsft
+	msftMeeting, err := graph.Me().Events().ByEventId(msftMeetingID).Get(ctx, nil)
+	if err != nil {
+		s.Logger.Error("failed to get meeting data from microsoft", zap.Error(err))
+		return database.Meeting{}, err
+	}
+
+	startTime, errOne := time.Parse(time.RFC3339Nano, *msftMeeting.GetStart().GetDateTime()+"Z")
+	if errOne != nil {
+		s.Logger.Error("failed to get parse start time", zap.Error(err))
+		return database.Meeting{}, errOne
+	}
+
+	newMeetingParams := NewMeetingAndPrefsParams{
+		MeetingStartTime: startTime,
+		OwnerEmail:       *msftMeeting.GetOrganizer().GetEmailAddress().GetAddress(),
+		MsftMeetingID:    msftMeetingID,
+	}
+
+	meeting, err := createNewMeetingsAndPrefs(ctx, newMeetingParams, s)
+	if err != nil {
+		s.Logger.Error("failed to get data from new db.Meeting", zap.Error(err))
 		return database.Meeting{}, err
 	}
 
