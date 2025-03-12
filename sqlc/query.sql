@@ -208,7 +208,7 @@ WHERE id=?;
 INSERT INTO MeetingPreferences (meeting_start_time, start_date_range, end_date_range) VALUES (?,?,?);
 
 -- name: CreateMeeting :execlastid
-INSERT INTO Meeting (meeting_pref_id, owner_id, msft_meeting_id) VALUES (?,?,?);
+INSERT INTO Meeting (meeting_pref_id, owner_email, msft_meeting_id) VALUES (?,?,?);
 
 -- name: CreateReschedulingRequest :execlastid
 INSERT INTO ReschedulingRequest (requested_by) VALUES (?);
@@ -228,7 +228,7 @@ FROM ReschedulingRequest rr
 JOIN RequestToMeeting rtm ON rr.request_id = rtm.request_id 
 JOIN Meeting m ON rtm.meeting_id = m.id 
 LEFT JOIN PlaceholderMeeting pm ON rr.request_id = pm.request_id 
-WHERE m.owner_id = ?;
+WHERE m.owner_email = ?;
 
 -- name: GetRequestByID :one
 SELECT rr.*, m.msft_meeting_id, m.id, pm.meeting_id, pm.title, pm.start_time, pm.end_time, pm.duration, pm.location 

@@ -160,7 +160,7 @@ func performReschedulingCheckProcess(ctx context.Context,
 
 type NewMeetingAndPrefsParams struct {
 	MeetingStartTime time.Time
-	OwnerID          uint32
+	OwnerEmail       string
 	MsftMeetingID    string
 }
 
@@ -169,6 +169,8 @@ func createNewMeetingsAndPrefs(ctx context.Context,
 	s Server,
 ) (database.Meeting, error) {
 	// Meeting Info does not exist so create a new one
+	// Check valid user id
+
 	meetingPrefParams := database.CreateMeetingPreferencesParams{
 		MeetingStartTime: body.MeetingStartTime,
 		StartDateRange:   time.Now(),
@@ -191,8 +193,7 @@ func createNewMeetingsAndPrefs(ctx context.Context,
 	meetingParams := database.CreateMeetingParams{
 		//nolint: gosec // id is unsigned 32 bit int
 		MeetingPrefID: uint32(meetingPrefID),
-
-		OwnerID:       body.OwnerID,
+		OwnerEmail:    body.OwnerEmail,
 		MsftMeetingID: body.MsftMeetingID,
 	}
 

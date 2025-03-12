@@ -221,17 +221,17 @@ func (q *Queries) CreateInvite(ctx context.Context, arg CreateInviteParams) (int
 }
 
 const createMeeting = `-- name: CreateMeeting :execlastid
-INSERT INTO Meeting (meeting_pref_id, owner_id, msft_meeting_id) VALUES (?,?,?)
+INSERT INTO Meeting (meeting_pref_id, owner_email, msft_meeting_id) VALUES (?,?,?)
 `
 
 type CreateMeetingParams struct {
 	MeetingPrefID uint32 `json:"meetingPrefId"`
-	OwnerID       uint32 `json:"ownerId"`
+	OwnerEmail    string `json:"ownerEmail"`
 	MsftMeetingID string `json:"msftMeetingId"`
 }
 
 func (q *Queries) CreateMeeting(ctx context.Context, arg CreateMeetingParams) (int64, error) {
-	result, err := q.exec(ctx, q.createMeetingStmt, createMeeting, arg.MeetingPrefID, arg.OwnerID, arg.MsftMeetingID)
+	result, err := q.exec(ctx, q.createMeetingStmt, createMeeting, arg.MeetingPrefID, arg.OwnerEmail, arg.MsftMeetingID)
 	if err != nil {
 		return 0, err
 	}
@@ -457,7 +457,7 @@ FROM ReschedulingRequest rr
 JOIN RequestToMeeting rtm ON rr.request_id = rtm.request_id 
 JOIN Meeting m ON rtm.meeting_id = m.id 
 LEFT JOIN PlaceholderMeeting pm ON rr.request_id = pm.request_id 
-WHERE m.owner_id = ?
+WHERE m.owner_email = ?
 `
 
 type GetAllRequestsForUserRow struct {
@@ -475,8 +475,8 @@ type GetAllRequestsForUserRow struct {
 	Location      sql.NullString            `json:"location"`
 }
 
-func (q *Queries) GetAllRequestsForUser(ctx context.Context, ownerID uint32) ([]GetAllRequestsForUserRow, error) {
-	rows, err := q.query(ctx, q.getAllRequestsForUserStmt, getAllRequestsForUser, ownerID)
+func (q *Queries) GetAllRequestsForUser(ctx context.Context, ownerEmail string) ([]GetAllRequestsForUserRow, error) {
+	rows, err := q.query(ctx, q.getAllRequestsForUserStmt, getAllRequestsForUser, ownerEmail)
 	if err != nil {
 		return nil, err
 	}
@@ -610,7 +610,7 @@ func (q *Queries) GetInviteByID(ctx context.Context, id uint32) (Invite, error) 
 }
 
 const getMeetingByID = `-- name: GetMeetingByID :one
-SELECT id, meeting_pref_id, owner_id, msft_meeting_id FROM Meeting
+SELECT id, meeting_pref_id, owner_email, msft_meeting_id FROM Meeting
 WHERE id=?
 `
 
@@ -620,14 +620,14 @@ func (q *Queries) GetMeetingByID(ctx context.Context, id uint32) (Meeting, error
 	err := row.Scan(
 		&i.ID,
 		&i.MeetingPrefID,
-		&i.OwnerID,
+		&i.OwnerEmail,
 		&i.MsftMeetingID,
 	)
 	return i, err
 }
 
 const getMeetingByMSFTID = `-- name: GetMeetingByMSFTID :one
-SELECT id, meeting_pref_id, owner_id, msft_meeting_id FROM Meeting
+SELECT id, meeting_pref_id, owner_email, msft_meeting_id FROM Meeting
 WHERE msft_meeting_id=?
 `
 
@@ -637,7 +637,7 @@ func (q *Queries) GetMeetingByMSFTID(ctx context.Context, msftMeetingID string) 
 	err := row.Scan(
 		&i.ID,
 		&i.MeetingPrefID,
-		&i.OwnerID,
+		&i.OwnerEmail,
 		&i.MsftMeetingID,
 	)
 	return i, err
