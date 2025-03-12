@@ -9,7 +9,7 @@ import (
 	"github.com/avast/retry-go"
 	msgraphsdkgo "github.com/microsoftgraph/msgraph-sdk-go"
 	graphmodels "github.com/microsoftgraph/msgraph-sdk-go/models"
-	"github.com/oapi-codegen/runtime/types"
+	openapi_types "github.com/oapi-codegen/runtime/types"
 	"go.uber.org/zap"
 )
 
@@ -41,7 +41,7 @@ func durationToISO(duration time.Duration) string {
 func createSchedulingRequest(body ReschedulingCheckBodySchema,
 	meetingPref database.Meetingpreferences,
 	msftMeeting graphmodels.Eventable,
-) SchedulingSlotsBodySchema {
+) (SchedulingSlotsBodySchema, error) {
 	// Create request body for scheduling slots api call
 	newReqBody := SchedulingSlotsBodySchema{}
 
@@ -53,14 +53,28 @@ func createSchedulingRequest(body ReschedulingCheckBodySchema,
 	newReqBody.Attendees = []AttendeeBase{}
 
 	// parse each attendee to attendeeBase
-	for _, attendee := range msftMeeting.GetAttendees() {
-		attendeeType := *attendee.GetTypeEscaped()
+	for _, a := range msftMeeting.GetAttendees() {
+		var email openapi_types.Email
+		if a.GetEmailAddress() != nil && a.GetEmailAddress().GetAddress() != nil {
+			emailStr := a.GetEmailAddress().GetAddress()
+			email = openapi_types.Email(*emailStr)
+		}
+
+		var name string
+		if a.GetEmailAddress() != nil && a.GetEmailAddress().GetName() != nil {
+			name = *a.GetEmailAddress().GetName()
+		}
+
+		var attendeeType AttendeeType
+		if a.GetTypeEscaped() != nil {
+			attendeeType = AttendeeType(a.GetTypeEscaped().String())
+		}
 
 		newReqBody.Attendees = append(newReqBody.Attendees, AttendeeBase{
-			AttendeeType: AttendeeType(attendeeType.String()),
+			AttendeeType: attendeeType,
 			EmailAddress: EmailAddress{
-				Name:    *attendee.GetEmailAddress().GetName(),
-				Address: types.Email(*attendee.GetEmailAddress().GetAddress()),
+				Name:    name,
+				Address: email,
 			},
 		})
 	}
@@ -68,15 +82,17 @@ func createSchedulingRequest(body ReschedulingCheckBodySchema,
 	// Caluclate duration
 	var duration time.Duration
 
-	startTime, errOne := time.Parse(time.RFC3339Nano, *msftMeeting.GetStart().GetDateTime()+"Z")
-	endTime, errTwo := time.Parse(time.RFC3339Nano, *msftMeeting.GetEnd().GetDateTime()+"Z")
-
-	if errOne != nil || errTwo != nil {
-		duration, _ = time.ParseDuration("1h")
-	} else {
-		duration = endTime.Sub(startTime)
+	startTime, err := time.Parse(time.RFC3339Nano, *msftMeeting.GetStart().GetDateTime()+"Z")
+	if err != nil {
+		return newReqBody, fmt.Errorf("failed in parsung start time: %w", err)
 	}
 
+	endTime, err := time.Parse(time.RFC3339Nano, *msftMeeting.GetEnd().GetDateTime()+"Z")
+	if err != nil {
+		return newReqBody, fmt.Errorf("failed in parsung start time: %w", err)
+	}
+
+	duration = endTime.Sub(startTime)
 	newReqBody.MeetingDuration = durationToISO(duration)
 
 	// Add time contraints
@@ -108,7 +124,7 @@ func createSchedulingRequest(body ReschedulingCheckBodySchema,
 
 	timeConstraint.SetTimeSlots(timeSlots)
 
-	return newReqBody
+	return newReqBody, nil
 }
 
 func checkValidReschedulingSlotExists(ctx context.Context,
@@ -118,7 +134,11 @@ func checkValidReschedulingSlotExists(ctx context.Context,
 	meetingPref database.Meetingpreferences,
 ) (bool, error) {
 	// Call scheduling function to check for valid slots
-	newRequest := createSchedulingRequest(body, meetingPref, msftMeeting)
+	newRequest, err := createSchedulingRequest(body, meetingPref, msftMeeting)
+	if err != nil {
+		return false,
+			fmt.Errorf("failed in creating request body for scheduling request: %w", err)
+	}
 
 	res, err := makeFindMeetingTimesAPICall(ctx, graph, newRequest)
 	if err != nil {
@@ -222,29 +242,38 @@ func processNewMeetingInfo(ctx context.Context,
 	graph *msgraphsdkgo.GraphServiceClient,
 	s Server,
 	msftMeetingID string,
+	logger zap.SugaredLogger,
 ) (database.Meeting, error) {
 	// Fetch meeting data from microsft
 	msftMeeting, err := graph.Me().Events().ByEventId(msftMeetingID).Get(ctx, nil)
 	if err != nil {
-		s.Logger.Error("failed to get meeting data from microsoft", zap.Error(err))
+		logger.Error("failed to get meeting data from microsoft", zap.Error(err))
 		return database.Meeting{}, err
 	}
 
-	startTime, errOne := time.Parse(time.RFC3339Nano, *msftMeeting.GetStart().GetDateTime()+"Z")
-	if errOne != nil {
-		s.Logger.Error("failed to get parse start time", zap.Error(err))
-		return database.Meeting{}, errOne
+	var startTime time.Time
+	startTime, err = time.Parse(time.RFC3339Nano, *msftMeeting.GetStart().GetDateTime()+"Z")
+	if err != nil {
+		logger.Error("failed to get parse start time", zap.Error(err))
+		return database.Meeting{}, err
+	}
+
+	// Parse email
+	var email string
+	if msftMeeting.GetOrganizer().GetEmailAddress() != nil &&
+		msftMeeting.GetOrganizer().GetEmailAddress().GetAddress() != nil {
+		email = *msftMeeting.GetOrganizer().GetEmailAddress().GetAddress()
 	}
 
 	newMeetingParams := NewMeetingAndPrefsParams{
 		MeetingStartTime: startTime,
-		OwnerEmail:       *msftMeeting.GetOrganizer().GetEmailAddress().GetAddress(),
+		OwnerEmail:       email,
 		MsftMeetingID:    msftMeetingID,
 	}
 
 	meeting, err := createNewMeetingsAndPrefs(ctx, newMeetingParams, s)
 	if err != nil {
-		s.Logger.Error("failed to get data from new db.Meeting", zap.Error(err))
+		logger.Error("failed to get data from new db.Meeting", zap.Error(err))
 		return database.Meeting{}, err
 	}
 

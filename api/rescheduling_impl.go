@@ -23,40 +23,37 @@ func (s Server) PostAPIRescheduleCheck(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), time.Minute*3)
 	defer cancel()
 
-	userID, ok := r.Context().Value(UserIDCtxKey{}).(uint32)
-	if !ok {
-		s.Logger.Error("failed to get userid from request context")
-		sendError(w, http.StatusUnauthorized, "Try again later.")
-		return
-	}
+	userID, _ := r.Context().Value(UserIDCtxKey{}).(uint32)
+	reqID, _ := r.Context().Value(RequestIDCtxKey{}).(string)
+	logger := s.Logger.With(zap.String("request_id", reqID), zap.Uint32("logged_in_user_id", userID))
 
 	var body ReschedulingCheckBodySchema
 	var err error
 	if err = json.NewDecoder(r.Body).Decode(&body); err != nil {
 		// TODO: Add zap log for body
-		s.Logger.Error(ErrUnmarshalBody, zap.Error(err))
+		logger.Error(ErrUnmarshalBody, zap.Error(err))
 		sendError(w, http.StatusBadRequest, ErrUnmarshalBody.Error())
 		return
 	}
 
 	graph, err := CreateMSFTGraphClient(ctx, s.MSALClient, s.DB, userID)
 	if err != nil {
-		s.Logger.Error("failed to create msgraph client", zap.Error(err))
+		logger.Error("failed to create msgraph client", zap.Error(err))
 		sendError(w, http.StatusBadGateway, "Failed to connect to microsoft graph API")
 		return
 	}
 
 	// Get old meeting data from microsoft
-	msftMeeting, err := graph.Me().Events().ByEventId(*body.OldMeeting.MsftMeetingID).Get(ctx, nil)
+	msftMeeting, err := graph.Me().Events().ByEventId(body.OldMeeting.MsftMeetingID).Get(ctx, nil)
 	if err != nil {
-		s.Logger.Error("failed to get meeting data from microsoft", zap.Error(err))
+		logger.Error("failed to get meeting data from microsoft", zap.Error(err))
 		sendError(w, http.StatusBadGateway, "Failed to get meeting data from microsoft")
 		return
 	}
 
 	// Get data from db
 	var meeting database.Meeting
-	meeting, err = s.DB.GetMeetingByMSFTID(ctx, *body.OldMeeting.MsftMeetingID)
+	meeting, err = s.DB.GetMeetingByMSFTID(ctx, body.OldMeeting.MsftMeetingID)
 
 	var meetingFound bool
 
@@ -64,7 +61,7 @@ func (s Server) PostAPIRescheduleCheck(w http.ResponseWriter, r *http.Request) {
 		// Meeting Not Found
 		meetingFound = false
 	} else if err != nil {
-		s.Logger.Error("failed to search meeting table in db", zap.Error(err))
+		logger.Error("failed to search meeting table in db", zap.Error(err))
 		sendError(w, http.StatusBadGateway, "Failed to process db request")
 		return
 	}
@@ -74,7 +71,7 @@ func (s Server) PostAPIRescheduleCheck(w http.ResponseWriter, r *http.Request) {
 		// Get meeting preferences if data exists
 		meetingPref, err = s.DB.GetMeetingPreferences(ctx, meeting.MeetingPrefID)
 		if err != nil {
-			s.Logger.Error("failed to search meeting table in db", zap.Error(err))
+			logger.Error("failed to search meeting table in db", zap.Error(err))
 			sendError(w, http.StatusBadGateway, "Failed to process db request")
 			return
 		}
@@ -82,16 +79,19 @@ func (s Server) PostAPIRescheduleCheck(w http.ResponseWriter, r *http.Request) {
 		// Create temp meeting preferences if data doesn't exist
 
 		dayTime := time.Hour * hoursInAWeek // 1 week : 24 * 7
-		loc, errr := time.LoadLocation(*msftMeeting.GetStart().GetTimeZone())
-		if errr != nil {
-			s.Logger.Error("failed to parse start time zone", zap.Error(err))
+
+		var loc *time.Location
+		loc, err = time.LoadLocation(*msftMeeting.GetStart().GetTimeZone())
+		if err != nil {
+			logger.Error("failed to parse start time zone", zap.Error(err))
 			sendError(w, http.StatusBadGateway, "Failed to parse start time zone")
 			return
 		}
 
-		newStartTime, errr := time.ParseInLocation(time.RFC3339Nano, *msftMeeting.GetStart().GetDateTime()+"Z", loc)
-		if errr != nil {
-			s.Logger.Error("failed to parse start time", zap.Error(err))
+		var newStartTime time.Time
+		newStartTime, err = time.ParseInLocation(time.RFC3339Nano, *msftMeeting.GetStart().GetDateTime()+"Z", loc)
+		if err != nil {
+			logger.Error("failed to parse start time", zap.Error(err))
 			sendError(w, http.StatusBadGateway, "Failed to parse start time")
 			return
 		}
@@ -104,7 +104,7 @@ func (s Server) PostAPIRescheduleCheck(w http.ResponseWriter, r *http.Request) {
 
 	respBody, err := performReschedulingCheckProcess(ctx, graph, body, msftMeeting, meetingPref)
 	if err != nil {
-		s.Logger.Error("failed to make msgraph api call to findMeetings", zap.Error(err))
+		logger.Error("failed to make msgraph api call to findMeetings", zap.Error(err))
 		sendError(w, http.StatusBadGateway, "Failed to process/send microsoft graph API request for findMeeting")
 		return
 	}
@@ -119,25 +119,22 @@ func (s Server) PostAPIRescheduleRequestReplace(w http.ResponseWriter, r *http.R
 	ctx, cancel := context.WithTimeout(r.Context(), time.Minute*3)
 	defer cancel()
 
-	userID, ok := r.Context().Value(UserIDCtxKey{}).(uint32)
-	if !ok {
-		s.Logger.Error("failed to get userid from request context")
-		sendError(w, http.StatusUnauthorized, "Try again later.")
-		return
-	}
+	userID, _ := r.Context().Value(UserIDCtxKey{}).(uint32)
+	reqID, _ := r.Context().Value(RequestIDCtxKey{}).(string)
+	logger := s.Logger.With(zap.String("request_id", reqID), zap.Uint32("logged_in_user_id", userID))
 
 	var body ReschedulingRequestBodySchema
 	var err error
 	if err = json.NewDecoder(r.Body).Decode(&body); err != nil {
 		// TODO: Add zap log for body
-		s.Logger.Error(ErrUnmarshalBody, zap.Error(err))
+		logger.Error(ErrUnmarshalBody, zap.Error(err))
 		sendError(w, http.StatusBadRequest, ErrUnmarshalBody.Error())
 		return
 	}
 
 	graph, err := CreateMSFTGraphClient(ctx, s.MSALClient, s.DB, userID)
 	if err != nil {
-		s.Logger.Error("failed to create msgraph client", zap.Error(err))
+		logger.Error("failed to create msgraph client", zap.Error(err))
 		sendError(w, http.StatusBadGateway, "Failed to connect to microsoft graph API")
 		return
 	}
@@ -160,18 +157,18 @@ func (s Server) PostAPIRescheduleRequestReplace(w http.ResponseWriter, r *http.R
 	var meeting database.Meeting
 	// Get data from db to validate meeting id
 
-	meeting, err = s.DB.GetMeetingByMSFTID(ctx, *body.OldMeeting.MsftMeetingID)
+	meeting, err = s.DB.GetMeetingByMSFTID(ctx, body.OldMeeting.MsftMeetingID)
 
 	if errors.Is(err, sql.ErrNoRows) {
 		// Meeting info not in db, so create new meeting info
-		meeting, err = processNewMeetingInfo(ctx, graph, s, *body.OldMeeting.MsftMeetingID)
+		meeting, err = processNewMeetingInfo(ctx, graph, s, body.OldMeeting.MsftMeetingID, *logger)
 		if err != nil {
-			s.Logger.Error("DB Creation Error: ", zap.Error(err))
+			logger.Error("DB Creation Error: ", zap.Error(err))
 			sendError(w, http.StatusBadGateway, "Failed to create New Meeting Info")
 			return
 		}
 	} else if err != nil {
-		s.Logger.Error("failed to get data from db.Meeting", zap.Error(err))
+		logger.Error("failed to get data from db.Meeting", zap.Error(err))
 		sendError(w, http.StatusBadGateway, "Failed to get data from db.Meeting")
 		return
 	}
@@ -190,15 +187,15 @@ func (s Server) PostAPIRescheduleRequestReplace(w http.ResponseWriter, r *http.R
 		return nil
 	}, retry.Attempts(3), retry.Delay(time.Millisecond*500))
 	if err != nil {
-		s.Logger.Error("DB Creation Error: ", zap.Error(err))
+		logger.Error("DB Creation Error: ", zap.Error(err))
 		sendError(w, http.StatusBadGateway, "Failed to create request to meeting link")
 		return
 	}
 
 	// Create Placeholder meeting info
-	parsedTime, err := time.Parse(time.RFC3339Nano, *body.NewMeeting.MeetingDuration)
+	parsedTime, err := time.Parse(time.RFC3339Nano, body.NewMeeting.MeetingDuration)
 	if err != nil {
-		s.Logger.Error("failed to parse time", zap.Error(err))
+		logger.Error("failed to parse time", zap.Error(err))
 		sendError(w, http.StatusBadGateway, "Failed to parse time")
 		return
 	}
@@ -206,14 +203,14 @@ func (s Server) PostAPIRescheduleRequestReplace(w http.ResponseWriter, r *http.R
 	placeholderParams := database.CreatePlaceholderMeetingParams{
 		//nolint: gosec // id is unsigned 32 bit int
 		RequestID: uint32(requestID),
-		Title:     *body.NewMeeting.Title,
-		StartTime: *body.NewMeeting.StartTime,
-		EndTime:   *body.NewMeeting.EndTime,
-		Location:  *body.NewMeeting.Location,
+		Title:     body.NewMeeting.Title,
+		StartTime: body.NewMeeting.StartTime,
+		EndTime:   body.NewMeeting.EndTime,
+		Location:  body.NewMeeting.Location,
 
 		Duration:       parsedTime,
-		StartDateRange: *body.NewMeeting.StartRangeTime,
-		EndDateRange:   *body.NewMeeting.EndRangeTime,
+		StartDateRange: body.NewMeeting.StartRangeTime,
+		EndDateRange:   body.NewMeeting.EndRangeTime,
 	}
 
 	var placeholderMeeting int64
@@ -224,13 +221,13 @@ func (s Server) PostAPIRescheduleRequestReplace(w http.ResponseWriter, r *http.R
 		return nil
 	}, retry.Attempts(3), retry.Delay(time.Millisecond*500))
 	if err != nil {
-		s.Logger.Error("DB Creation Error: ", zap.Error(err))
+		logger.Error("DB Creation Error: ", zap.Error(err))
 		sendError(w, http.StatusBadGateway, "Failed to create placeholder meeting")
 		return
 	}
 
 	// For each attendee, create placeholder attendee row
-	for _, attendee := range *body.NewMeeting.Attendees {
+	for _, attendee := range body.NewMeeting.Attendees {
 		attendeeParams := database.CreatePlaceholderMeetingAttendeeParams{
 			//nolint: gosec // id is unsigned 32 bit int
 			MeetingID: uint32(placeholderMeeting),
@@ -255,12 +252,12 @@ func (s Server) PostAPIRescheduleRequestReplace(w http.ResponseWriter, r *http.R
 	// Get Owner ID
 	ownerObj, err := s.DB.GetUserByEmail(ctx, meeting.OwnerEmail)
 	if err != nil {
-		s.Logger.Error("Failed to get owner user obj: ", zap.Error(err))
+		logger.Error("Failed to get owner user obj: ", zap.Error(err))
 	}
 
 	err = s.NotificationService.SendNotification(ctx, s.Logger, s.DB, []uint32{ownerObj.ID}, notifParam)
 	if err != nil {
-		s.Logger.Error("Failed to send notification for reschedule request: ", zap.Error(err))
+		logger.Error("Failed to send notification for reschedule request: ", zap.Error(err))
 	}
 
 	SetHeaderAndWriteResponse(w, http.StatusOK, requestID)
@@ -273,25 +270,22 @@ func (s Server) PostAPIRescheduleRequestSingle(w http.ResponseWriter, r *http.Re
 	ctx, cancel := context.WithTimeout(r.Context(), time.Minute*3)
 	defer cancel()
 
-	userID, ok := r.Context().Value(UserIDCtxKey{}).(uint32)
-	if !ok {
-		s.Logger.Error("failed to get userid from request context")
-		sendError(w, http.StatusUnauthorized, "Try again later.")
-		return
-	}
+	userID, _ := r.Context().Value(UserIDCtxKey{}).(uint32)
+	reqID, _ := r.Context().Value(RequestIDCtxKey{}).(string)
+	logger := s.Logger.With(zap.String("request_id", reqID), zap.Uint32("logged_in_user_id", userID))
 
 	var body ReschedulingRequestSingleBodySchema
 	var err error
 	if err = json.NewDecoder(r.Body).Decode(&body); err != nil {
 		// TODO: Add zap log for body
-		s.Logger.Error(ErrUnmarshalBody, zap.Error(err))
+		logger.Error(ErrUnmarshalBody, zap.Error(err))
 		sendError(w, http.StatusBadRequest, ErrUnmarshalBody.Error())
 		return
 	}
 
 	graph, err := CreateMSFTGraphClient(ctx, s.MSALClient, s.DB, userID)
 	if err != nil {
-		s.Logger.Error("failed to create msgraph client", zap.Error(err))
+		logger.Error("failed to create msgraph client", zap.Error(err))
 		sendError(w, http.StatusBadGateway, "Failed to connect to microsoft graph API")
 		return
 	}
@@ -308,7 +302,7 @@ func (s Server) PostAPIRescheduleRequestSingle(w http.ResponseWriter, r *http.Re
 		return nil
 	}, retry.Attempts(3), retry.Delay(time.Millisecond*500))
 	if err != nil {
-		s.Logger.Error("failed to make reschedule request", zap.Error(err))
+		logger.Error("failed to make reschedule request", zap.Error(err))
 		sendError(w, http.StatusBadGateway, "Failed to make rescheduling request")
 		return
 	}
@@ -317,17 +311,17 @@ func (s Server) PostAPIRescheduleRequestSingle(w http.ResponseWriter, r *http.Re
 	var meeting database.Meeting
 
 	// Get data from db to validate meeting id
-	meeting, err = s.DB.GetMeetingByMSFTID(ctx, *body.MsftMeetingID)
+	meeting, err = s.DB.GetMeetingByMSFTID(ctx, body.MsftMeetingID)
 
 	if errors.Is(err, sql.ErrNoRows) {
-		meeting, err = processNewMeetingInfo(ctx, graph, s, *body.MsftMeetingID)
+		meeting, err = processNewMeetingInfo(ctx, graph, s, body.MsftMeetingID, *logger)
 		if err != nil {
-			s.Logger.Error("failed to make new meeting info", zap.Error(err))
+			logger.Error("failed to make new meeting info", zap.Error(err))
 			sendError(w, http.StatusBadGateway, "Failed to make new meeting info")
 			return
 		}
 	} else if err != nil {
-		s.Logger.Error("failed to get data from db.Meeting", zap.Error(err))
+		logger.Error("failed to get data from db.Meeting", zap.Error(err))
 		sendError(w, http.StatusBadGateway, "Failed to get data from db.Meeting")
 		return
 	}
@@ -346,7 +340,7 @@ func (s Server) PostAPIRescheduleRequestSingle(w http.ResponseWriter, r *http.Re
 		return nil
 	}, retry.Attempts(3), retry.Delay(time.Millisecond*500))
 	if err != nil {
-		s.Logger.Error("DB Creation Error: ", zap.Error(err))
+		logger.Error("DB Creation Error: ", zap.Error(err))
 		sendError(w, http.StatusBadGateway, "Failed to create request to meeting link")
 		return
 	}
@@ -360,12 +354,12 @@ func (s Server) PostAPIRescheduleRequestSingle(w http.ResponseWriter, r *http.Re
 	// Get Owner ID
 	ownerObj, err := s.DB.GetUserByEmail(ctx, meeting.OwnerEmail)
 	if err != nil {
-		s.Logger.Error("Failed to get owner user obj: ", zap.Error(err))
+		logger.Error("Failed to get owner user obj: ", zap.Error(err))
 	}
 
 	err = s.NotificationService.SendNotification(ctx, s.Logger, s.DB, []uint32{ownerObj.ID}, notifParam)
 	if err != nil {
-		s.Logger.Error("Failed to send notification for reschedule request: ", zap.Error(err))
+		logger.Error("Failed to send notification for reschedule request: ", zap.Error(err))
 	}
 
 	SetHeaderAndWriteResponse(w, http.StatusOK, requestID)
@@ -377,24 +371,21 @@ func (s Server) GetAPIRescheduleRequest(w http.ResponseWriter, r *http.Request) 
 	ctx, cancel := context.WithTimeout(r.Context(), time.Minute*3)
 	defer cancel()
 
-	userID, ok := r.Context().Value(UserIDCtxKey{}).(uint32)
-	if !ok {
-		s.Logger.Error("failed to get userid from request context")
-		sendError(w, http.StatusUnauthorized, "Try again later.")
-		return
-	}
+	userID, _ := r.Context().Value(UserIDCtxKey{}).(uint32)
+	reqID, _ := r.Context().Value(RequestIDCtxKey{}).(string)
+	logger := s.Logger.With(zap.String("request_id", reqID), zap.Uint32("logged_in_user_id", userID))
 
 	// Get all requests for the user
 	userObj, err := s.DB.GetUserByID(ctx, userID)
 	if err != nil {
-		s.Logger.Error("failed to get user data from db", zap.Error(err))
+		logger.Error("failed to get user data from db", zap.Error(err))
 		sendError(w, http.StatusBadGateway, "failed to get user data from db")
 		return
 	}
 
 	requests, err := s.DB.GetAllRequestsForUser(ctx, userObj.Email)
 	if err != nil {
-		s.Logger.Error("failed to get requests", zap.Error(err))
+		logger.Error("failed to get requests", zap.Error(err))
 		sendError(w, http.StatusBadGateway, "Failed to get requests")
 		return
 	}
@@ -403,36 +394,29 @@ func (s Server) GetAPIRescheduleRequest(w http.ResponseWriter, r *http.Request) 
 	response := []RescheduleRequest{}
 
 	for _, req := range requests {
-		requestID := int(req.RequestID)
-		requestBy := int(req.RequestedBy)
-
 		newMeeting := ReschedulingRequestNewMeeting{}
 
 		if req.MeetingID.Valid {
-			newMeeting.EndTime = &req.EndTime.Time
-			newMeeting.Location = &req.Location.String
+			newMeeting.EndTime = req.EndTime.Time
+			newMeeting.Location = req.Location.String
 
 			dur := req.Duration.Time.Format(time.RFC3339Nano)
-			newMeeting.MeetingDuration = &dur
+			newMeeting.MeetingDuration = dur
 
-			newMeeting.StartTime = &req.StartTime.Time
-			newMeeting.Title = &req.Title.String
-		}
-
-		meetingID := int(req.ID)
-
-		oldMeeting := ReschedulingRequestOldMeeting{
-			MeetingId:     &meetingID,
-			MsftMeetingID: &req.MsftMeetingID,
+			newMeeting.StartTime = req.StartTime.Time
+			newMeeting.Title = req.Title.String
 		}
 
 		response = append(response, RescheduleRequest{
-			RequestId:   &requestID,
-			RequestedAt: &req.CreatedAt,
-			RequestedBy: &requestBy,
-			Status:      (*string)(&req.Status),
+			RequestId:   req.RequestID,
+			RequestedAt: req.CreatedAt,
+			RequestedBy: req.RequestedBy,
+			Status:      string(req.Status),
 			NewMeeting:  &newMeeting,
-			OldMeeting:  &oldMeeting,
+			OldMeeting: ReschedulingRequestOldMeeting{
+				MeetingId:     req.ID,
+				MsftMeetingID: req.MsftMeetingID,
+			},
 		})
 	}
 
@@ -445,53 +429,42 @@ func (s Server) GetAPIRescheduleRequestRequestID(w http.ResponseWriter, r *http.
 	ctx, cancel := context.WithTimeout(r.Context(), time.Minute*3)
 	defer cancel()
 
-	_, ok := r.Context().Value(UserIDCtxKey{}).(uint32)
-	if !ok {
-		s.Logger.Error("failed to get userid from request context")
-		sendError(w, http.StatusUnauthorized, "Try again later.")
-		return
-	}
+	userID, _ := r.Context().Value(UserIDCtxKey{}).(uint32)
+	reqID, _ := r.Context().Value(RequestIDCtxKey{}).(string)
+	logger := s.Logger.With(zap.String("request_id", reqID), zap.Uint32("logged_in_user_id", userID))
 
 	// Get request for the user
 	req, err := s.DB.GetRequestByID(ctx, paramRequestID)
 	if err != nil {
-		s.Logger.Error("failed to get requests", zap.Error(err))
+		logger.Error("failed to get requests", zap.Error(err))
 		sendError(w, http.StatusBadGateway, "Failed to get requests")
 		return
 	}
 
 	// Parse results to response
-
-	requestID := int(req.RequestID)
-	requestBy := int(req.RequestedBy)
-
 	newMeeting := ReschedulingRequestNewMeeting{}
 
 	if req.MeetingID.Valid {
-		newMeeting.EndTime = &req.EndTime.Time
-		newMeeting.Location = &req.Location.String
+		newMeeting.EndTime = req.EndTime.Time
+		newMeeting.Location = req.Location.String
 
 		dur := req.Duration.Time.Format(time.RFC3339Nano)
-		newMeeting.MeetingDuration = &dur
+		newMeeting.MeetingDuration = dur
 
-		newMeeting.StartTime = &req.StartTime.Time
-		newMeeting.Title = &req.Title.String
-	}
-
-	meetingID := int(req.ID)
-
-	oldMeeting := ReschedulingRequestOldMeeting{
-		MeetingId:     &meetingID,
-		MsftMeetingID: &req.MsftMeetingID,
+		newMeeting.StartTime = req.StartTime.Time
+		newMeeting.Title = req.Title.String
 	}
 
 	response := RescheduleRequest{
-		RequestId:   &requestID,
-		RequestedAt: &req.CreatedAt,
-		RequestedBy: &requestBy,
-		Status:      (*string)(&req.Status),
+		RequestId:   req.RequestID,
+		RequestedAt: req.CreatedAt,
+		RequestedBy: req.RequestedBy,
+		Status:      string(req.Status),
 		NewMeeting:  &newMeeting,
-		OldMeeting:  &oldMeeting,
+		OldMeeting: ReschedulingRequestOldMeeting{
+			MeetingId:     req.ID,
+			MsftMeetingID: req.MsftMeetingID,
+		},
 	}
 
 	SetHeaderAndWriteResponse(w, http.StatusOK, response)
@@ -505,17 +478,14 @@ func (s Server) PatchAPIRescheduleRequestRequestIDReject(w http.ResponseWriter,
 	ctx, cancel := context.WithTimeout(r.Context(), time.Minute*3)
 	defer cancel()
 
-	userID, ok := r.Context().Value(UserIDCtxKey{}).(uint32)
-	if !ok {
-		s.Logger.Error("failed to get userid from request context")
-		sendError(w, http.StatusUnauthorized, "Try again later.")
-		return
-	}
+	userID, _ := r.Context().Value(UserIDCtxKey{}).(uint32)
+	reqID, _ := r.Context().Value(RequestIDCtxKey{}).(string)
+	logger := s.Logger.With(zap.String("request_id", reqID), zap.Uint32("logged_in_user_id", userID))
 
 	// Get request for the user
 	req, err := s.DB.GetMeetingIDFromRequestID(ctx, paramRequestID)
 	if err != nil {
-		s.Logger.Error("failed to get requests", zap.Error(err))
+		logger.Error("failed to get requests", zap.Error(err))
 		sendError(w, http.StatusBadGateway, "Failed to get requests")
 		return
 	}
@@ -524,7 +494,7 @@ func (s Server) PatchAPIRescheduleRequestRequestIDReject(w http.ResponseWriter,
 
 	_, err = s.DB.UpdateRequestStatusAsRejected(ctx, req.MeetingID)
 	if err != nil {
-		s.Logger.Error("failed to update status of all the requests to declined", zap.Error(err))
+		logger.Error("failed to update status of all the requests to declined", zap.Error(err))
 		sendError(w, http.StatusBadGateway, "Failed to update status of all the requests to declined")
 		return
 	}
@@ -538,17 +508,17 @@ func (s Server) PatchAPIRescheduleRequestRequestIDReject(w http.ResponseWriter,
 	// Get request owner
 	requester, err := s.DB.GetOnlyRequestByID(ctx, req.RequestID)
 	if err != nil {
-		s.Logger.Error("Failed to get requester user: ", zap.Error(err))
+		logger.Error("Failed to get requester user: ", zap.Error(err))
 	}
 
 	err = s.NotificationService.SendNotification(ctx, s.Logger, s.DB, []uint32{requester.RequestedBy}, notifParam)
 	if err != nil {
-		s.Logger.Error("Failed to send notification to requester: ", zap.Error(err))
+		logger.Error("Failed to send notification to requester: ", zap.Error(err))
 	}
 
 	err = s.NotificationService.SendNotification(ctx, s.Logger, s.DB, []uint32{userID}, notifParam)
 	if err != nil {
-		s.Logger.Error("Failed to send notification to requester: ", zap.Error(err))
+		logger.Error("Failed to send notification to requester: ", zap.Error(err))
 	}
 
 	SetHeaderAndWriteResponse(w, http.StatusOK, "Successfully declined rescheduling request")
@@ -561,25 +531,22 @@ func (s Server) PatchAPIRescheduleRequestRequestIDAccept(w http.ResponseWriter, 
 	ctx, cancel := context.WithTimeout(r.Context(), time.Minute*3)
 	defer cancel()
 
-	userID, ok := r.Context().Value(UserIDCtxKey{}).(uint32)
-	if !ok {
-		s.Logger.Error("failed to get userid from request context")
-		sendError(w, http.StatusUnauthorized, "Try again later.")
-		return
-	}
+	userID, _ := r.Context().Value(UserIDCtxKey{}).(uint32)
+	reqID, _ := r.Context().Value(RequestIDCtxKey{}).(string)
+	logger := s.Logger.With(zap.String("request_id", reqID), zap.Uint32("logged_in_user_id", userID))
 
 	var body ReschedulingRequestAcceptBodySchema
 	var err error
 	if err = json.NewDecoder(r.Body).Decode(&body); err != nil {
 		// TODO: Add zap log for body
-		s.Logger.Error(ErrUnmarshalBody, zap.Error(err))
+		logger.Error(ErrUnmarshalBody, zap.Error(err))
 		sendError(w, http.StatusBadRequest, ErrUnmarshalBody.Error())
 		return
 	}
 
 	graph, err := CreateMSFTGraphClient(ctx, s.MSALClient, s.DB, userID)
 	if err != nil {
-		s.Logger.Error("failed to create msgraph client", zap.Error(err))
+		logger.Error("failed to create msgraph client", zap.Error(err))
 		sendError(w, http.StatusBadGateway, "Failed to connect to microsoft graph API")
 		return
 	}
@@ -587,7 +554,7 @@ func (s Server) PatchAPIRescheduleRequestRequestIDAccept(w http.ResponseWriter, 
 	// Get request for the user
 	req, err := s.DB.GetRequestByID(ctx, parRequestID)
 	if err != nil {
-		s.Logger.Error("failed to get requests", zap.Error(err))
+		logger.Error("failed to get requests", zap.Error(err))
 		sendError(w, http.StatusBadGateway, "Failed to get requests")
 		return
 	}
@@ -612,18 +579,18 @@ func (s Server) PatchAPIRescheduleRequestRequestIDAccept(w http.ResponseWriter, 
 	// Make the microsoft API call
 	_, err = graph.Me().Events().ByEventId(req.MsftMeetingID).Patch(ctx, requestBody, nil)
 	if err != nil {
-		s.Logger.Error("failed to update event in microsoft", zap.Error(err))
+		logger.Error("failed to update event in microsoft", zap.Error(err))
 		sendError(w, http.StatusBadGateway, "Failed to update event in microsoft")
 		return
 	}
 
 	// Update time in meeting db
 	_, err = s.DB.UpdateMeetingStartTime(ctx, database.UpdateMeetingStartTimeParams{
-		MeetingStartTime: *body.NewStartTime,
+		MeetingStartTime: body.NewStartTime,
 		ID:               req.ID,
 	})
 	if err != nil {
-		s.Logger.Error("failed to update new start time of meeting", zap.Error(err))
+		logger.Error("failed to update new start time of meeting", zap.Error(err))
 		sendError(w, http.StatusBadGateway, "Failed to update new start time of meeting")
 		return
 	}
@@ -632,14 +599,14 @@ func (s Server) PatchAPIRescheduleRequestRequestIDAccept(w http.ResponseWriter, 
 
 	rows, err := s.DB.UpdateRequestStatusAsAccepted(ctx, req.ID)
 	if err != nil {
-		s.Logger.Error("failed to update status of all the requests to accepted", zap.Error(err))
+		logger.Error("failed to update status of all the requests to accepted", zap.Error(err))
 		sendError(w, http.StatusBadGateway, "Failed to update status of all the requests to accepted")
 		return
 	}
 
 	// At least 1 row has to be updated
 	if rows == 0 {
-		s.Logger.Error("failed to update a request invite as accepted",
+		logger.Error("failed to update a request invite as accepted",
 			zap.Error(database.WrongNumberSQLRowsError{ActualRows: rows, ExpectedRows: []int64{1}}))
 		sendError(w, http.StatusBadGateway, "Failed to update invite message")
 		return
@@ -653,14 +620,14 @@ func (s Server) PatchAPIRescheduleRequestRequestIDAccept(w http.ResponseWriter, 
 	// Notify Owner
 	err = s.NotificationService.SendNotification(ctx, s.Logger, s.DB, []uint32{userID}, notifparam)
 	if err != nil {
-		s.Logger.Error("failed to send accepted request notification to owner", zap.Error(err))
+		logger.Error("failed to send accepted request notification to owner", zap.Error(err))
 	}
 
 	// Notify all attendees
 
 	meetingData, err := graph.Me().Events().ByEventId(req.MsftMeetingID).Get(ctx, nil)
 	if err != nil {
-		s.Logger.Error("failed to get meeting data from microsoft", zap.Error(err))
+		logger.Error("failed to get meeting data from microsoft", zap.Error(err))
 	}
 
 	attendeeUsers := []uint32{}
@@ -668,7 +635,7 @@ func (s Server) PatchAPIRescheduleRequestRequestIDAccept(w http.ResponseWriter, 
 	for _, attendee := range meetingData.GetAttendees() {
 		attendeeData, errOne := s.DB.GetUserByEmail(ctx, *attendee.GetEmailAddress().GetAddress())
 		if errOne != nil {
-			s.Logger.Error("failed to get user id for email address:", *attendee.GetEmailAddress().GetAddress())
+			logger.Error("failed to get user id for email address:", *attendee.GetEmailAddress().GetAddress())
 		}
 
 		attendeeUsers = append(attendeeUsers, attendeeData.ID)
@@ -681,7 +648,7 @@ func (s Server) PatchAPIRescheduleRequestRequestIDAccept(w http.ResponseWriter, 
 
 	err = s.NotificationService.SendNotification(ctx, s.Logger, s.DB, attendeeUsers, newNotifparam)
 	if err != nil {
-		s.Logger.Error("failed to send accepted request notification to all attendees", zap.Error(err))
+		logger.Error("failed to send accepted request notification to all attendees", zap.Error(err))
 	}
 
 	SetHeaderAndWriteResponse(w, http.StatusOK, "Successfully accepted rescheduling request")
