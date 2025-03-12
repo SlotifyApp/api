@@ -1009,7 +1009,15 @@ func (q *Queries) ListSlotifyGroups(ctx context.Context, name interface{}) ([]Sl
 
 const listUsers = `-- name: ListUsers :many
 SELECT id, email, first_name, last_name FROM User
+WHERE id > ?
+ORDER BY id
+LIMIT ?
 `
+
+type ListUsersParams struct {
+	LastID uint32 `json:"lastId"`
+	Limit  int32  `json:"limit"`
+}
 
 type ListUsersRow struct {
 	ID        uint32 `json:"id"`
@@ -1018,8 +1026,8 @@ type ListUsersRow struct {
 	LastName  string `json:"lastName"`
 }
 
-func (q *Queries) ListUsers(ctx context.Context) ([]ListUsersRow, error) {
-	rows, err := q.query(ctx, q.listUsersStmt, listUsers)
+func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]ListUsersRow, error) {
+	rows, err := q.query(ctx, q.listUsersStmt, listUsers, arg.LastID, arg.Limit)
 	if err != nil {
 		return nil, err
 	}
@@ -1098,12 +1106,15 @@ func (q *Queries) RemoveSlotifyGroupMember(ctx context.Context, arg RemoveSlotif
 const searchUsersByEmail = `-- name: SearchUsersByEmail :many
 SELECT id, email, first_name, last_name FROM User
 WHERE LOWER(email) LIKE LOWER(CONCAT('%', ?, '%'))
+  and id > ?
+ORDER BY id
 LIMIT ?
 `
 
 type SearchUsersByEmailParams struct {
-	Email interface{} `json:"email"`
-	Limit int32       `json:"limit"`
+	Email  interface{} `json:"email"`
+	LastID uint32      `json:"lastId"`
+	Limit  int32       `json:"limit"`
 }
 
 type SearchUsersByEmailRow struct {
@@ -1114,7 +1125,7 @@ type SearchUsersByEmailRow struct {
 }
 
 func (q *Queries) SearchUsersByEmail(ctx context.Context, arg SearchUsersByEmailParams) ([]SearchUsersByEmailRow, error) {
-	rows, err := q.query(ctx, q.searchUsersByEmailStmt, searchUsersByEmail, arg.Email, arg.Limit)
+	rows, err := q.query(ctx, q.searchUsersByEmailStmt, searchUsersByEmail, arg.Email, arg.LastID, arg.Limit)
 	if err != nil {
 		return nil, err
 	}
@@ -1144,12 +1155,15 @@ func (q *Queries) SearchUsersByEmail(ctx context.Context, arg SearchUsersByEmail
 const searchUsersByName = `-- name: SearchUsersByName :many
 SELECT id, email, first_name, last_name FROM User
 WHERE LOWER(CONCAT(first_name, ' ', last_name)) LIKE LOWER(CONCAT('%', ?, '%'))
+  AND id > ?
+ORDER BY id
 LIMIT ?
 `
 
 type SearchUsersByNameParams struct {
-	Name  interface{} `json:"name"`
-	Limit int32       `json:"limit"`
+	Name   interface{} `json:"name"`
+	LastID uint32      `json:"lastId"`
+	Limit  int32       `json:"limit"`
 }
 
 type SearchUsersByNameRow struct {
@@ -1160,7 +1174,7 @@ type SearchUsersByNameRow struct {
 }
 
 func (q *Queries) SearchUsersByName(ctx context.Context, arg SearchUsersByNameParams) ([]SearchUsersByNameRow, error) {
-	rows, err := q.query(ctx, q.searchUsersByNameStmt, searchUsersByName, arg.Name, arg.Limit)
+	rows, err := q.query(ctx, q.searchUsersByNameStmt, searchUsersByName, arg.Name, arg.LastID, arg.Limit)
 	if err != nil {
 		return nil, err
 	}

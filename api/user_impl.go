@@ -29,15 +29,18 @@ func (s Server) GetAPIUsers(w http.ResponseWriter, r *http.Request, params GetAP
 	ctx, cancel := context.WithTimeout(r.Context(), database.DatabaseTimeout)
 	defer cancel()
 
-	// search users by name
+	var users []database.User
+
+	// searches by name first if both name and email params are given a value
 	switch {
+	// search users by name
 	case params.Name != nil:
 		usersByName, err := s.DB.SearchUsersByName(ctx,
 			//nolint: gosec // page is unsigned 32 bit int
 			database.SearchUsersByNameParams{
 				Name:   *params.Name,
 				Limit:  SearchUserLim,
-				LastID: uint32(params.PageToken),
+				LastID: uint32(params.PageToken.Page),
 			})
 		if err != nil {
 			logger.Error("failed to search user by name", zap.Error(err),
@@ -45,8 +48,14 @@ func (s Server) GetAPIUsers(w http.ResponseWriter, r *http.Request, params GetAP
 			sendError(w, http.StatusInternalServerError, "failed to search users by name")
 			return
 		}
-		SetHeaderAndWriteResponse(w, http.StatusOK, users)
-		return
+		for _, row := range usersByName {
+			users = append(users, database.User{
+				ID:        row.ID,
+				Email:     row.Email,
+				FirstName: row.FirstName,
+				LastName:  row.LastName,
+			})
+		}
 	// search users by email
 	case params.Email != nil:
 		usersByEmail, err := s.DB.SearchUsersByEmail(ctx,
@@ -54,7 +63,7 @@ func (s Server) GetAPIUsers(w http.ResponseWriter, r *http.Request, params GetAP
 			database.SearchUsersByEmailParams{
 				Email:  string(*params.Email),
 				Limit:  SearchUserLim,
-				LastID: uint32(params.PageToken),
+				LastID: uint32(params.PageToken.Page),
 			})
 		if err != nil {
 			logger.Error("failed to search user by email", zap.Error(err),
@@ -76,7 +85,7 @@ func (s Server) GetAPIUsers(w http.ResponseWriter, r *http.Request, params GetAP
 			//nolint: gosec // page is unsigned 32 bit int
 			database.ListUsersParams{
 				Limit:  SearchUserLim,
-				LastID: uint32(params.PageToken),
+				LastID: uint32(params.PageToken.Page),
 			})
 		if err != nil {
 			logger.Error("failed to list all users", zap.Error(err))
@@ -92,23 +101,21 @@ func (s Server) GetAPIUsers(w http.ResponseWriter, r *http.Request, params GetAP
 			})
 		}
 	}
-	var nextPageToken int
+	var nextPageToken *PaginationToken
 	if len(users) == SearchUserLim {
 		// id of the last user gotten here
-		nextPageToken = int(users[len(users)-1].ID)
-	} else {
-		// -1 if end of database
-		nextPageToken = -1
+		// nil if end of database
+		nextPageToken = &PaginationToken{Page: int(users[len(users)-1].ID)}
 	}
 
 	response := struct {
 		Users         []database.User
-		NextPageToken int
+		NextPageToken *PaginationToken
 	}{
 		Users:         users,
 		NextPageToken: nextPageToken,
 	}
-	SetHeaderAndWriteResponse(w, http.StatusOK, users)
+	SetHeaderAndWriteResponse(w, http.StatusOK, response)
 }
 
 // (POST /users) Create a new user.
