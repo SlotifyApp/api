@@ -30,9 +30,15 @@ func (s Server) GetAPIUsers(w http.ResponseWriter, r *http.Request, params GetAP
 	defer cancel()
 
 	// search users by name
-	if params.Name != nil {
-		users, err := s.DB.SearchUsersByName(ctx,
-			database.SearchUsersByNameParams{Name: *params.Name, Limit: SearchUserLim})
+	switch {
+	case params.Name != nil:
+		usersByName, err := s.DB.SearchUsersByName(ctx,
+			//nolint: gosec // page is unsigned 32 bit int
+			database.SearchUsersByNameParams{
+				Name:   *params.Name,
+				Limit:  SearchUserLim,
+				LastID: uint32(params.PageToken),
+			})
 		if err != nil {
 			logger.Error("failed to search user by name", zap.Error(err),
 				zap.String("name", *params.Name))
@@ -41,27 +47,66 @@ func (s Server) GetAPIUsers(w http.ResponseWriter, r *http.Request, params GetAP
 		}
 		SetHeaderAndWriteResponse(w, http.StatusOK, users)
 		return
-	}
 	// search users by email
-	if params.Email != nil {
-		users, err := s.DB.SearchUsersByEmail(ctx,
-			database.SearchUsersByEmailParams{Email: string(*params.Email), Limit: SearchUserLim})
+	case params.Email != nil:
+		usersByEmail, err := s.DB.SearchUsersByEmail(ctx,
+			//nolint: gosec // page is unsigned 32 bit int
+			database.SearchUsersByEmailParams{
+				Email:  string(*params.Email),
+				Limit:  SearchUserLim,
+				LastID: uint32(params.PageToken),
+			})
 		if err != nil {
 			logger.Error("failed to search user by email", zap.Error(err),
 				zap.String("email", string(*params.Email)))
 			sendError(w, http.StatusInternalServerError, "failed to search users by email")
 			return
 		}
-		SetHeaderAndWriteResponse(w, http.StatusOK, users)
-		return
+		for _, row := range usersByEmail {
+			users = append(users, database.User{
+				ID:        row.ID,
+				Email:     row.Email,
+				FirstName: row.FirstName,
+				LastName:  row.LastName,
+			})
+		}
+	// Default, just list all users
+	default:
+		usersAll, err := s.DB.ListUsers(ctx,
+			//nolint: gosec // page is unsigned 32 bit int
+			database.ListUsersParams{
+				Limit:  SearchUserLim,
+				LastID: uint32(params.PageToken),
+			})
+		if err != nil {
+			logger.Error("failed to list all users", zap.Error(err))
+			sendError(w, http.StatusInternalServerError, "failed to list all users")
+			return
+		}
+		for _, row := range usersAll {
+			users = append(users, database.User{
+				ID:        row.ID,
+				Email:     row.Email,
+				FirstName: row.FirstName,
+				LastName:  row.LastName,
+			})
+		}
+	}
+	var nextPageToken int
+	if len(users) == SearchUserLim {
+		// id of the last user gotten here
+		nextPageToken = int(users[len(users)-1].ID)
+	} else {
+		// -1 if end of database
+		nextPageToken = -1
 	}
 
-	// Default, just list all users
-	users, err := s.DB.ListUsers(ctx)
-	if err != nil {
-		logger.Error("failed to list all users", zap.Error(err))
-		sendError(w, http.StatusInternalServerError, "failed to list all users")
-		return
+	response := struct {
+		Users         []database.User
+		NextPageToken int
+	}{
+		Users:         users,
+		NextPageToken: nextPageToken,
 	}
 	SetHeaderAndWriteResponse(w, http.StatusOK, users)
 }
