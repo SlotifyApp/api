@@ -67,7 +67,7 @@ func (s Server) DeleteSlotifyGroupsSlotifyGroupIDLeaveMe(w http.ResponseWriter, 
 			return
 		}
 
-		var expectedRows int64 = 2
+		var expectedRows int64 = 1
 		if rowsAffected != expectedRows {
 			err = database.WrongNumberSQLRowsError{ActualRows: rowsAffected, ExpectedRows: []int64{expectedRows}}
 			logger.Error("failed to delete slotify group", zap.Error(err),
