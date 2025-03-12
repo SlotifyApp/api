@@ -40,7 +40,7 @@ func (s Server) GetAPIUsers(w http.ResponseWriter, r *http.Request, params GetAP
 			database.SearchUsersByNameParams{
 				Name:   *params.Name,
 				Limit:  SearchUserLim,
-				LastID: uint32(params.PageToken.Page),
+				LastID: uint32(params.PageToken),
 			})
 		if err != nil {
 			logger.Error("failed to search user by name", zap.Error(err),
@@ -63,7 +63,7 @@ func (s Server) GetAPIUsers(w http.ResponseWriter, r *http.Request, params GetAP
 			database.SearchUsersByEmailParams{
 				Email:  string(*params.Email),
 				Limit:  SearchUserLim,
-				LastID: uint32(params.PageToken.Page),
+				LastID: uint32(params.PageToken),
 			})
 		if err != nil {
 			logger.Error("failed to search user by email", zap.Error(err),
@@ -85,7 +85,7 @@ func (s Server) GetAPIUsers(w http.ResponseWriter, r *http.Request, params GetAP
 			//nolint: gosec // page is unsigned 32 bit int
 			database.ListUsersParams{
 				Limit:  SearchUserLim,
-				LastID: uint32(params.PageToken.Page),
+				LastID: uint32(params.PageToken),
 			})
 		if err != nil {
 			logger.Error("failed to list all users", zap.Error(err))
@@ -101,16 +101,18 @@ func (s Server) GetAPIUsers(w http.ResponseWriter, r *http.Request, params GetAP
 			})
 		}
 	}
-	var nextPageToken *PaginationToken
+	var nextPageToken int
 	if len(users) == SearchUserLim {
 		// id of the last user gotten here
-		// nil if end of database
-		nextPageToken = &PaginationToken{Page: int(users[len(users)-1].ID)}
+		nextPageToken = int(users[len(users)-1].ID)
+	} else {
+		// -1 if end of database
+		nextPageToken = -1
 	}
 
 	response := struct {
 		Users         []database.User
-		NextPageToken *PaginationToken
+		NextPageToken int
 	}{
 		Users:         users,
 		NextPageToken: nextPageToken,
