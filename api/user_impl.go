@@ -29,7 +29,7 @@ func (s Server) GetAPIUsers(w http.ResponseWriter, r *http.Request, params GetAP
 	ctx, cancel := context.WithTimeout(r.Context(), database.DatabaseTimeout)
 	defer cancel()
 
-	var users []database.User
+	users := make([]database.User, 0)
 
 	// searches by name first if both name and email params are given a value
 	switch {
