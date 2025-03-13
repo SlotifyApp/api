@@ -25,7 +25,7 @@ func (s Server) PostAPIRescheduleCheck(w http.ResponseWriter, r *http.Request) {
 
 	userID, _ := r.Context().Value(UserIDCtxKey{}).(uint32)
 	reqID, _ := r.Context().Value(RequestIDCtxKey{}).(string)
-	logger := s.Logger.With(zap.String("request_id", reqID), zap.Uint32("logged_in_user_id", userID))
+	logger := s.Logger.With(zap.String("request_id", reqID), zap.Uint32("userID", userID))
 
 	var body ReschedulingCheckBodySchema
 	var err error
@@ -121,7 +121,7 @@ func (s Server) PostAPIRescheduleRequestReplace(w http.ResponseWriter, r *http.R
 
 	userID, _ := r.Context().Value(UserIDCtxKey{}).(uint32)
 	reqID, _ := r.Context().Value(RequestIDCtxKey{}).(string)
-	logger := s.Logger.With(zap.String("request_id", reqID), zap.Uint32("logged_in_user_id", userID))
+	logger := s.Logger.With(zap.String("request_id", reqID), zap.Uint32("userID", userID))
 
 	var body ReschedulingRequestBodySchema
 	var err error
@@ -272,7 +272,7 @@ func (s Server) PostAPIRescheduleRequestSingle(w http.ResponseWriter, r *http.Re
 
 	userID, _ := r.Context().Value(UserIDCtxKey{}).(uint32)
 	reqID, _ := r.Context().Value(RequestIDCtxKey{}).(string)
-	logger := s.Logger.With(zap.String("request_id", reqID), zap.Uint32("logged_in_user_id", userID))
+	logger := s.Logger.With(zap.String("request_id", reqID), zap.Uint32("userID", userID))
 
 	var body ReschedulingRequestSingleBodySchema
 	var err error
@@ -365,15 +365,15 @@ func (s Server) PostAPIRescheduleRequestSingle(w http.ResponseWriter, r *http.Re
 	SetHeaderAndWriteResponse(w, http.StatusOK, requestID)
 }
 
-// (GET /api/reschedule/request).
-func (s Server) GetAPIRescheduleRequest(w http.ResponseWriter, r *http.Request) {
+// (GET /api/reschedule/requests/me).
+func (s Server) GetAPIRescheduleRequestsMe(w http.ResponseWriter, r *http.Request) {
 	// Get userid from access token
 	ctx, cancel := context.WithTimeout(r.Context(), time.Minute*3)
 	defer cancel()
 
 	userID, _ := r.Context().Value(UserIDCtxKey{}).(uint32)
 	reqID, _ := r.Context().Value(RequestIDCtxKey{}).(string)
-	logger := s.Logger.With(zap.String("request_id", reqID), zap.Uint32("logged_in_user_id", userID))
+	logger := s.Logger.With(zap.String("request_id", reqID), zap.Uint32("userID", userID))
 
 	// Get all requests for the user
 	userObj, err := s.DB.GetUserByID(ctx, userID)
@@ -431,7 +431,7 @@ func (s Server) GetAPIRescheduleRequestRequestID(w http.ResponseWriter, r *http.
 
 	userID, _ := r.Context().Value(UserIDCtxKey{}).(uint32)
 	reqID, _ := r.Context().Value(RequestIDCtxKey{}).(string)
-	logger := s.Logger.With(zap.String("request_id", reqID), zap.Uint32("logged_in_user_id", userID))
+	logger := s.Logger.With(zap.String("request_id", reqID), zap.Uint32("userID", userID))
 
 	// Get request for the user
 	req, err := s.DB.GetRequestByID(ctx, paramRequestID)
@@ -480,7 +480,7 @@ func (s Server) PatchAPIRescheduleRequestRequestIDReject(w http.ResponseWriter,
 
 	userID, _ := r.Context().Value(UserIDCtxKey{}).(uint32)
 	reqID, _ := r.Context().Value(RequestIDCtxKey{}).(string)
-	logger := s.Logger.With(zap.String("request_id", reqID), zap.Uint32("logged_in_user_id", userID))
+	logger := s.Logger.With(zap.String("request_id", reqID), zap.Uint32("userID", userID))
 
 	// Get request for the user
 	req, err := s.DB.GetMeetingIDFromRequestID(ctx, paramRequestID)
@@ -533,7 +533,7 @@ func (s Server) PatchAPIRescheduleRequestRequestIDAccept(w http.ResponseWriter, 
 
 	userID, _ := r.Context().Value(UserIDCtxKey{}).(uint32)
 	reqID, _ := r.Context().Value(RequestIDCtxKey{}).(string)
-	logger := s.Logger.With(zap.String("request_id", reqID), zap.Uint32("logged_in_user_id", userID))
+	logger := s.Logger.With(zap.String("request_id", reqID), zap.Uint32("userID", userID))
 
 	var body ReschedulingRequestAcceptBodySchema
 	var err error
