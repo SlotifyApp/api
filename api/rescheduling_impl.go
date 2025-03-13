@@ -367,7 +367,6 @@ func (s Server) PostAPIRescheduleRequestSingle(w http.ResponseWriter, r *http.Re
 
 // (GET /api/reschedule/requests/me).
 func (s Server) GetAPIRescheduleRequestsMe(w http.ResponseWriter, r *http.Request) {
-	// Get userid from access token
 	ctx, cancel := context.WithTimeout(r.Context(), time.Minute*3)
 	defer cancel()
 
