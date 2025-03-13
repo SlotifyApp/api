@@ -14,6 +14,10 @@ import (
 	"go.uber.org/zap"
 )
 
+const (
+	invitesLimit = 10
+)
+
 // (POST /api/invites) Create a new invite.
 func (s Server) PostAPIInvites(w http.ResponseWriter, r *http.Request) {
 	userID, _ := r.Context().Value(UserIDCtxKey{}).(uint32)
@@ -137,7 +141,6 @@ func (s Server) GetAPIInvitesMe(w http.ResponseWriter, r *http.Request, params G
 
 	//nolint: gosec // page is unsigned 32 bit int
 	lastID := uint32(params.PageToken)
-	const invitesLimit = 10
 
 	invites, err := s.DB.ListInvitesMe(ctx, database.ListInvitesMeParams{
 		Status:   params.Status,
@@ -390,10 +393,15 @@ func (s Server) GetAPISlotifyGroupsSlotifyGroupIDInvites(w http.ResponseWriter,
 	ctx, cancel := context.WithTimeout(r.Context(), 2*database.DatabaseTimeout)
 	defer cancel()
 
+	//nolint: gosec // page is unsigned 32 bit int
+	lastID := uint32(params.PageToken)
+
 	invites, err := s.DB.ListInvitesByGroup(ctx,
 		database.ListInvitesByGroupParams{
 			SlotifyGroupID: slotifyGroupID,
 			Status:         params.Status,
+			LastID:         lastID,
+			Limit:          invitesLimit,
 		})
 	if err != nil {
 		switch {
@@ -412,5 +420,20 @@ func (s Server) GetAPISlotifyGroupsSlotifyGroupIDInvites(w http.ResponseWriter,
 		}
 	}
 
-	SetHeaderAndWriteResponse(w, http.StatusOK, invites)
+	var nextPageToken int
+	if len(invites) == invitesLimit {
+		nextPageToken = int(invites[len(invites)-1].InviteID)
+	} else {
+		nextPageToken = -1
+	}
+
+	response := struct {
+		Invites       []database.ListInvitesByGroupRow `json:"invites"`
+		NextPageToken int                              `json:"nextpageToken"`
+	}{
+		Invites:       invites,
+		NextPageToken: nextPageToken,
+	}
+
+	SetHeaderAndWriteResponse(w, http.StatusOK, response)
 }
