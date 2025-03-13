@@ -44,9 +44,10 @@ type MSFTTokenResult struct {
 // getMSFTScopes will return the requested scopes for a MSFT access token.
 func getMSFTScopes() []string {
 	return []string{
-		oidc.ScopeOpenID, "profile", "email", "User.ReadWrite",
+		oidc.ScopeOpenID, "profile", "email", "User.ReadWrite.All",
 		"Calendars.ReadBasic", "Calendars.Read", "Calendars.ReadWrite",
-		"Calendars.ReadWrite.Shared",
+		"Calendars.ReadWrite.Shared", "Group.Read.All", "Group.ReadWrite.All",
+		"Place.Read.All",
 	}
 }
 
