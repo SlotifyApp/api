@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -9,10 +10,10 @@ import (
 	"github.com/avast/retry-go"
 	msgraphsdkgo "github.com/microsoftgraph/msgraph-sdk-go"
 	graphmodels "github.com/microsoftgraph/msgraph-sdk-go/models"
-	openapi_types "github.com/oapi-codegen/runtime/types"
 	"go.uber.org/zap"
 )
 
+// durationToISO formats a positive duration in the ISO 8601 format.
 func durationToISO(duration time.Duration) string {
 	hours := int(duration.Hours())
 	//nolint: mnd // Magic Number 60
@@ -53,7 +54,7 @@ func createSchedulingRequest(body ReschedulingCheckBodySchema,
 	newReqBody.Attendees = []AttendeeBase{}
 
 	// parse each attendee to attendeeBase
-	if attendees, err := parseMSFTAttendees(msftMeeting)
+	attendees, err := parseMSFTAttendees(msftMeeting)
 	if err != nil {
 		return SchedulingSlotsBodySchema{}, fmt.Errorf("failed to parse msft attendees: %w", err)
 	}
@@ -68,20 +69,21 @@ func createSchedulingRequest(body ReschedulingCheckBodySchema,
 		newReqBody.Attendees = append(newReqBody.Attendees, ab)
 	}
 
-	// Caluclate duration
-	var duration time.Duration
-
 	startTime, err := time.Parse(time.RFC3339Nano, *msftMeeting.GetStart().GetDateTime()+"Z")
 	if err != nil {
-		return newReqBody, fmt.Errorf("failed in parsung start time: %w", err)
+		return newReqBody, fmt.Errorf("failed in parse start time: %w", err)
 	}
 
 	endTime, err := time.Parse(time.RFC3339Nano, *msftMeeting.GetEnd().GetDateTime()+"Z")
 	if err != nil {
-		return newReqBody, fmt.Errorf("failed in parsung start time: %w", err)
+		return newReqBody, fmt.Errorf("failed to parse end time: %w", err)
 	}
 
-	duration = endTime.Sub(startTime)
+	if endTime.Before(startTime) {
+		return SchedulingSlotsBodySchema{}, errors.New("end time is before the start time, which is invalid")
+	}
+
+	duration := endTime.Sub(startTime)
 	newReqBody.MeetingDuration = durationToISO(duration)
 
 	// Add time contraints
@@ -152,7 +154,7 @@ func performReschedulingCheckProcess(ctx context.Context,
 			fmt.Errorf("failed to check valid rescheduling slots exists: %w", err)
 	}
 
-	// TODO: 
+	// TODO:
 	// Check if the new meeting is more important
 	// Simply call AWS Sagemaker AI Endpoint
 
