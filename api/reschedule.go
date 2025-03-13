@@ -53,30 +53,19 @@ func createSchedulingRequest(body ReschedulingCheckBodySchema,
 	newReqBody.Attendees = []AttendeeBase{}
 
 	// parse each attendee to attendeeBase
-	for _, a := range msftMeeting.GetAttendees() {
-		var email openapi_types.Email
-		if a.GetEmailAddress() != nil && a.GetEmailAddress().GetAddress() != nil {
-			emailStr := a.GetEmailAddress().GetAddress()
-			email = openapi_types.Email(*emailStr)
-		}
-
-		var name string
-		if a.GetEmailAddress() != nil && a.GetEmailAddress().GetName() != nil {
-			name = *a.GetEmailAddress().GetName()
-		}
-
-		var attendeeType AttendeeType
-		if a.GetTypeEscaped() != nil {
-			attendeeType = AttendeeType(a.GetTypeEscaped().String())
-		}
-
-		newReqBody.Attendees = append(newReqBody.Attendees, AttendeeBase{
-			AttendeeType: attendeeType,
+	if attendees, err := parseMSFTAttendees(msftMeeting)
+	if err != nil {
+		return SchedulingSlotsBodySchema{}, fmt.Errorf("failed to parse msft attendees: %w", err)
+	}
+	for _, a := range attendees {
+		ab := AttendeeBase{
+			AttendeeType: *a.AttendeeType,
 			EmailAddress: EmailAddress{
-				Name:    name,
-				Address: email,
+				Address: a.Email,
+				Name:    string(a.Email),
 			},
-		})
+		}
+		newReqBody.Attendees = append(newReqBody.Attendees, ab)
 	}
 
 	// Caluclate duration
@@ -143,15 +132,10 @@ func checkValidReschedulingSlotExists(ctx context.Context,
 	res, err := makeFindMeetingTimesAPICall(ctx, graph, newRequest)
 	if err != nil {
 		return false,
-			fmt.Errorf("failed in calling fine meeting times api: %w", err)
+			fmt.Errorf("failed in calling find meeting times api: %w", err)
 	}
 
-	// Check if valid slots exist
-	if len(*res.MeetingTimeSuggestions) > 0 {
-		return true, nil
-	}
-
-	return false, nil
+	return len(*res.MeetingTimeSuggestions) > 0, nil
 }
 
 func performReschedulingCheckProcess(ctx context.Context,
@@ -168,7 +152,7 @@ func performReschedulingCheckProcess(ctx context.Context,
 			fmt.Errorf("failed to check valid rescheduling slots exists: %w", err)
 	}
 
-	// TODO
+	// TODO: 
 	// Check if the new meeting is more important
 	// Simply call AWS Sagemaker AI Endpoint
 

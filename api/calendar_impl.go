@@ -105,7 +105,12 @@ func (s Server) PostAPICalendarMe(w http.ResponseWriter, r *http.Request) {
 		logger.Error("failed to send notification", zap.Error(err))
 	}
 
-	createdEvent := parseEventableResp([]graphmodels.Eventable{createdEventable})[0]
+	var parsedEvent []CalendarEvent
+	if parsedEvent, err = parseEventableResp([]graphmodels.Eventable{createdEventable}); err != nil {
+		logger.Error("failed to parse msft event response", zap.Error(err))
+		sendError(w, http.StatusBadRequest, "failed to parse msft event response")
+		return
+	}
 
-	SetHeaderAndWriteResponse(w, http.StatusCreated, createdEvent)
+	SetHeaderAndWriteResponse(w, http.StatusCreated, parsedEvent[0])
 }

@@ -1,6 +1,7 @@
 package api
 
 import (
+	"errors"
 	"time"
 
 	graphmodels "github.com/microsoftgraph/msgraph-sdk-go/models"
@@ -12,7 +13,7 @@ import (
 
 // parseMSFTAttendees filters out attributes of MSFT attendees.
 // see openapi spec to find docs about this.
-func parseMSFTAttendees(e graphmodels.Eventable) []Attendee {
+func parseMSFTAttendees(e graphmodels.Eventable) ([]Attendee, error) {
 	msftAttendees := e.GetAttendees()
 	var attendees []Attendee
 	attendees = make([]Attendee, 0)
@@ -23,6 +24,8 @@ func parseMSFTAttendees(e graphmodels.Eventable) []Attendee {
 		if a.GetEmailAddress() != nil && a.GetEmailAddress().GetAddress() != nil {
 			emailStr := a.GetEmailAddress().GetAddress()
 			email = openapi_types.Email(*emailStr)
+		} else {
+			return nil, errors.New("failed to get email from msft attendee")
 		}
 
 		var responseStatus AttendeeResponseStatus
@@ -36,13 +39,13 @@ func parseMSFTAttendees(e graphmodels.Eventable) []Attendee {
 		}
 
 		attendee := Attendee{
-			Email:          &email,
+			Email:          email,
 			ResponseStatus: &responseStatus,
 			AttendeeType:   &attendeeType,
 		}
 		attendees = append(attendees, attendee)
 	}
-	return attendees
+	return attendees, nil
 }
 
 // parseCalendarEventToMSFTEvent parses CalendarEvent to create a MSFT Event.
@@ -77,11 +80,8 @@ func parseCalendarEventToMSFTEvent(eventRequest CalendarEvent) *graphmodels.Even
 	var attendees []graphmodels.Attendeeable
 	if eventRequest.Attendees != nil {
 		for _, inviteAttendee := range eventRequest.Attendees {
-			var email *graphmodels.EmailAddress
-			if inviteAttendee.Email != nil {
-				email = graphmodels.NewEmailAddress()
-				email.SetAddress((*string)(inviteAttendee.Email))
-			}
+			email := graphmodels.NewEmailAddress()
+			email.SetAddress((*string)(&inviteAttendee.Email))
 
 			attendee := graphmodels.NewAttendee()
 			attendee.SetEmailAddress(email)
