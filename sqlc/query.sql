@@ -174,7 +174,10 @@ SELECT
 JOIN User fu ON fu.id=i.from_user_id
 JOIN User tu ON tu.id=i.to_user_id
 WHERE i.status = ifnull(sqlc.arg('status'), i.status) 
-AND i.slotify_group_id=?;
+  AND i.slotify_group_id=?
+  AND i.id > sqlc.arg('last_id')
+ORDER BY i.id
+LIMIT ?;
 
 -- name: BatchDeleteWeekOldInvites :execrows
 DELETE FROM Invite
