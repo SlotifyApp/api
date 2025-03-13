@@ -301,3 +301,49 @@ func InsertUser(t *testing.T, db *sql.DB, userOpts ...UserOption) api.User {
 		LastName:  lastName,
 	}
 }
+
+func InsertInvite(t *testing.T, db *sql.DB, fromUser api.User, toUser api.User, groupID uint32) api.InvitesGroup {
+	const (
+		oneDay        = 24 * time.Hour
+		sentenceWords = 5
+	)
+	createdAt := time.Now()
+	expirtyDate := createdAt.Add(oneDay)
+	inviteStatus := "pending"
+	message := gofakeit.Sentence(sentenceWords)
+
+	res, err := db.Exec(
+		//nolint: lll
+		"INSERT INTO Invite (slotify_group_id, from_user_id, to_user_id, message, status, expiry_date, created_at) VALUES(?, ?, ?, ?, ?, ?, ?)",
+		groupID,
+		fromUser.Id,
+		toUser.Id,
+		message,
+		inviteStatus,
+		expirtyDate,
+		createdAt,
+	)
+	require.NoError(t, err, "db insert user failed")
+
+	rows, err := res.RowsAffected()
+	require.Equal(t, int64(1), rows, "rows affected after insert is 1")
+	require.NoError(t, err, "failed to get rows affected")
+
+	id, err := res.LastInsertId()
+	require.NoError(t, err, "failed to get last insert id")
+
+	return api.InvitesGroup{
+		CreatedAt:         createdAt,
+		ExpiryDate:        openapi_types.Date{Time: expirtyDate},
+		FromUserEmail:     fromUser.Email,
+		FromUserFirstName: fromUser.FirstName,
+		FromUserLastName:  fromUser.LastName,
+		//nolint: gosec // id is unsigned 32 bit int
+		InviteID:        uint32(id),
+		Message:         message,
+		Status:          api.InviteStatus(inviteStatus),
+		ToUserEmail:     toUser.Email,
+		ToUserFirstName: toUser.FirstName,
+		ToUserLastName:  toUser.LastName,
+	}
+}
