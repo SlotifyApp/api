@@ -12,6 +12,10 @@ import (
 	"go.uber.org/zap"
 )
 
+const (
+	groupLimit = 10
+)
+
 // (DELETE /api/slotify-groups/{slotifyGroupID}/leave/me)  Have a member leave from a slotify group.
 func (s Server) DeleteSlotifyGroupsSlotifyGroupIDLeaveMe(w http.ResponseWriter, r *http.Request,
 	slotifyGroupID uint32,
@@ -113,7 +117,7 @@ func (s Server) DeleteSlotifyGroupsSlotifyGroupIDLeaveMe(w http.ResponseWriter, 
 }
 
 // (GET /api/slotify-groups/me).
-func (s Server) GetAPISlotifyGroupsMe(w http.ResponseWriter, r *http.Request) {
+func (s Server) GetAPISlotifyGroupsMe(w http.ResponseWriter, r *http.Request, params GetAPISlotifyGroupsMeParams) {
 	userID, _ := r.Context().Value(UserIDCtxKey{}).(uint32)
 	reqID, _ := r.Context().Value(RequestIDCtxKey{}).(string)
 
@@ -122,7 +126,17 @@ func (s Server) GetAPISlotifyGroupsMe(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 2*database.DatabaseTimeout)
 	defer cancel()
 
-	slotifyGroups, err := s.DB.GetUsersSlotifyGroups(ctx, userID)
+	//nolint: gosec // page is unsigned 32 bit int
+	lastID := uint32(params.PageToken)
+
+	slotifyGroups, err := s.DB.GetUsersSlotifyGroups(
+		ctx,
+		database.GetUsersSlotifyGroupsParams{
+			UserID: userID,
+			LastID: lastID,
+			Limit:  groupLimit,
+		},
+	)
 	if err != nil {
 		switch {
 		case errors.Is(err, context.Canceled):
@@ -141,7 +155,22 @@ func (s Server) GetAPISlotifyGroupsMe(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	SetHeaderAndWriteResponse(w, http.StatusOK, slotifyGroups)
+
+	var nextPageToken int
+	if len(slotifyGroups) == groupLimit {
+		nextPageToken = int(slotifyGroups[len(slotifyGroups)-1].ID)
+	} else {
+		nextPageToken = -1
+	}
+
+	response := struct {
+		SlotifyGroups []database.SlotifyGroup `json:"slotifyGroups"`
+		NextPageToken int                     `json:"nextPageToken"`
+	}{
+		SlotifyGroups: slotifyGroups,
+		NextPageToken: nextPageToken,
+	}
+	SetHeaderAndWriteResponse(w, http.StatusOK, response)
 }
 
 // (POST /api/slotify-groups).
