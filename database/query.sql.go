@@ -864,12 +864,17 @@ SELECT
 JOIN User fu ON fu.id=i.from_user_id
 JOIN User tu ON tu.id=i.to_user_id
 WHERE i.status = ifnull(?, i.status) 
-AND i.slotify_group_id=?
+  AND i.slotify_group_id=?
+  AND i.id > ?
+ORDER BY i.id
+LIMIT ?
 `
 
 type ListInvitesByGroupParams struct {
 	Status         interface{} `json:"status"`
 	SlotifyGroupID uint32      `json:"slotifyGroupId"`
+	LastID         uint32      `json:"lastId"`
+	Limit          int32       `json:"limit"`
 }
 
 type ListInvitesByGroupRow struct {
@@ -887,7 +892,12 @@ type ListInvitesByGroupRow struct {
 }
 
 func (q *Queries) ListInvitesByGroup(ctx context.Context, arg ListInvitesByGroupParams) ([]ListInvitesByGroupRow, error) {
-	rows, err := q.query(ctx, q.listInvitesByGroupStmt, listInvitesByGroup, arg.Status, arg.SlotifyGroupID)
+	rows, err := q.query(ctx, q.listInvitesByGroupStmt, listInvitesByGroup,
+		arg.Status,
+		arg.SlotifyGroupID,
+		arg.LastID,
+		arg.Limit,
+	)
 	if err != nil {
 		return nil, err
 	}
