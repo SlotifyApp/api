@@ -22,7 +22,10 @@ UPDATE User SET msft_home_account_id=? WHERE id=?;
 -- name: GetUsersSlotifyGroups :many
 SELECT sg.* FROM UserToSlotifyGroup utsg
 JOIN SlotifyGroup sg ON utsg.slotify_group_id=sg.id 
-WHERE utsg.user_id=?;
+WHERE utsg.user_id=?
+AND sg.id > sqlc.arg('last_id')
+ORDER BY sg.id
+LIMIT ?;
 
 -- name: SearchUsersByName :many
 SELECT id, email, first_name, last_name FROM User

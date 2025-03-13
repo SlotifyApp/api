@@ -833,10 +833,19 @@ const getUsersSlotifyGroups = `-- name: GetUsersSlotifyGroups :many
 SELECT sg.id, sg.name FROM UserToSlotifyGroup utsg
 JOIN SlotifyGroup sg ON utsg.slotify_group_id=sg.id 
 WHERE utsg.user_id=?
+AND sg.id > ?
+ORDER BY sg.id
+LIMIT ?
 `
 
-func (q *Queries) GetUsersSlotifyGroups(ctx context.Context, userID uint32) ([]SlotifyGroup, error) {
-	rows, err := q.query(ctx, q.getUsersSlotifyGroupsStmt, getUsersSlotifyGroups, userID)
+type GetUsersSlotifyGroupsParams struct {
+	UserID uint32 `json:"userId"`
+	LastID uint32 `json:"lastId"`
+	Limit  int32  `json:"limit"`
+}
+
+func (q *Queries) GetUsersSlotifyGroups(ctx context.Context, arg GetUsersSlotifyGroupsParams) ([]SlotifyGroup, error) {
+	rows, err := q.query(ctx, q.getUsersSlotifyGroupsStmt, getUsersSlotifyGroups, arg.UserID, arg.LastID, arg.Limit)
 	if err != nil {
 		return nil, err
 	}

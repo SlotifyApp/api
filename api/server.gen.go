@@ -519,6 +519,11 @@ type GetAPIMSFTUsersSearchParams struct {
 	Search *string `form:"search,omitempty" json:"search,omitempty"`
 }
 
+// GetAPISlotifyGroupsMeParams defines parameters for GetAPISlotifyGroupsMe.
+type GetAPISlotifyGroupsMeParams struct {
+	PageToken int `form:"pageToken" json:"pageToken"`
+}
+
 // GetAPISlotifyGroupsSlotifyGroupIDInvitesParams defines parameters for GetAPISlotifyGroupsSlotifyGroupIDInvites.
 type GetAPISlotifyGroupsSlotifyGroupIDInvitesParams struct {
 	// Status Invite status
@@ -657,7 +662,7 @@ type ServerInterface interface {
 	PostAPISlotifyGroups(w http.ResponseWriter, r *http.Request)
 	// Get all slotify-groups for current user.
 	// (GET /api/slotify-groups/me)
-	GetAPISlotifyGroupsMe(w http.ResponseWriter, r *http.Request)
+	GetAPISlotifyGroupsMe(w http.ResponseWriter, r *http.Request, params GetAPISlotifyGroupsMeParams)
 	// Delete a slotifyGroup by id.
 	// (DELETE /api/slotify-groups/{slotifyGroupID})
 	DeleteAPISlotifyGroupsSlotifyGroupID(w http.ResponseWriter, r *http.Request, slotifyGroupID uint32)
@@ -1392,8 +1397,28 @@ func (siw *ServerInterfaceWrapper) PostAPISlotifyGroups(w http.ResponseWriter, r
 // GetAPISlotifyGroupsMe operation middleware
 func (siw *ServerInterfaceWrapper) GetAPISlotifyGroupsMe(w http.ResponseWriter, r *http.Request) {
 
+	var err error
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetAPISlotifyGroupsMeParams
+
+	// ------------- Required query parameter "pageToken" -------------
+
+	if paramValue := r.URL.Query().Get("pageToken"); paramValue != "" {
+
+	} else {
+		siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "pageToken"})
+		return
+	}
+
+	err = runtime.BindQueryParameter("form", true, true, "pageToken", r.URL.Query(), &params.PageToken)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "pageToken", Err: err})
+		return
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetAPISlotifyGroupsMe(w, r)
+		siw.Handler.GetAPISlotifyGroupsMe(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -2000,17 +2025,17 @@ var swaggerSpec = []string{
 	"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",
-	"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",
+	"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",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file
