@@ -163,7 +163,10 @@ SELECT i.id AS invite_id, i.message, i.status,i.created_at, i.expiry_date, fu.em
 JOIN User fu ON fu.id=i.from_user_id
 JOIN SlotifyGroup sg ON sg.id=i.slotify_group_id
 WHERE i.status = ifnull(sqlc.arg('status'), i.status) 
-AND i.to_user_id=?;
+AND i.to_user_id=?
+AND i.id > sqlc.arg('last_id')
+ORDER BY i.id
+LIMIT ?;
 
 -- name: ListInvitesByGroup :many
 SELECT 

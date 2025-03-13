@@ -135,14 +135,38 @@ func (s Server) GetAPIInvitesMe(w http.ResponseWriter, r *http.Request, params G
 		return
 	}
 
-	invites, err := s.DB.ListInvitesMe(ctx, database.ListInvitesMeParams{Status: params.Status, ToUserID: userID})
+	//nolint: gosec // page is unsigned 32 bit int
+	lastID := uint32(params.PageToken)
+	const invitesLimit = 10
+
+	invites, err := s.DB.ListInvitesMe(ctx, database.ListInvitesMeParams{
+		Status:   params.Status,
+		ToUserID: userID,
+		LastID:   lastID,
+		Limit:    invitesLimit,
+	})
 	if err != nil {
 		logger.Error("invite api: failed to get invites", zap.Error(err))
 		sendError(w, http.StatusInternalServerError, "user api: failed to get invites")
 		return
 	}
 
-	SetHeaderAndWriteResponse(w, http.StatusOK, invites)
+	var nextPageToken int
+	if len(invites) == invitesLimit {
+		nextPageToken = int(invites[len(invites)-1].InviteID)
+	} else {
+		nextPageToken = -1
+	}
+
+	response := struct {
+		Invites       []database.ListInvitesMeRow
+		NextPageToken int
+	}{
+		Invites:       invites,
+		NextPageToken: nextPageToken,
+	}
+
+	SetHeaderAndWriteResponse(w, http.StatusOK, response)
 }
 
 // (DELETE /api/invites/{inviteID} Delete an invite).
