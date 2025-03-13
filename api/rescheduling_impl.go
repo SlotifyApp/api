@@ -538,7 +538,6 @@ func (s Server) PatchAPIRescheduleRequestRequestIDAccept(w http.ResponseWriter, 
 	var body ReschedulingRequestAcceptBodySchema
 	var err error
 	if err = json.NewDecoder(r.Body).Decode(&body); err != nil {
-		// TODO: Add zap log for body
 		logger.Error(ErrUnmarshalBody, zap.Error(err))
 		sendError(w, http.StatusBadRequest, ErrUnmarshalBody.Error())
 		return
@@ -630,15 +629,21 @@ func (s Server) PatchAPIRescheduleRequestRequestIDAccept(w http.ResponseWriter, 
 		logger.Error("failed to get meeting data from microsoft", zap.Error(err))
 	}
 
-	attendeeUsers := []uint32{}
-
-	for _, attendee := range meetingData.GetAttendees() {
-		attendeeData, errOne := s.DB.GetUserByEmail(ctx, *attendee.GetEmailAddress().GetAddress())
-		if errOne != nil {
-			logger.Error("failed to get user id for email address:", *attendee.GetEmailAddress().GetAddress())
+	var attendees []Attendee
+	if attendees, err = parseMSFTAttendees(meetingData); err != nil {
+		logger.Error("failed to parse msft attendees", zap.Error(err))
+		sendError(w, http.StatusBadRequest, "failed to parse the msft attendees received")
+		return
+	}
+	attendeeIDs := make([]uint32, 0)
+	for _, a := range attendees {
+		var u database.User
+		// don't send error, we only need the id for notifications, just log
+		if u, err = s.DB.GetUserByEmail(ctx, string(a.Email)); err != nil {
+			logger.Error("failed to get user by email in PatchAPIReschedule for sending notifications",
+				zap.Error(err))
 		}
-
-		attendeeUsers = append(attendeeUsers, attendeeData.ID)
+		attendeeIDs = append(attendeeIDs, u.ID)
 	}
 
 	newNotifparam := database.CreateNotificationParams{
@@ -646,7 +651,7 @@ func (s Server) PatchAPIRescheduleRequestRequestIDAccept(w http.ResponseWriter, 
 		Created: time.Now(),
 	}
 
-	err = s.NotificationService.SendNotification(ctx, s.Logger, s.DB, attendeeUsers, newNotifparam)
+	err = s.NotificationService.SendNotification(ctx, s.Logger, s.DB, attendeeIDs, newNotifparam)
 	if err != nil {
 		logger.Error("failed to send accepted request notification to all attendees", zap.Error(err))
 	}
