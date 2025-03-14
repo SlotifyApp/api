@@ -61,7 +61,10 @@ SELECT COUNT(*) FROM SlotifyGroup WHERE id=?;
 SELECT u.id, u.email, u.first_name, u.last_name FROM SlotifyGroup sg
 JOIN UserToSlotifyGroup utsg ON sg.id=utsg.slotify_group_id
 JOIN User u ON u.id=utsg.user_id 
-WHERE sg.id=?;
+WHERE sg.id=?
+AND u.id > sqlc.arg('last_id')
+ORDER BY u.id
+LIMIT ?;
 
 -- name: CountSlotifyGroupMembers :one
 SELECT COUNT(*) FROM SlotifyGroup sg
