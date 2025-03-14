@@ -268,26 +268,35 @@ func TestUser_GetUsers(t *testing.T) {
 		tx, err = db.Begin()
 		require.NoError(t, err, "could not begin transaction")
 
-		rr := httptest.NewRecorder()
+		var rr *httptest.ResponseRecorder
 
 		req := httptest.NewRequest(http.MethodGet, "/api/users?pageToken=0", nil)
 		req.Header.Add("Content-Type", "application/json")
 
 		count := testutil.GetCount(t, db, "User")
-		server.GetAPIUsers(rr, req, api.GetAPIUsersParams{PageToken: 0})
+
+		allUsers := api.Users{}
+		pageToken := 0
+		for {
+			rr = httptest.NewRecorder()
+			server.GetAPIUsers(rr, req, api.GetAPIUsersParams{PageToken: pageToken})
+			require.Equal(t, http.StatusOK, rr.Result().StatusCode)
+			var resp struct {
+				Users         api.Users `json:"users"`
+				NextPageToken int       `json:"nextPageToken"`
+			}
+			err = json.NewDecoder(rr.Result().Body).Decode(&resp)
+			require.NoError(t, err, "response body can be decoded")
+			allUsers = append(allUsers, resp.Users...)
+			if resp.NextPageToken == -1 {
+				break
+			}
+			pageToken = resp.NextPageToken
+		}
 		err = tx.Commit()
 		require.NoError(t, err, "failed to commit transaction")
-
 		testutil.OpenAPIValidateTest(t, rr, req)
-
-		var respUsers struct {
-			Users         api.Users `json:"users"`
-			NextPageToken int       `json:"nextPageToken,omitempty"`
-		}
-		require.Equal(t, http.StatusOK, rr.Result().StatusCode)
-		err = json.NewDecoder(rr.Result().Body).Decode(&respUsers)
-		require.NoError(t, err, "response body can be decoded into Users struct")
-		require.Len(t, respUsers.Users, count, "got all users from the User table")
+		require.Len(t, allUsers, count, "got all users from the User table")
 	})
 	t.Run("Pagination", func(t *testing.T) {
 		for range 11 {
