@@ -272,20 +272,31 @@ func TestSlotifyGroup_GetSlotifyGroupsSlotifyGroupIDUsers(t *testing.T) {
 			t.Parallel()
 
 			rr := httptest.NewRecorder()
-			req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/slotify-groups/%d/users", tt.slotifyGroupID), nil)
+			req := httptest.NewRequest(
+				http.MethodGet,
+				fmt.Sprintf("/api/slotify-groups/%d/users?pageToken=0", tt.slotifyGroupID),
+				nil,
+			)
 
 			req.Header.Set(api.ReqHeader, uuid.NewString())
 
-			server.GetAPISlotifyGroupsSlotifyGroupIDUsers(rr, req, tt.slotifyGroupID)
+			server.GetAPISlotifyGroupsSlotifyGroupIDUsers(rr,
+				req,
+				tt.slotifyGroupID,
+				api.GetAPISlotifyGroupsSlotifyGroupIDUsersParams{PageToken: 0},
+			)
 
 			testutil.OpenAPIValidateTest(t, rr, req)
 
 			if tt.httpStatus == http.StatusOK {
-				var respBody api.Users
+				var respBody struct {
+					Users         api.Users `json:"users"`
+					NextPageToken int       `json:"nextPageToken"`
+				}
 				require.Equal(t, tt.httpStatus, rr.Result().StatusCode)
 				err = json.NewDecoder(rr.Result().Body).Decode(&respBody)
 				require.NoError(t, err, "response cannot be decoded into Users struct")
-				require.Equal(t, tt.expectedRespBody, respBody, tt.testMsg)
+				require.Equal(t, tt.expectedRespBody, respBody.Users, tt.testMsg)
 			} else {
 				var respBody string
 				require.Equal(t, tt.httpStatus, rr.Result().StatusCode)
@@ -295,6 +306,66 @@ func TestSlotifyGroup_GetSlotifyGroupsSlotifyGroupIDUsers(t *testing.T) {
 			}
 		})
 	}
+	t.Run("pagination", func(t *testing.T) {
+		groupForPagination := testutil.InsertSlotifyGroup(t, db)
+		for range 11 {
+			newUser := testutil.InsertUser(t, db)
+			testutil.AddUserToSlotifyGroup(t, db, newUser.Id, groupForPagination.Id)
+		}
+		rr := httptest.NewRecorder()
+		req := httptest.NewRequest(
+			http.MethodGet,
+			fmt.Sprintf("/api/slotify-groups/%d/users?pageToken=0", groupForPagination.Id),
+			nil,
+		)
+		req.Header.Set(api.ReqHeader, uuid.NewString())
+		server.GetAPISlotifyGroupsSlotifyGroupIDUsers(
+			rr,
+			req,
+			groupForPagination.Id,
+			api.GetAPISlotifyGroupsSlotifyGroupIDUsersParams{PageToken: 0},
+		)
+		require.Equal(t, http.StatusOK, rr.Result().StatusCode)
+		var firstPageResp struct {
+			Users         api.Users `json:"users"`
+			NextPageToken int       `json:"nextPageToken"`
+		}
+		err = json.NewDecoder(rr.Result().Body).Decode(&firstPageResp)
+		require.NoError(t, err)
+		require.Len(t, firstPageResp.Users, 10, "first page should return 10 users")
+		require.NotEqual(t, -1, firstPageResp.NextPageToken, "nextPageToken should be set if more users exist")
+
+		rr2 := httptest.NewRecorder()
+		req2 := httptest.NewRequest(
+			http.MethodGet,
+			fmt.Sprintf("/api/slotify-groups/%d/users?pageToken=%d", groupForPagination.Id, firstPageResp.NextPageToken),
+			nil,
+		)
+		req2.Header.Set(api.ReqHeader, uuid.NewString())
+		server.GetAPISlotifyGroupsSlotifyGroupIDUsers(
+			rr2,
+			req2,
+			groupForPagination.Id,
+			api.GetAPISlotifyGroupsSlotifyGroupIDUsersParams{PageToken: firstPageResp.NextPageToken},
+		)
+		require.Equal(t, http.StatusOK, rr2.Result().StatusCode)
+		var secondPageResp struct {
+			Users         api.Users `json:"users"`
+			NextPageToken int       `json:"nextPageToken"`
+		}
+		err = json.NewDecoder(rr2.Result().Body).Decode(&secondPageResp)
+		require.NoError(t, err)
+		require.Len(t, secondPageResp.Users, 1, "second page should return 1 user")
+
+		// no overlapping users between pages.
+		firstPageIDs := make(map[uint32]bool)
+		for _, u := range firstPageResp.Users {
+			firstPageIDs[u.Id] = true
+		}
+		for _, u := range secondPageResp.Users {
+			require.False(t, firstPageIDs[u.Id], "user id %d appears in both pages", u.Id)
+		}
+	})
 }
 
 func TestSlotifyGroup_GetAPISlotifyGroupsMe(t *testing.T) {
