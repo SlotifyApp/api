@@ -355,7 +355,8 @@ func (s Server) GetAPISlotifyGroupsSlotifyGroupID(w http.ResponseWriter, r *http
 }
 
 // (GET /api/slotify-groups/{slotifyGroupID}/users).
-func (s Server) GetAPISlotifyGroupsSlotifyGroupIDUsers(w http.ResponseWriter, r *http.Request, slotifyGroupID uint32) {
+// nolint: lll // function name
+func (s Server) GetAPISlotifyGroupsSlotifyGroupIDUsers(w http.ResponseWriter, r *http.Request, slotifyGroupID uint32, params GetAPISlotifyGroupsSlotifyGroupIDUsersParams) {
 	userID, _ := r.Context().Value(UserIDCtxKey{}).(uint32)
 	reqID, _ := r.Context().Value(RequestIDCtxKey{}).(string)
 
@@ -383,7 +384,14 @@ func (s Server) GetAPISlotifyGroupsSlotifyGroupIDUsers(w http.ResponseWriter, r 
 		return
 	}
 
-	users, err := s.DB.GetAllSlotifyGroupMembers(ctx, slotifyGroupID)
+	//nolint: gosec // page is unsigned 32 bit int
+	lastID := uint32(params.PageToken)
+
+	users, err := s.DB.GetAllSlotifyGroupMembers(ctx, database.GetAllSlotifyGroupMembersParams{
+		ID:     slotifyGroupID,
+		LastID: lastID,
+		Limit:  groupLimit,
+	})
 	if err != nil {
 		logger.Error("slotifyGroup api: failed to get users of a group",
 			zap.Uint32("slotifyGroupID",
@@ -394,5 +402,20 @@ func (s Server) GetAPISlotifyGroupsSlotifyGroupIDUsers(w http.ResponseWriter, r 
 		return
 	}
 
-	SetHeaderAndWriteResponse(w, http.StatusOK, users)
+	var nextPageToken int
+	if len(users) == groupLimit {
+		nextPageToken = int(users[len(users)-1].ID)
+	} else {
+		nextPageToken = -1
+	}
+
+	response := struct {
+		Users         []database.GetAllSlotifyGroupMembersRow `json:"users"` // adjust the type as appropriate
+		NextPageToken int                                     `json:"nextPageToken"`
+	}{
+		Users:         users,
+		NextPageToken: nextPageToken,
+	}
+
+	SetHeaderAndWriteResponse(w, http.StatusOK, response)
 }
