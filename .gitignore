@@ -1,3 +1,5 @@
 venv/
 virenv/
 .42c/
+rebase.sh
+.gitattributes
