@@ -521,7 +521,16 @@ SELECT u.id, u.email, u.first_name, u.last_name FROM SlotifyGroup sg
 JOIN UserToSlotifyGroup utsg ON sg.id=utsg.slotify_group_id
 JOIN User u ON u.id=utsg.user_id 
 WHERE sg.id=?
+AND u.id > ?
+ORDER BY u.id
+LIMIT ?
 `
+
+type GetAllSlotifyGroupMembersParams struct {
+	ID     uint32 `json:"id"`
+	LastID uint32 `json:"lastId"`
+	Limit  int32  `json:"limit"`
+}
 
 type GetAllSlotifyGroupMembersRow struct {
 	ID        uint32 `json:"id"`
@@ -530,8 +539,8 @@ type GetAllSlotifyGroupMembersRow struct {
 	LastName  string `json:"lastName"`
 }
 
-func (q *Queries) GetAllSlotifyGroupMembers(ctx context.Context, id uint32) ([]GetAllSlotifyGroupMembersRow, error) {
-	rows, err := q.query(ctx, q.getAllSlotifyGroupMembersStmt, getAllSlotifyGroupMembers, id)
+func (q *Queries) GetAllSlotifyGroupMembers(ctx context.Context, arg GetAllSlotifyGroupMembersParams) ([]GetAllSlotifyGroupMembersRow, error) {
+	rows, err := q.query(ctx, q.getAllSlotifyGroupMembersStmt, getAllSlotifyGroupMembers, arg.ID, arg.LastID, arg.Limit)
 	if err != nil {
 		return nil, err
 	}
