@@ -53,7 +53,7 @@ func (s Server) GetAPICalendarMe(w http.ResponseWriter, r *http.Request, params 
 	s.GetAPICalendarUserID(w, r, userID, GetAPICalendarUserIDParams(params))
 }
 
-// (POST /calendar/event).
+// (POST /calendar/me).
 func (s Server) PostAPICalendarMe(w http.ResponseWriter, r *http.Request) {
 	userID, _ := r.Context().Value(UserIDCtxKey{}).(uint32)
 	reqID, _ := r.Context().Value(RequestIDCtxKey{}).(string)
@@ -113,4 +113,42 @@ func (s Server) PostAPICalendarMe(w http.ResponseWriter, r *http.Request) {
 	}
 
 	SetHeaderAndWriteResponse(w, http.StatusCreated, parsedEvent[0])
+}
+
+// (GET /api/calendar/event).
+func (s Server) GetAPICalendarEvent(w http.ResponseWriter, r *http.Request, params GetAPICalendarEventParams) {
+	loggedInUserID, _ := r.Context().Value(UserIDCtxKey{}).(uint32)
+	reqID, _ := r.Context().Value(RequestIDCtxKey{}).(string)
+
+	logger := s.Logger.With(zap.String("request_id", reqID), zap.Uint32("logged_in_user_id", loggedInUserID))
+
+	ctx, cancel := context.WithTimeout(r.Context(), time.Minute)
+	defer cancel()
+
+	// create graph client for the userID in query params.
+	graph, err := CreateMSFTGraphClient(ctx, s.MSALClient, s.DB, loggedInUserID)
+	if err != nil {
+		logger.Error("failed to create msgraph client", zap.Error(err))
+		sendError(w, http.StatusBadGateway, "Failed to connect to microsoft graph API")
+		return
+	}
+
+	// Make call to API route and parse events
+	// Get old meeting data from microsoft
+	msftMeeting, err := graph.Me().Events().ByEventId(params.MsftID).Get(ctx, nil)
+	if err != nil {
+		logger.Error("failed to get meeting data from microsoft", zap.Error(err))
+		sendError(w, http.StatusBadGateway, "Failed to get meeting data from microsoft")
+		return
+	}
+
+	//nolint: ineffassign, staticcheck, wastedassign  // It is used in the returned obj
+	parsedEvents := []CalendarEvent{}
+	if parsedEvents, err = parseEventableResp([]graphmodels.Eventable{msftMeeting}); err != nil {
+		logger.Error("failed to get meeting data from microsoft", zap.Error(err))
+		sendError(w, http.StatusBadGateway, "Failed to get meeting data from microsoft")
+		return
+	}
+
+	SetHeaderAndWriteResponse(w, http.StatusOK, parsedEvents[0])
 }

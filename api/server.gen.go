@@ -489,6 +489,11 @@ type GetAPIAuthCallbackParams struct {
 	State string `form:"state" json:"state"`
 }
 
+// GetAPICalendarEventParams defines parameters for GetAPICalendarEvent.
+type GetAPICalendarEventParams struct {
+	MsftID string `form:"msftID" json:"msftID"`
+}
+
 // GetAPICalendarMeParams defines parameters for GetAPICalendarMe.
 type GetAPICalendarMeParams struct {
 	Start time.Time `form:"start" json:"start"`
@@ -574,6 +579,9 @@ type ServerInterface interface {
 	// Auth route for authorisation code flow.
 	// (GET /api/auth/callback)
 	GetAPIAuthCallback(w http.ResponseWriter, r *http.Request, params GetAPIAuthCallbackParams)
+	// Get the users specific microsoft calendar event
+	// (GET /api/calendar/event)
+	GetAPICalendarEvent(w http.ResponseWriter, r *http.Request, params GetAPICalendarEventParams)
 	// Get a user's calendar events for a given time range.
 	// (GET /api/calendar/me)
 	GetAPICalendarMe(w http.ResponseWriter, r *http.Request, params GetAPICalendarMeParams)
@@ -751,6 +759,40 @@ func (siw *ServerInterfaceWrapper) GetAPIAuthCallback(w http.ResponseWriter, r *
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetAPIAuthCallback(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAPICalendarEvent operation middleware
+func (siw *ServerInterfaceWrapper) GetAPICalendarEvent(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetAPICalendarEventParams
+
+	// ------------- Required query parameter "msftID" -------------
+
+	if paramValue := r.URL.Query().Get("msftID"); paramValue != "" {
+
+	} else {
+		siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "msftID"})
+		return
+	}
+
+	err = runtime.BindQueryParameter("form", true, true, "msftID", r.URL.Query(), &params.MsftID)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "msftID", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAPICalendarEvent(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1799,6 +1841,8 @@ func HandlerWithOptions(si ServerInterface, options GorillaServerOptions) http.H
 	}
 
 	r.HandleFunc(options.BaseURL+"/api/auth/callback", wrapper.GetAPIAuthCallback).Methods("GET")
+
+	r.HandleFunc(options.BaseURL+"/api/calendar/event", wrapper.GetAPICalendarEvent).Methods("GET")
 
 	r.HandleFunc(options.BaseURL+"/api/calendar/me", wrapper.GetAPICalendarMe).Methods("GET")
 
