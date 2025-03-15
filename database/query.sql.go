@@ -28,8 +28,8 @@ INSERT INTO UserToSlotifyGroup (user_id, slotify_group_id) VALUES (?, ?)
 `
 
 type AddUserToSlotifyGroupParams struct {
-	UserID         uint32 `json:"userId"`
-	SlotifyGroupID uint32 `json:"slotifyGroupId"`
+	UserID         uint32 `json:"userID"`
+	SlotifyGroupID uint32 `json:"slotifyGroupID"`
 }
 
 func (q *Queries) AddUserToSlotifyGroup(ctx context.Context, arg AddUserToSlotifyGroupParams) (int64, error) {
@@ -95,8 +95,8 @@ WHERE user_id=? AND slotify_group_id=?
 `
 
 type CheckMemberInSlotifyGroupParams struct {
-	UserID         uint32 `json:"userId"`
-	SlotifyGroupID uint32 `json:"slotifyGroupId"`
+	UserID         uint32 `json:"userID"`
+	SlotifyGroupID uint32 `json:"slotifyGroupID"`
 }
 
 func (q *Queries) CheckMemberInSlotifyGroup(ctx context.Context, arg CheckMemberInSlotifyGroupParams) (int64, error) {
@@ -195,9 +195,9 @@ VALUES(?, ?, ?, ?, ?, ?, ?)
 `
 
 type CreateInviteParams struct {
-	SlotifyGroupID uint32       `json:"slotifyGroupId"`
-	FromUserID     uint32       `json:"fromUserId"`
-	ToUserID       uint32       `json:"toUserId"`
+	SlotifyGroupID uint32       `json:"slotifyGroupID"`
+	FromUserID     uint32       `json:"fromUserID"`
+	ToUserID       uint32       `json:"toUserID"`
 	Message        string       `json:"message"`
 	Status         InviteStatus `json:"status"`
 	ExpiryDate     time.Time    `json:"expiryDate"`
@@ -225,9 +225,9 @@ INSERT INTO Meeting (meeting_pref_id, owner_email, msft_meeting_id) VALUES (?,?,
 `
 
 type CreateMeetingParams struct {
-	MeetingPrefID uint32 `json:"meetingPrefId"`
+	MeetingPrefID uint32 `json:"meetingPrefID"`
 	OwnerEmail    string `json:"ownerEmail"`
-	MsftMeetingID string `json:"msftMeetingId"`
+	MsftMeetingID string `json:"msftMeetingID"`
 }
 
 func (q *Queries) CreateMeeting(ctx context.Context, arg CreateMeetingParams) (int64, error) {
@@ -278,7 +278,7 @@ INSERT INTO PlaceholderMeeting (request_id, title, start_time, end_time, locatio
 `
 
 type CreatePlaceholderMeetingParams struct {
-	RequestID      uint32    `json:"requestId"`
+	RequestID      uint32    `json:"requestID"`
 	Title          string    `json:"title"`
 	StartTime      time.Time `json:"startTime"`
 	EndTime        time.Time `json:"endTime"`
@@ -310,8 +310,8 @@ INSERT INTO PlaceholderMeetingAttendee (meeting_id, user_id) VALUES (?,?)
 `
 
 type CreatePlaceholderMeetingAttendeeParams struct {
-	MeetingID uint32 `json:"meetingId"`
-	UserID    uint32 `json:"userId"`
+	MeetingID uint32 `json:"meetingID"`
+	UserID    uint32 `json:"userID"`
 }
 
 func (q *Queries) CreatePlaceholderMeetingAttendee(ctx context.Context, arg CreatePlaceholderMeetingAttendeeParams) (int64, error) {
@@ -327,7 +327,7 @@ REPLACE INTO RefreshToken (user_id, token) VALUES (?, ?)
 `
 
 type CreateRefreshTokenParams struct {
-	UserID uint32 `json:"userId"`
+	UserID uint32 `json:"userID"`
 	Token  string `json:"token"`
 }
 
@@ -344,8 +344,8 @@ INSERT INTO RequestToMeeting (request_id, meeting_id) VALUES (?,?)
 `
 
 type CreateRequestToMeetingParams struct {
-	RequestID uint32 `json:"requestId"`
-	MeetingID uint32 `json:"meetingId"`
+	RequestID uint32 `json:"requestID"`
+	MeetingID uint32 `json:"meetingID"`
 }
 
 func (q *Queries) CreateRequestToMeeting(ctx context.Context, arg CreateRequestToMeetingParams) (int64, error) {
@@ -396,8 +396,8 @@ INSERT INTO UserToNotification (user_id, notification_id, is_read) VALUES(?, ?, 
 `
 
 type CreateUserNotificationParams struct {
-	UserID         uint32 `json:"userId"`
-	NotificationID uint32 `json:"notificationId"`
+	UserID         uint32 `json:"userID"`
+	NotificationID uint32 `json:"notificationID"`
 }
 
 func (q *Queries) CreateUserNotification(ctx context.Context, arg CreateUserNotificationParams) (int64, error) {
@@ -466,13 +466,13 @@ WHERE m.owner_email = ?
 `
 
 type GetAllRequestsForUserRow struct {
-	RequestID     uint32                    `json:"requestId"`
+	RequestID     uint32                    `json:"requestID"`
 	RequestedBy   uint32                    `json:"requestedBy"`
 	Status        ReschedulingrequestStatus `json:"status"`
 	CreatedAt     time.Time                 `json:"createdAt"`
-	MsftMeetingID string                    `json:"msftMeetingId"`
+	MsftMeetingID string                    `json:"msftMeetingID"`
 	ID            uint32                    `json:"id"`
-	MeetingID     sql.NullInt32             `json:"meetingId"`
+	MeetingID     sql.NullInt32             `json:"meetingID"`
 	Title         sql.NullString            `json:"title"`
 	StartTime     sql.NullTime              `json:"startTime"`
 	EndTime       sql.NullTime              `json:"endTime"`
@@ -720,13 +720,13 @@ WHERE rr.request_id = ?
 `
 
 type GetRequestByIDRow struct {
-	RequestID     uint32                    `json:"requestId"`
+	RequestID     uint32                    `json:"requestID"`
 	RequestedBy   uint32                    `json:"requestedBy"`
 	Status        ReschedulingrequestStatus `json:"status"`
 	CreatedAt     time.Time                 `json:"createdAt"`
-	MsftMeetingID string                    `json:"msftMeetingId"`
+	MsftMeetingID string                    `json:"msftMeetingID"`
 	ID            uint32                    `json:"id"`
-	MeetingID     sql.NullInt32             `json:"meetingId"`
+	MeetingID     sql.NullInt32             `json:"meetingID"`
 	Title         sql.NullString            `json:"title"`
 	StartTime     sql.NullTime              `json:"startTime"`
 	EndTime       sql.NullTime              `json:"endTime"`
@@ -869,11 +869,11 @@ AND i.slotify_group_id=?
 
 type ListInvitesByGroupParams struct {
 	Status         interface{} `json:"status"`
-	SlotifyGroupID uint32      `json:"slotifyGroupId"`
+	SlotifyGroupID uint32      `json:"slotifyGroupID"`
 }
 
 type ListInvitesByGroupRow struct {
-	InviteID          uint32       `json:"inviteId"`
+	InviteID          uint32       `json:"inviteID"`
 	Message           string       `json:"message"`
 	Status            InviteStatus `json:"status"`
 	CreatedAt         time.Time    `json:"createdAt"`
@@ -931,11 +931,11 @@ AND i.to_user_id=?
 
 type ListInvitesMeParams struct {
 	Status   interface{} `json:"status"`
-	ToUserID uint32      `json:"toUserId"`
+	ToUserID uint32      `json:"toUserID"`
 }
 
 type ListInvitesMeRow struct {
-	InviteID          uint32       `json:"inviteId"`
+	InviteID          uint32       `json:"inviteID"`
 	Message           string       `json:"message"`
 	Status            InviteStatus `json:"status"`
 	CreatedAt         time.Time    `json:"createdAt"`
@@ -1052,8 +1052,8 @@ WHERE user_id=? AND notification_id=?
 `
 
 type MarkNotificationAsReadParams struct {
-	UserID         uint32 `json:"userId"`
-	NotificationID uint32 `json:"notificationId"`
+	UserID         uint32 `json:"userID"`
+	NotificationID uint32 `json:"notificationID"`
 }
 
 func (q *Queries) MarkNotificationAsRead(ctx context.Context, arg MarkNotificationAsReadParams) (int64, error) {
@@ -1083,8 +1083,8 @@ WHERE user_id=? AND slotify_group_id=?
 `
 
 type RemoveSlotifyGroupMemberParams struct {
-	UserID         uint32 `json:"userId"`
-	SlotifyGroupID uint32 `json:"slotifyGroupId"`
+	UserID         uint32 `json:"userID"`
+	SlotifyGroupID uint32 `json:"slotifyGroupID"`
 }
 
 func (q *Queries) RemoveSlotifyGroupMember(ctx context.Context, arg RemoveSlotifyGroupMemberParams) (int64, error) {
@@ -1195,7 +1195,7 @@ WHERE id=? AND from_user_id=?
 type UpdateInviteMessageParams struct {
 	Message    string `json:"message"`
 	ID         uint32 `json:"id"`
-	FromUserID uint32 `json:"fromUserId"`
+	FromUserID uint32 `json:"fromUserID"`
 }
 
 func (q *Queries) UpdateInviteMessage(ctx context.Context, arg UpdateInviteMessageParams) (int64, error) {
@@ -1277,7 +1277,7 @@ UPDATE User SET msft_home_account_id=? WHERE id=?
 `
 
 type UpdateUserHomeAccountIDParams struct {
-	MsftHomeAccountID sql.NullString `json:"msftHomeAccountId"`
+	MsftHomeAccountID sql.NullString `json:"msftHomeAccountID"`
 	ID                uint32         `json:"id"`
 }
 

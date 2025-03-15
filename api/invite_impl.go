@@ -137,20 +137,9 @@ func (s Server) GetAPIInvitesMe(w http.ResponseWriter, r *http.Request, params G
 
 	invites, err := s.DB.ListInvitesMe(ctx, database.ListInvitesMeParams{Status: params.Status, ToUserID: userID})
 	if err != nil {
-		switch {
-		case errors.Is(err, context.Canceled):
-			logger.Error("invite api: failed to get invites: context cancelled")
-			sendError(w, http.StatusInternalServerError, "user api: failed to get invites")
-			return
-		case errors.Is(err, context.DeadlineExceeded):
-			logger.Error("invite api: failed to get invites: query timed out")
-			sendError(w, http.StatusInternalServerError, "invite api: failed to get invites")
-			return
-		default:
-			logger.Error("invite api: failed to get invites")
-			sendError(w, http.StatusInternalServerError, "user api: failed to get invites")
-			return
-		}
+		logger.Error("invite api: failed to get invites", zap.Error(err))
+		sendError(w, http.StatusInternalServerError, "user api: failed to get invites")
+		return
 	}
 
 	SetHeaderAndWriteResponse(w, http.StatusOK, invites)

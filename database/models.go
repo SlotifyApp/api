@@ -100,9 +100,9 @@ func (ns NullReschedulingrequestStatus) Value() (driver.Value, error) {
 
 type Invite struct {
 	ID             uint32       `json:"id"`
-	SlotifyGroupID uint32       `json:"slotifyGroupId"`
-	FromUserID     uint32       `json:"fromUserId"`
-	ToUserID       uint32       `json:"toUserId"`
+	SlotifyGroupID uint32       `json:"slotifyGroupID"`
+	FromUserID     uint32       `json:"fromUserID"`
+	ToUserID       uint32       `json:"toUserID"`
 	Message        string       `json:"message"`
 	Status         InviteStatus `json:"status"`
 	ExpiryDate     time.Time    `json:"expiryDate"`
@@ -111,9 +111,9 @@ type Invite struct {
 
 type Meeting struct {
 	ID            uint32 `json:"id"`
-	MeetingPrefID uint32 `json:"meetingPrefId"`
+	MeetingPrefID uint32 `json:"meetingPrefID"`
 	OwnerEmail    string `json:"ownerEmail"`
-	MsftMeetingID string `json:"msftMeetingId"`
+	MsftMeetingID string `json:"msftMeetingID"`
 }
 
 type Meetingpreferences struct {
@@ -130,8 +130,8 @@ type Notification struct {
 }
 
 type Placeholdermeeting struct {
-	MeetingID      uint32    `json:"meetingId"`
-	RequestID      uint32    `json:"requestId"`
+	MeetingID      uint32    `json:"meetingID"`
+	RequestID      uint32    `json:"requestID"`
 	Title          string    `json:"title"`
 	StartTime      time.Time `json:"startTime"`
 	EndTime        time.Time `json:"endTime"`
@@ -142,24 +142,24 @@ type Placeholdermeeting struct {
 }
 
 type Placeholdermeetingattendee struct {
-	MeetingID uint32 `json:"meetingId"`
-	UserID    uint32 `json:"userId"`
+	MeetingID uint32 `json:"meetingID"`
+	UserID    uint32 `json:"userID"`
 }
 
 type RefreshToken struct {
 	ID      uint32 `json:"id"`
-	UserID  uint32 `json:"userId"`
+	UserID  uint32 `json:"userID"`
 	Token   string `json:"token"`
 	Revoked bool   `json:"revoked"`
 }
 
 type Requesttomeeting struct {
-	RequestID uint32 `json:"requestId"`
-	MeetingID uint32 `json:"meetingId"`
+	RequestID uint32 `json:"requestID"`
+	MeetingID uint32 `json:"meetingID"`
 }
 
 type Reschedulingrequest struct {
-	RequestID   uint32                    `json:"requestId"`
+	RequestID   uint32                    `json:"requestID"`
 	RequestedBy uint32                    `json:"requestedBy"`
 	Status      ReschedulingrequestStatus `json:"status"`
 	CreatedAt   time.Time                 `json:"createdAt"`
@@ -175,22 +175,22 @@ type User struct {
 	Email             string         `json:"email"`
 	FirstName         string         `json:"firstName"`
 	LastName          string         `json:"lastName"`
-	MsftHomeAccountID sql.NullString `json:"msftHomeAccountId"`
+	MsftHomeAccountID sql.NullString `json:"msftHomeAccountID"`
 }
 
 type Userpreferences struct {
-	UserID         uint32    `json:"userId"`
+	UserID         uint32    `json:"userID"`
 	LunchStartTime time.Time `json:"lunchStartTime"`
 	LunchEndTime   time.Time `json:"lunchEndTime"`
 }
 
 type Usertonotification struct {
-	UserID         uint32 `json:"userId"`
-	NotificationID uint32 `json:"notificationId"`
+	UserID         uint32 `json:"userID"`
+	NotificationID uint32 `json:"notificationID"`
 	IsRead         bool   `json:"isRead"`
 }
 
 type Usertoslotifygroup struct {
-	UserID         uint32 `json:"userId"`
-	SlotifyGroupID uint32 `json:"slotifyGroupId"`
+	UserID         uint32 `json:"userID"`
+	SlotifyGroupID uint32 `json:"slotifyGroupID"`
 }
