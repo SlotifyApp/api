@@ -6,10 +6,13 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/SlotifyApp/slotify-backend/database"
 	"github.com/avast/retry-go"
 	abstractions "github.com/microsoft/kiota-abstractions-go"
 	msgraphsdkgo "github.com/microsoftgraph/msgraph-sdk-go"
 	graphusers "github.com/microsoftgraph/msgraph-sdk-go/users"
+	"github.com/oapi-codegen/runtime/types"
+	"go.uber.org/zap"
 
 	graphmodels "github.com/microsoftgraph/msgraph-sdk-go/models"
 
@@ -260,4 +263,134 @@ func makeFindMeetingTimesAPICall(ctx context.Context,
 	}
 
 	return respBody, nil
+}
+
+func getUserWorkingHours(s Server,
+	calendarEvent []CalendarEvent,
+	userWorkingHours map[string]float64,
+) map[string]float64 {
+	// Calculate working hours for each day
+	for _, event := range calendarEvent {
+		startTime, err := time.Parse(time.RFC3339, *event.StartTime+"Z")
+		if err != nil {
+			s.Logger.Error("failed to parse calendar start time", zap.Error(err))
+			continue
+		}
+
+		var endTime time.Time
+		endTime, err = time.Parse(time.RFC3339, *event.EndTime+"Z")
+		if err != nil {
+			s.Logger.Error("failed to parse calendar end time", zap.Error(err))
+			continue
+		}
+
+		duration := endTime.Sub(startTime).Minutes()
+
+		val, ok := userWorkingHours[startTime.Format("2006-01-02")]
+
+		if !ok {
+			userWorkingHours[startTime.Format("2006-01-02")] = duration
+		} else {
+			userWorkingHours[startTime.Format("2006-01-02")] = val + duration
+		}
+	}
+
+	return userWorkingHours
+}
+
+func generateRatingsForSlots(ctx context.Context,
+	s Server,
+	ownerID uint32,
+	possibleSlots SchedulingSlotsSuccessResponseBody,
+	body SchedulingSlotsBodySchema,
+) SchedulingSlotsSuccessResponseBody {
+	// For each attendee, get their calendar data to calculate how many hours of meetings they have each day
+	// then update the running average
+	const workingMinutes = float64(540) // 9 hours * 60 minutes
+	response := possibleSlots
+
+	tempBody := body
+
+	ownerUser, err := s.DB.GetUserByID(ctx, ownerID)
+	if err != nil {
+		s.Logger.Error("failed to create msgraph client", zap.Error(err))
+	} else {
+		tempBody.Attendees = append(tempBody.Attendees, AttendeeBase{
+			AttendeeType: "required",
+			EmailAddress: EmailAddress{
+				Address: types.Email(ownerUser.Email),
+				Name:    ownerUser.FirstName,
+			},
+		})
+	}
+
+	proAttende := processReqBodyAttendees(&tempBody)
+
+	for no, a := range proAttende {
+		var aEmailAdd string
+		if a.GetEmailAddress() != nil || a.GetEmailAddress().GetAddress() != nil {
+			aEmailAdd = *a.GetEmailAddress().GetAddress()
+		} else {
+			continue
+		}
+
+		// Get user ID
+		var user database.User
+		user, err = s.DB.GetUserByEmail(ctx, aEmailAdd)
+		if err != nil {
+			s.Logger.Error("failed to create msgraph client", zap.Error(err))
+			continue
+		}
+
+		// Fetch calendar for user
+		var graph *msgraphsdkgo.GraphServiceClient
+		graph, err = CreateMSFTGraphClient(ctx, s.MSALClient, s.DB, user.ID)
+		if err != nil {
+			s.Logger.Error("failed to create msgraph client", zap.Error(err))
+			continue
+		}
+		userWorkingHours := map[string]float64{}
+
+		// Make call to API route and parse events
+		var calendarEvent []CalendarEvent
+		calendarEvent, err = makeCalendarMeAPICall(graph,
+			body.TimeConstraint.TimeSlots[0].Start,
+			body.TimeConstraint.TimeSlots[0].End)
+		if err != nil {
+			s.Logger.Error("failed to make calendar me msgraph api call", zap.Error(err))
+			continue
+		}
+
+		userWorkingHours = getUserWorkingHours(s, calendarEvent, userWorkingHours)
+
+		// Update running average of confidence
+		for idx, slot := range *possibleSlots.MeetingTimeSuggestions {
+			dur := slot.MeetingTimeSlot.End.Sub(slot.MeetingTimeSlot.End)
+			totalTime, ok := userWorkingHours[slot.MeetingTimeSlot.Start.Format("2006-01-02")]
+
+			if ok {
+				totalTime = 0
+			}
+
+			remainingMinutes := workingMinutes - dur.Minutes() - totalTime
+			var personalScore float64
+			if remainingMinutes > 0 {
+				//nolint: mnd // magic number 100 for converting to percentage from decimal
+				personalScore = (remainingMinutes / workingMinutes) * 100
+			} else {
+				personalScore = 0
+			}
+
+			if no == 0 {
+				(*response.MeetingTimeSuggestions)[idx].Confidence = &personalScore
+			} else {
+				// running average
+				curr := *(*response.MeetingTimeSuggestions)[idx].Confidence * float64(no)
+				updatedConfidence := (personalScore + curr) / float64(no+1)
+				(*response.MeetingTimeSuggestions)[idx].Confidence = &updatedConfidence
+			}
+		}
+	}
+
+	return response
 }
