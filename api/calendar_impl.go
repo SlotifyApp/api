@@ -21,7 +21,7 @@ func (s Server) GetAPICalendarUserID(w http.ResponseWriter,
 	loggedInUserID, _ := r.Context().Value(UserIDCtxKey{}).(uint32)
 	reqID, _ := r.Context().Value(RequestIDCtxKey{}).(string)
 
-	logger := s.Logger.With(zap.String("request_id", reqID), zap.Uint32("logged_in_user_id", loggedInUserID))
+	logger := s.Logger.With(zap.String("request_id", reqID), zap.Uint32("user_id", loggedInUserID))
 
 	ctx, cancel := context.WithTimeout(r.Context(), time.Minute)
 	defer cancel()
@@ -117,16 +117,16 @@ func (s Server) PostAPICalendarMe(w http.ResponseWriter, r *http.Request) {
 
 // (GET /api/calendar/event).
 func (s Server) GetAPICalendarEvent(w http.ResponseWriter, r *http.Request, params GetAPICalendarEventParams) {
-	loggedInUserID, _ := r.Context().Value(UserIDCtxKey{}).(uint32)
+	userID, _ := r.Context().Value(UserIDCtxKey{}).(uint32)
 	reqID, _ := r.Context().Value(RequestIDCtxKey{}).(string)
 
-	logger := s.Logger.With(zap.String("request_id", reqID), zap.Uint32("logged_in_user_id", loggedInUserID))
+	logger := s.Logger.With(zap.String("request_id", reqID), zap.Uint32("user_id", userID))
 
 	ctx, cancel := context.WithTimeout(r.Context(), time.Minute)
 	defer cancel()
 
 	// create graph client for the userID in query params.
-	graph, err := CreateMSFTGraphClient(ctx, s.MSALClient, s.DB, loggedInUserID)
+	graph, err := CreateMSFTGraphClient(ctx, s.MSALClient, s.DB, userID)
 	if err != nil {
 		logger.Error("failed to create msgraph client", zap.Error(err))
 		sendError(w, http.StatusBadGateway, "Failed to connect to microsoft graph API")
@@ -142,8 +142,7 @@ func (s Server) GetAPICalendarEvent(w http.ResponseWriter, r *http.Request, para
 		return
 	}
 
-	//nolint: ineffassign, staticcheck, wastedassign  // It is used in the returned obj
-	parsedEvents := []CalendarEvent{}
+	var parsedEvents []CalendarEvent
 	if parsedEvents, err = parseEventableResp([]graphmodels.Eventable{msftMeeting}); err != nil {
 		logger.Error("failed to get meeting data from microsoft", zap.Error(err))
 		sendError(w, http.StatusBadGateway, "Failed to get meeting data from microsoft")
