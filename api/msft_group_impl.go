@@ -62,7 +62,7 @@ func (s Server) GetAPIMSFTGroups(w http.ResponseWriter, r *http.Request, params 
 }
 
 // (GET  /api/msft-groups/me).
-func (s Server) GetAPIMSFTGroupsMe(w http.ResponseWriter, r *http.Request) {
+func (s Server) GetAPIMSFTGroupsMe(w http.ResponseWriter, r *http.Request, _ GetAPIMSFTGroupsMeParams) {
 	userID, _ := r.Context().Value(UserIDCtxKey{}).(uint32)
 	reqID, _ := r.Context().Value(RequestIDCtxKey{}).(string)
 
