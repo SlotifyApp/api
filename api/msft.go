@@ -47,7 +47,7 @@ func getMSFTScopes() []string {
 		oidc.ScopeOpenID, "profile", "email", "User.ReadWrite.All",
 		"Calendars.ReadBasic", "Calendars.Read", "Calendars.ReadWrite",
 		"Calendars.ReadWrite.Shared", "Group.Read.All", "Group.ReadWrite.All",
-		"Place.Read.All",
+		"Place.Read.All", "People.Read.All",
 	}
 }
 
