@@ -179,6 +179,8 @@ func TestUser_GetUsers(t *testing.T) {
 	insertedUser2 := testutil.InsertUser(t, db, testutil.WithFirstName(insertedUser.FirstName))
 	insertedUser3 := testutil.InsertUser(t, db, testutil.WithLastName(insertedUser.LastName))
 
+	zerothPage := 0
+
 	tests := map[string]struct {
 		httpStatus   int
 		expectedBody any
@@ -190,40 +192,64 @@ func TestUser_GetUsers(t *testing.T) {
 			httpStatus:   http.StatusOK,
 			expectedBody: api.Users{insertedUser},
 			testMsg:      "successfully got user by email",
-			route:        fmt.Sprintf("?email=%s&pageToken=0", url.QueryEscape(string(insertedUser.Email))),
+			route: fmt.Sprintf(
+				"?email=%s&pageToken=%d&limit=%d",
+				url.QueryEscape(string(insertedUser.Email)),
+				zerothPage,
+				testutil.PageLimit,
+			),
 			params: api.GetAPIUsersParams{
 				Email:     &insertedUser.Email,
-				PageToken: 0,
+				PageToken: &zerothPage,
+				Limit:     testutil.PageLimit,
 			},
 		},
 		"get existing user by first name": {
 			httpStatus:   http.StatusOK,
 			expectedBody: api.Users{insertedUser, insertedUser2},
 			testMsg:      "successfully got users by first name",
-			route:        fmt.Sprintf("?firstName=%s&pageToken=0", url.QueryEscape(insertedUser.FirstName)),
+			route: fmt.Sprintf(
+				"?firstName=%s&pageToken=%d&limit=%d",
+				url.QueryEscape(insertedUser.FirstName),
+				zerothPage,
+				testutil.PageLimit,
+			),
 			params: api.GetAPIUsersParams{
 				Name:      &insertedUser.FirstName,
-				PageToken: 0,
+				PageToken: &zerothPage,
+				Limit:     testutil.PageLimit,
 			},
 		},
 		"get existing user by last name": {
 			httpStatus:   http.StatusOK,
 			expectedBody: api.Users{insertedUser, insertedUser3},
 			testMsg:      "successfully got users by last name",
-			route:        fmt.Sprintf("?lastName=%s&pageToken=0", url.QueryEscape(insertedUser.LastName)),
+			route: fmt.Sprintf(
+				"?lastName=%s&pageToken=%d&limit=%d",
+				url.QueryEscape(insertedUser.LastName),
+				zerothPage,
+				testutil.PageLimit,
+			),
 			params: api.GetAPIUsersParams{
 				Name:      &insertedUser.LastName,
-				PageToken: 0,
+				PageToken: &zerothPage,
+				Limit:     testutil.PageLimit,
 			},
 		},
 		"get users by non-existent query params": {
 			httpStatus:   http.StatusOK,
 			expectedBody: api.Users{},
 			testMsg:      "successfully got empty array of users when users don't exist by query params",
-			route:        fmt.Sprintf("?lastName=%s&pageToken=0", url.QueryEscape(fakeLastName)),
+			route: fmt.Sprintf(
+				"?lastName=%s&pageToken=%d&limit=%d",
+				url.QueryEscape(fakeLastName),
+				zerothPage,
+				testutil.PageLimit,
+			),
 			params: api.GetAPIUsersParams{
 				Name:      &fakeLastName,
-				PageToken: 0,
+				PageToken: &zerothPage,
+				Limit:     testutil.PageLimit,
 			},
 		},
 	}
@@ -232,7 +258,11 @@ func TestUser_GetUsers(t *testing.T) {
 		t.Run(testName, func(t *testing.T) {
 			rr := httptest.NewRecorder()
 
-			req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/users?%s&pageToken=0", tt.route), nil)
+			req := httptest.NewRequest(
+				http.MethodGet,
+				fmt.Sprintf("/api/users?%s&pageToken=%d&limit=%d", tt.route, zerothPage, testutil.PageLimit),
+				nil,
+			)
 			req.Header.Add("Content-Type", "application/json")
 
 			req.Header.Set(api.ReqHeader, uuid.NewString())
@@ -270,7 +300,11 @@ func TestUser_GetUsers(t *testing.T) {
 
 		var rr *httptest.ResponseRecorder
 
-		req := httptest.NewRequest(http.MethodGet, "/api/users?pageToken=0", nil)
+		req := httptest.NewRequest(
+			http.MethodGet,
+			fmt.Sprintf("/api/users?pageToken=%d&limit=%d", zerothPage, testutil.PageLimit),
+			nil,
+		)
 		req.Header.Add("Content-Type", "application/json")
 
 		count := testutil.GetCount(t, db, "User")
@@ -279,7 +313,11 @@ func TestUser_GetUsers(t *testing.T) {
 		pageToken := 0
 		for {
 			rr = httptest.NewRecorder()
-			server.GetAPIUsers(rr, req, api.GetAPIUsersParams{PageToken: pageToken})
+			server.GetAPIUsers(rr, req, api.GetAPIUsersParams{
+				PageToken: &pageToken,
+				Limit:     testutil.PageLimit,
+			},
+			)
 			require.Equal(t, http.StatusOK, rr.Result().StatusCode)
 			var resp struct {
 				Users         api.Users `json:"users"`
@@ -303,9 +341,16 @@ func TestUser_GetUsers(t *testing.T) {
 			testutil.InsertUser(t, db)
 		}
 		rr := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/api/users&pageToken=0", nil)
+		req := httptest.NewRequest(
+			http.MethodGet,
+			fmt.Sprintf("/api/users?pageToken=%d&limit=%d", zerothPage, testutil.PageLimit),
+			nil,
+		)
 		req.Header.Set(api.ReqHeader, uuid.NewString())
-		params := api.GetAPIUsersParams{PageToken: 0}
+		params := api.GetAPIUsersParams{
+			PageToken: &zerothPage,
+			Limit:     testutil.PageLimit,
+		}
 		server.GetAPIUsers(rr, req, params)
 		require.Equal(t, http.StatusOK, rr.Result().StatusCode)
 		var response struct {
@@ -320,7 +365,8 @@ func TestUser_GetUsers(t *testing.T) {
 			req2 := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/users&pageToken=%d", response.NextPageToken), nil)
 			req2.Header.Set(api.ReqHeader, uuid.NewString())
 			params2 := api.GetAPIUsersParams{
-				PageToken: response.NextPageToken,
+				PageToken: &response.NextPageToken,
+				Limit:     testutil.PageLimit,
 			}
 			server.GetAPIUsers(rr2, req2, params2)
 			require.Equal(t, http.StatusOK, rr2.Result().StatusCode)

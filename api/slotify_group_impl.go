@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	groupLimit = 10
+	GroupLimitMax = 10
 )
 
 // (DELETE /api/slotify-groups/{slotifyGroupID}/leave/me)  Have a member leave from a slotify group.
@@ -129,6 +129,8 @@ func (s Server) GetAPISlotifyGroupsMe(w http.ResponseWriter, r *http.Request, pa
 	//nolint: gosec // page is unsigned 32 bit int
 	lastID := uint32(*params.PageToken)
 
+	groupLimit := min(params.Limit, GroupLimitMax)
+
 	slotifyGroups, err := s.DB.GetUsersSlotifyGroups(
 		ctx,
 		database.GetUsersSlotifyGroupsParams{
@@ -157,7 +159,7 @@ func (s Server) GetAPISlotifyGroupsMe(w http.ResponseWriter, r *http.Request, pa
 	}
 
 	var nextPageToken int
-	if len(slotifyGroups) == groupLimit {
+	if len(slotifyGroups) == int(groupLimit) {
 		nextPageToken = int(slotifyGroups[len(slotifyGroups)-1].ID)
 	} else {
 		nextPageToken = -1
@@ -355,7 +357,7 @@ func (s Server) GetAPISlotifyGroupsSlotifyGroupID(w http.ResponseWriter, r *http
 }
 
 // (GET /api/slotify-groups/{slotifyGroupID}/users).
-// nolint: lll // function name
+// nolint: lll // function declaration
 func (s Server) GetAPISlotifyGroupsSlotifyGroupIDUsers(w http.ResponseWriter, r *http.Request, slotifyGroupID uint32, params GetAPISlotifyGroupsSlotifyGroupIDUsersParams) {
 	userID, _ := r.Context().Value(UserIDCtxKey{}).(uint32)
 	reqID, _ := r.Context().Value(RequestIDCtxKey{}).(string)
@@ -387,6 +389,8 @@ func (s Server) GetAPISlotifyGroupsSlotifyGroupIDUsers(w http.ResponseWriter, r 
 	//nolint: gosec // page is unsigned 32 bit int
 	lastID := uint32(*params.PageToken)
 
+	groupLimit := min(params.Limit, GroupLimitMax)
+
 	users, err := s.DB.GetAllSlotifyGroupMembers(ctx, database.GetAllSlotifyGroupMembersParams{
 		ID:     slotifyGroupID,
 		LastID: lastID,
@@ -403,7 +407,7 @@ func (s Server) GetAPISlotifyGroupsSlotifyGroupIDUsers(w http.ResponseWriter, r 
 	}
 
 	var nextPageToken int
-	if len(users) == groupLimit {
+	if len(users) == int(groupLimit) {
 		nextPageToken = int(users[len(users)-1].ID)
 	} else {
 		nextPageToken = -1
