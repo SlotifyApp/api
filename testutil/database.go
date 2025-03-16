@@ -25,6 +25,10 @@ import (
 	"go.uber.org/mock/gomock"
 )
 
+const (
+	PageLimit = 10
+)
+
 func CreateNotificationAndLink(t *testing.T, ctx context.Context, db *database.Database,
 	arg database.CreateNotificationParams, userID uint32,
 ) {

@@ -141,6 +141,7 @@ func (s Server) GetAPIMSFTGroupsGroupID(w http.ResponseWriter, r *http.Request, 
 }
 
 // (GET /api/msft-groups/{groupID}/users).
+// nolint: lll // function declaration
 func (s Server) GetAPIMSFTGroupsGroupIDUsers(w http.ResponseWriter, r *http.Request, groupID string, params GetAPIMSFTGroupsGroupIDUsersParams) {
 	userID, _ := r.Context().Value(UserIDCtxKey{}).(uint32)
 	reqID, _ := r.Context().Value(RequestIDCtxKey{}).(string)

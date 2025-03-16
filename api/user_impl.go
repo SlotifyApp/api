@@ -16,8 +16,8 @@ import (
 )
 
 const (
-	// SearchUserLim is the limit for number of users to return from the users search.
-	SearchUserLim = 10
+	// SearchUserLim is the maximum limit for number of users to return from the users search.
+	SearchUserLimMax = 50
 )
 
 // (GET /users) Get a user by query params.
@@ -32,6 +32,8 @@ func (s Server) GetAPIUsers(w http.ResponseWriter, r *http.Request, params GetAP
 
 	users := make([]database.User, 0)
 
+	searchUserLim := min(SearchUserLimMax, params.Limit)
+
 	// searches by name first if both name and email params are given a value
 	switch {
 	// search users by name
@@ -40,7 +42,7 @@ func (s Server) GetAPIUsers(w http.ResponseWriter, r *http.Request, params GetAP
 			//nolint: gosec // page is unsigned 32 bit int
 			database.SearchUsersByNameParams{
 				Name:   *params.Name,
-				Limit:  SearchUserLim,
+				Limit:  searchUserLim,
 				LastID: uint32(*params.PageToken),
 			})
 		if err != nil {
@@ -63,7 +65,7 @@ func (s Server) GetAPIUsers(w http.ResponseWriter, r *http.Request, params GetAP
 			//nolint: gosec // page is unsigned 32 bit int
 			database.SearchUsersByEmailParams{
 				Email:  string(*params.Email),
-				Limit:  SearchUserLim,
+				Limit:  searchUserLim,
 				LastID: uint32(*params.PageToken),
 			})
 		if err != nil {
@@ -85,7 +87,7 @@ func (s Server) GetAPIUsers(w http.ResponseWriter, r *http.Request, params GetAP
 		usersAll, err := s.DB.ListUsers(ctx,
 			//nolint: gosec // page is unsigned 32 bit int
 			database.ListUsersParams{
-				Limit:  SearchUserLim,
+				Limit:  searchUserLim,
 				LastID: uint32(*params.PageToken),
 			})
 		if err != nil {
@@ -103,7 +105,7 @@ func (s Server) GetAPIUsers(w http.ResponseWriter, r *http.Request, params GetAP
 		}
 	}
 	var nextPageToken int
-	if len(users) == SearchUserLim {
+	if len(users) == int(searchUserLim) {
 		// id of the last user gotten here
 		nextPageToken = int(users[len(users)-1].ID)
 	} else {

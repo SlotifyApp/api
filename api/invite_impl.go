@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	invitesLimit = 10
+	InvitesLimitMax = 50
 )
 
 // (POST /api/invites) Create a new invite.
@@ -139,6 +139,8 @@ func (s Server) GetAPIInvitesMe(w http.ResponseWriter, r *http.Request, params G
 		return
 	}
 
+	invitesLimit := min(params.Limit, InvitesLimitMax)
+
 	//nolint: gosec // page is unsigned 32 bit int
 	lastID := uint32(*params.PageToken)
 
@@ -155,7 +157,7 @@ func (s Server) GetAPIInvitesMe(w http.ResponseWriter, r *http.Request, params G
 	}
 
 	var nextPageToken int
-	if len(invites) == invitesLimit {
+	if len(invites) == int(invitesLimit) {
 		nextPageToken = int(invites[len(invites)-1].InviteID)
 	} else {
 		nextPageToken = -1
@@ -393,6 +395,8 @@ func (s Server) GetAPISlotifyGroupsSlotifyGroupIDInvites(w http.ResponseWriter,
 	ctx, cancel := context.WithTimeout(r.Context(), 2*database.DatabaseTimeout)
 	defer cancel()
 
+	invitesLimit := min(InvitesLimitMax, params.Limit)
+
 	//nolint: gosec // page is unsigned 32 bit int
 	lastID := uint32(*params.PageToken)
 
@@ -421,7 +425,7 @@ func (s Server) GetAPISlotifyGroupsSlotifyGroupIDInvites(w http.ResponseWriter,
 	}
 
 	var nextPageToken int
-	if len(invites) == invitesLimit {
+	if len(invites) == int(invitesLimit) {
 		nextPageToken = int(invites[len(invites)-1].InviteID)
 	} else {
 		nextPageToken = -1
