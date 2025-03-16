@@ -521,7 +521,16 @@ SELECT u.id, u.email, u.first_name, u.last_name FROM SlotifyGroup sg
 JOIN UserToSlotifyGroup utsg ON sg.id=utsg.slotify_group_id
 JOIN User u ON u.id=utsg.user_id 
 WHERE sg.id=?
+AND u.id > ?
+ORDER BY u.id
+LIMIT ?
 `
+
+type GetAllSlotifyGroupMembersParams struct {
+	ID     uint32 `json:"id"`
+	LastID uint32 `json:"lastID"`
+	Limit  int32  `json:"limit"`
+}
 
 type GetAllSlotifyGroupMembersRow struct {
 	ID        uint32 `json:"id"`
@@ -530,8 +539,8 @@ type GetAllSlotifyGroupMembersRow struct {
 	LastName  string `json:"lastName"`
 }
 
-func (q *Queries) GetAllSlotifyGroupMembers(ctx context.Context, id uint32) ([]GetAllSlotifyGroupMembersRow, error) {
-	rows, err := q.query(ctx, q.getAllSlotifyGroupMembersStmt, getAllSlotifyGroupMembers, id)
+func (q *Queries) GetAllSlotifyGroupMembers(ctx context.Context, arg GetAllSlotifyGroupMembersParams) ([]GetAllSlotifyGroupMembersRow, error) {
+	rows, err := q.query(ctx, q.getAllSlotifyGroupMembersStmt, getAllSlotifyGroupMembers, arg.ID, arg.LastID, arg.Limit)
 	if err != nil {
 		return nil, err
 	}
@@ -833,10 +842,19 @@ const getUsersSlotifyGroups = `-- name: GetUsersSlotifyGroups :many
 SELECT sg.id, sg.name FROM UserToSlotifyGroup utsg
 JOIN SlotifyGroup sg ON utsg.slotify_group_id=sg.id 
 WHERE utsg.user_id=?
+AND sg.id > ?
+ORDER BY sg.id
+LIMIT ?
 `
 
-func (q *Queries) GetUsersSlotifyGroups(ctx context.Context, userID uint32) ([]SlotifyGroup, error) {
-	rows, err := q.query(ctx, q.getUsersSlotifyGroupsStmt, getUsersSlotifyGroups, userID)
+type GetUsersSlotifyGroupsParams struct {
+	UserID uint32 `json:"userID"`
+	LastID uint32 `json:"lastID"`
+	Limit  int32  `json:"limit"`
+}
+
+func (q *Queries) GetUsersSlotifyGroups(ctx context.Context, arg GetUsersSlotifyGroupsParams) ([]SlotifyGroup, error) {
+	rows, err := q.query(ctx, q.getUsersSlotifyGroupsStmt, getUsersSlotifyGroups, arg.UserID, arg.LastID, arg.Limit)
 	if err != nil {
 		return nil, err
 	}
@@ -864,12 +882,17 @@ SELECT
 JOIN User fu ON fu.id=i.from_user_id
 JOIN User tu ON tu.id=i.to_user_id
 WHERE i.status = ifnull(?, i.status) 
-AND i.slotify_group_id=?
+  AND i.slotify_group_id=?
+  AND i.id > ?
+ORDER BY i.id
+LIMIT ?
 `
 
 type ListInvitesByGroupParams struct {
 	Status         interface{} `json:"status"`
 	SlotifyGroupID uint32      `json:"slotifyGroupID"`
+	LastID         uint32      `json:"lastID"`
+	Limit          int32       `json:"limit"`
 }
 
 type ListInvitesByGroupRow struct {
@@ -887,7 +910,12 @@ type ListInvitesByGroupRow struct {
 }
 
 func (q *Queries) ListInvitesByGroup(ctx context.Context, arg ListInvitesByGroupParams) ([]ListInvitesByGroupRow, error) {
-	rows, err := q.query(ctx, q.listInvitesByGroupStmt, listInvitesByGroup, arg.Status, arg.SlotifyGroupID)
+	rows, err := q.query(ctx, q.listInvitesByGroupStmt, listInvitesByGroup,
+		arg.Status,
+		arg.SlotifyGroupID,
+		arg.LastID,
+		arg.Limit,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -927,11 +955,16 @@ JOIN User fu ON fu.id=i.from_user_id
 JOIN SlotifyGroup sg ON sg.id=i.slotify_group_id
 WHERE i.status = ifnull(?, i.status) 
 AND i.to_user_id=?
+AND i.id > ?
+ORDER BY i.id
+LIMIT ?
 `
 
 type ListInvitesMeParams struct {
 	Status   interface{} `json:"status"`
 	ToUserID uint32      `json:"toUserID"`
+	LastID   uint32      `json:"lastID"`
+	Limit    int32       `json:"limit"`
 }
 
 type ListInvitesMeRow struct {
@@ -947,7 +980,12 @@ type ListInvitesMeRow struct {
 }
 
 func (q *Queries) ListInvitesMe(ctx context.Context, arg ListInvitesMeParams) ([]ListInvitesMeRow, error) {
-	rows, err := q.query(ctx, q.listInvitesMeStmt, listInvitesMe, arg.Status, arg.ToUserID)
+	rows, err := q.query(ctx, q.listInvitesMeStmt, listInvitesMe,
+		arg.Status,
+		arg.ToUserID,
+		arg.LastID,
+		arg.Limit,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -1009,7 +1047,15 @@ func (q *Queries) ListSlotifyGroups(ctx context.Context, name interface{}) ([]Sl
 
 const listUsers = `-- name: ListUsers :many
 SELECT id, email, first_name, last_name FROM User
+WHERE id > ?
+ORDER BY id
+LIMIT ?
 `
+
+type ListUsersParams struct {
+	LastID uint32 `json:"lastID"`
+	Limit  int32  `json:"limit"`
+}
 
 type ListUsersRow struct {
 	ID        uint32 `json:"id"`
@@ -1018,8 +1064,8 @@ type ListUsersRow struct {
 	LastName  string `json:"lastName"`
 }
 
-func (q *Queries) ListUsers(ctx context.Context) ([]ListUsersRow, error) {
-	rows, err := q.query(ctx, q.listUsersStmt, listUsers)
+func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]ListUsersRow, error) {
+	rows, err := q.query(ctx, q.listUsersStmt, listUsers, arg.LastID, arg.Limit)
 	if err != nil {
 		return nil, err
 	}
@@ -1098,12 +1144,15 @@ func (q *Queries) RemoveSlotifyGroupMember(ctx context.Context, arg RemoveSlotif
 const searchUsersByEmail = `-- name: SearchUsersByEmail :many
 SELECT id, email, first_name, last_name FROM User
 WHERE LOWER(email) LIKE LOWER(CONCAT('%', ?, '%'))
+  and id > ?
+ORDER BY id
 LIMIT ?
 `
 
 type SearchUsersByEmailParams struct {
-	Email interface{} `json:"email"`
-	Limit int32       `json:"limit"`
+	Email  interface{} `json:"email"`
+	LastID uint32      `json:"lastID"`
+	Limit  int32       `json:"limit"`
 }
 
 type SearchUsersByEmailRow struct {
@@ -1114,7 +1163,7 @@ type SearchUsersByEmailRow struct {
 }
 
 func (q *Queries) SearchUsersByEmail(ctx context.Context, arg SearchUsersByEmailParams) ([]SearchUsersByEmailRow, error) {
-	rows, err := q.query(ctx, q.searchUsersByEmailStmt, searchUsersByEmail, arg.Email, arg.Limit)
+	rows, err := q.query(ctx, q.searchUsersByEmailStmt, searchUsersByEmail, arg.Email, arg.LastID, arg.Limit)
 	if err != nil {
 		return nil, err
 	}
@@ -1144,12 +1193,15 @@ func (q *Queries) SearchUsersByEmail(ctx context.Context, arg SearchUsersByEmail
 const searchUsersByName = `-- name: SearchUsersByName :many
 SELECT id, email, first_name, last_name FROM User
 WHERE LOWER(CONCAT(first_name, ' ', last_name)) LIKE LOWER(CONCAT('%', ?, '%'))
+  AND id > ?
+ORDER BY id
 LIMIT ?
 `
 
 type SearchUsersByNameParams struct {
-	Name  interface{} `json:"name"`
-	Limit int32       `json:"limit"`
+	Name   interface{} `json:"name"`
+	LastID uint32      `json:"lastID"`
+	Limit  int32       `json:"limit"`
 }
 
 type SearchUsersByNameRow struct {
@@ -1160,7 +1212,7 @@ type SearchUsersByNameRow struct {
 }
 
 func (q *Queries) SearchUsersByName(ctx context.Context, arg SearchUsersByNameParams) ([]SearchUsersByNameRow, error) {
-	rows, err := q.query(ctx, q.searchUsersByNameStmt, searchUsersByName, arg.Name, arg.Limit)
+	rows, err := q.query(ctx, q.searchUsersByNameStmt, searchUsersByName, arg.Name, arg.LastID, arg.Limit)
 	if err != nil {
 		return nil, err
 	}

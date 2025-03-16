@@ -127,7 +127,7 @@ func (s Server) GetAPISlotifyGroupsMe(w http.ResponseWriter, r *http.Request, pa
 	defer cancel()
 
 	//nolint: gosec // page is unsigned 32 bit int
-	lastID := uint32(params.PageToken)
+	lastID := uint32(*params.PageToken)
 
 	slotifyGroups, err := s.DB.GetUsersSlotifyGroups(
 		ctx,
@@ -385,7 +385,7 @@ func (s Server) GetAPISlotifyGroupsSlotifyGroupIDUsers(w http.ResponseWriter, r 
 	}
 
 	//nolint: gosec // page is unsigned 32 bit int
-	lastID := uint32(params.PageToken)
+	lastID := uint32(*params.PageToken)
 
 	users, err := s.DB.GetAllSlotifyGroupMembers(ctx, database.GetAllSlotifyGroupMembersParams{
 		ID:     slotifyGroupID,

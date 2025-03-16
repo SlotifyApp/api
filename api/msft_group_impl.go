@@ -4,10 +4,8 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"strconv"
 
 	"github.com/SlotifyApp/slotify-backend/database"
-	graphcore "github.com/microsoftgraph/msgraph-sdk-go-core"
 	graphgroups "github.com/microsoftgraph/msgraph-sdk-go/groups"
 	"github.com/microsoftgraph/msgraph-sdk-go/models"
 	graphusers "github.com/microsoftgraph/msgraph-sdk-go/users"
@@ -88,17 +86,20 @@ func (s Server) GetAPIMSFTGroupsMe(w http.ResponseWriter, r *http.Request) {
 		requestBody,
 		nil,
 	)
+	if err != nil {
+		logger.Error("failed to fetch my groups from Microsoft", zap.Error(err))
+		sendError(w, http.StatusNotFound, "Failed to fetch my groups from Microsoft")
+		return
+	}
 
 	var outs []string
-	for _, st := range gets.GetValue() {
-		outs = append(outs, st)
-	}
+	outs = append(outs, gets.GetValue()...)
 
 	SetHeaderAndWriteResponse(w, http.StatusOK, outs)
 }
 
 // (GET /api/msft-groups/{groupID}).
-func (s Server) GetAPIMSFTGroupsGroupID(w http.ResponseWriter, r *http.Request, groupID uint32) {
+func (s Server) GetAPIMSFTGroupsGroupID(w http.ResponseWriter, r *http.Request, groupID string) {
 	userID, _ := r.Context().Value(UserIDCtxKey{}).(uint32)
 	reqID, _ := r.Context().Value(RequestIDCtxKey{}).(string)
 
@@ -114,9 +115,7 @@ func (s Server) GetAPIMSFTGroupsGroupID(w http.ResponseWriter, r *http.Request, 
 		return
 	}
 
-	groupIDStr := strconv.FormatUint(uint64(groupID), 10)
-
-	groupable, err := graph.Groups().ByGroupId(groupIDStr).Get(ctx, nil)
+	groupable, err := graph.Groups().ByGroupId(groupID).Get(ctx, nil)
 	if err != nil {
 		logger.Error("failed to get group from microsoft")
 		sendError(w, http.StatusNotFound, "Failed to find group")
@@ -128,7 +127,7 @@ func (s Server) GetAPIMSFTGroupsGroupID(w http.ResponseWriter, r *http.Request, 
 	if groupable != nil && groupable.GetId() != nil && groupable.GetDisplayName() != nil {
 		group, err = GroupableToMSFTGroup(groupable)
 		if err != nil {
-			logger.Error("error converting groupable")
+			logger.Errorf("error converting groupable: %v", err)
 			sendError(w, http.StatusInternalServerError, "Failed to convert groupable")
 			return
 		}
@@ -142,7 +141,7 @@ func (s Server) GetAPIMSFTGroupsGroupID(w http.ResponseWriter, r *http.Request, 
 }
 
 // (GET /api/msft-groups/{groupID}/users).
-func (s Server) GetAPIMSFTGroupsGroupIDUsers(w http.ResponseWriter, r *http.Request, groupID uint32) {
+func (s Server) GetAPIMSFTGroupsGroupIDUsers(w http.ResponseWriter, r *http.Request, groupID string, params GetAPIMSFTGroupsGroupIDUsersParams) {
 	userID, _ := r.Context().Value(UserIDCtxKey{}).(uint32)
 	reqID, _ := r.Context().Value(RequestIDCtxKey{}).(string)
 
@@ -158,60 +157,60 @@ func (s Server) GetAPIMSFTGroupsGroupIDUsers(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	groupIDStr := strconv.FormatUint(uint64(groupID), 10)
+	var users []MSFTUser
 
-	groupable, err := graph.Groups().ByGroupId(groupIDStr).Members().Get(ctx, nil)
+	//nolint: gosec // limit is unsigned 32 bit int
+	limit := int32(params.Limit)
+
+	requestParameters := &graphgroups.ItemMembersRequestBuilderGetQueryParameters{
+		Top: &limit,
+	}
+	configuration := &graphgroups.ItemMembersRequestBuilderGetRequestConfiguration{
+		QueryParameters: requestParameters,
+	}
+
+	var gets models.DirectoryObjectCollectionResponseable
+	// initial, when there is no nextLink url
+	if params.NextLink == nil {
+		gets, err = graph.Groups().ByGroupId(groupID).Members().Get(ctx, configuration)
+	} else {
+		gets, err = graph.Groups().ByGroupId(groupID).Members().WithUrl(*params.NextLink).Get(ctx, configuration)
+	}
+
 	if err != nil {
 		logger.Error("failed to get group from microsoft", zap.Error(err))
 		sendError(w, http.StatusNotFound, "Failed to find group")
 		return
 	}
 
-	var users []MSFTUser
-
-	pageIterator, err := graphcore.NewPageIterator[models.DirectoryObjectable](
-		groupable,
-		graph.GetAdapter(),
-		models.CreateDirectoryObjectCollectionResponseFromDiscriminatorValue,
-	)
-	if err != nil {
-		logger.Error("failed to initiate page iterator", zap.Error(err))
-		sendError(w, http.StatusInternalServerError, "Failed to initiate page iterator")
-		return
-	}
-
-	err = pageIterator.Iterate(ctx, func(d models.DirectoryObjectable) bool {
-		if usr, ok := d.(models.Userable); ok {
-			user, convErr := UserableToMSFTUser(usr)
-			if convErr != nil {
-				logger.Error("failed to convert userable to user")
-				sendError(w, http.StatusInternalServerError, "Failed to convert userable to user")
-				return false
+	if gets.GetValue() != nil {
+		for _, dirs := range gets.GetValue() {
+			if usr, ok := dirs.(models.Userable); ok {
+				var user MSFTUser
+				user, err = UserableToMSFTUser(usr)
+				if err != nil {
+					logger.Error("failed to convert userable to user")
+					sendError(w, http.StatusInternalServerError, "Failed to convert userable to user")
+					return
+				}
+				users = append(users, user)
 			}
-			users = append(users, user)
 		}
-		return true
-	})
-	if err != nil {
-		logger.Error("failed to iterate group member pages", zap.Error(err))
-		sendError(w, http.StatusInternalServerError, "Failed to iterate group member pages")
-		return
 	}
 
-	// if groupable.GetValue() != nil {
-	// 	for _, dirs := range groupable.GetValue() {
-	// 		if usr, ok := dirs.(models.Userable); ok {
-	// 			var user MSFTUser
-	// 			user, err = UserableToMSFTUser(usr)
-	// 			if err != nil {
-	// 				logger.Error("failed to convert userable to user")
-	// 				sendError(w, http.StatusInternalServerError, "Failed to convert userable to user")
-	// 				return
-	// 			}
-	// 			users = append(users, user)
-	// 		}
-	// 	}
-	// }
+	var nextLink *string
+	if gets.GetOdataNextLink() != nil {
+		value := *gets.GetOdataNextLink()
+		nextLink = &value
+	}
 
-	SetHeaderAndWriteResponse(w, http.StatusOK, users)
+	resp := struct {
+		Users    []MSFTUser `json:"users"`
+		NextLink *string    `json:"nextLink,omitempty"`
+	}{
+		Users:    users,
+		NextLink: nextLink,
+	}
+
+	SetHeaderAndWriteResponse(w, http.StatusOK, resp)
 }

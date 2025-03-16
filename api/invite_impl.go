@@ -140,7 +140,7 @@ func (s Server) GetAPIInvitesMe(w http.ResponseWriter, r *http.Request, params G
 	}
 
 	//nolint: gosec // page is unsigned 32 bit int
-	lastID := uint32(params.PageToken)
+	lastID := uint32(*params.PageToken)
 
 	invites, err := s.DB.ListInvitesMe(ctx, database.ListInvitesMeParams{
 		Status:   params.Status,
@@ -394,7 +394,7 @@ func (s Server) GetAPISlotifyGroupsSlotifyGroupIDInvites(w http.ResponseWriter,
 	defer cancel()
 
 	//nolint: gosec // page is unsigned 32 bit int
-	lastID := uint32(params.PageToken)
+	lastID := uint32(*params.PageToken)
 
 	invites, err := s.DB.ListInvitesByGroup(ctx,
 		database.ListInvitesByGroupParams{

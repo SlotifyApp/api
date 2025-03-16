@@ -10,7 +10,6 @@ require (
 	github.com/golang-jwt/jwt/v5 v5.2.1
 	github.com/google/uuid v1.6.0
 	github.com/microsoft/kiota-abstractions-go v1.8.1
-	github.com/microsoftgraph/msgraph-sdk-go-core v1.2.1
 	github.com/oapi-codegen/runtime v1.1.1
 	github.com/stretchr/testify v1.10.0
 	go.uber.org/mock v0.5.0
@@ -40,6 +39,7 @@ require (
 	github.com/microsoft/kiota-serialization-json-go v1.0.9 // indirect
 	github.com/microsoft/kiota-serialization-multipart-go v1.0.0 // indirect
 	github.com/microsoft/kiota-serialization-text-go v1.0.0 // indirect
+	github.com/microsoftgraph/msgraph-sdk-go-core v1.2.1 // indirect
 	github.com/mohae/deepcopy v0.0.0-20170929034955-c48cc78d4826 // indirect
 	github.com/oapi-codegen/oapi-codegen/v2 v2.4.1 // indirect
 	github.com/perimeterx/marshmallow v1.1.5 // indirect
