@@ -247,7 +247,7 @@ func TestSlotifyGroup_GetSlotifyGroupsSlotifyGroupIDUsers(t *testing.T) {
 	testutil.AddUserToSlotifyGroup(t, db, userInserted.Id, slotifyGroupInserted.Id)
 	testutil.AddUserToSlotifyGroup(t, db, userInserted2.Id, slotifyGroupInserted.Id)
 
-	zerothPage := 0
+	var zerothPage uint32
 
 	tests := map[string]struct {
 		expectedRespBody any
@@ -270,6 +270,7 @@ func TestSlotifyGroup_GetSlotifyGroupsSlotifyGroupIDUsers(t *testing.T) {
 	}
 
 	for testName, tt := range tests {
+		t.Log("TestSlotifyGroup_GetSlotifyGroupsSlotifyGroupIDUsers range tests")
 		t.Run(testName, func(t *testing.T) {
 			t.Parallel()
 
@@ -317,6 +318,7 @@ func TestSlotifyGroup_GetSlotifyGroupsSlotifyGroupIDUsers(t *testing.T) {
 		})
 	}
 	t.Run("pagination", func(t *testing.T) {
+		t.Log("TestSlotifyGroup_GetSlotifyGroupsSlotifyGroupIDUsers pagination")
 		groupForPagination := testutil.InsertSlotifyGroup(t, db)
 		for range 11 {
 			newUser := testutil.InsertUser(t, db)
@@ -365,12 +367,14 @@ func TestSlotifyGroup_GetSlotifyGroupsSlotifyGroupIDUsers(t *testing.T) {
 			nil,
 		)
 		req2.Header.Set(api.ReqHeader, uuid.NewString())
+
+		nextToken := uint32(firstPageResp.NextPageToken)
 		server.GetAPISlotifyGroupsSlotifyGroupIDUsers(
 			rr2,
 			req2,
 			groupForPagination.Id,
 			api.GetAPISlotifyGroupsSlotifyGroupIDUsersParams{
-				PageToken: &firstPageResp.NextPageToken,
+				PageToken: &nextToken,
 				Limit:     testutil.PageLimit,
 			},
 		)
@@ -412,7 +416,7 @@ func TestSlotifyGroup_GetAPISlotifyGroupsMe(t *testing.T) {
 	testutil.AddUserToSlotifyGroup(t, db, user2.Id, insertedSlotifyGroup1.Id)
 	testutil.AddUserToSlotifyGroup(t, db, user2.Id, insertedSlotifyGroup2.Id)
 
-	zerothPage := 0
+	var zerothPage uint32
 
 	tests := map[string]struct {
 		expectedRespBody any
@@ -435,6 +439,7 @@ func TestSlotifyGroup_GetAPISlotifyGroupsMe(t *testing.T) {
 	}
 
 	for testName, tt := range tests {
+		t.Log("TestSlotifyGroup_GetAPISlotifyGroupsMe range tests")
 		t.Run(testName, func(t *testing.T) {
 			t.Parallel()
 
@@ -479,6 +484,7 @@ func TestSlotifyGroup_GetAPISlotifyGroupsMe(t *testing.T) {
 	}
 
 	t.Run("pagination", func(t *testing.T) {
+		t.Log("TestSlotifyGroup_GetAPISlotifyGroupsMe pagination")
 		// new user to prevent interference with previous tests
 		user3 := testutil.InsertUser(t, db)
 		for range 11 {
@@ -522,10 +528,12 @@ func TestSlotifyGroup_GetAPISlotifyGroupsMe(t *testing.T) {
 		ctx2 = context.WithValue(ctx2, api.RequestIDCtxKey{}, uuid.NewString())
 		req2 = req2.WithContext(ctx2)
 		req2.Header.Set(api.ReqHeader, uuid.NewString())
+
+		nextToken := uint32(firstPageResp.NextPageToken)
 		server.GetAPISlotifyGroupsMe(rr2,
 			req2,
 			api.GetAPISlotifyGroupsMeParams{
-				PageToken: &firstPageResp.NextPageToken,
+				PageToken: &nextToken,
 				Limit:     testutil.PageLimit,
 			},
 		)

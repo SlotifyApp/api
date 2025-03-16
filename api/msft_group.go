@@ -46,19 +46,16 @@ func UserableToMSFTUser(u models.Userable) (MSFTUser, error) {
 }
 
 func PersonableToMSFTUser(u models.Personable) (MSFTUser, error) {
-	var firstName, lastName string
 	if u.GetId() == nil || u.GetScoredEmailAddresses() == nil {
 		return MSFTUser{}, errors.New("missing required fields")
 	}
+	firstName := "No First Name Found"
 	if u.GetGivenName() != nil {
 		firstName = *u.GetGivenName()
-	} else {
-		firstName = "No First Name Found"
 	}
+	lastName := "No Last Name Found"
 	if u.GetSurname() != nil {
-		lastName = *u.GetGivenName()
-	} else {
-		lastName = "No Last Name Found"
+		lastName = *u.GetSurname()
 	}
 	var email string
 	if len(u.GetScoredEmailAddresses()) == 0 {

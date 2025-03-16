@@ -126,8 +126,12 @@ func (s Server) GetAPISlotifyGroupsMe(w http.ResponseWriter, r *http.Request, pa
 	ctx, cancel := context.WithTimeout(r.Context(), 2*database.DatabaseTimeout)
 	defer cancel()
 
-	//nolint: gosec // page is unsigned 32 bit int
-	lastID := uint32(*params.PageToken)
+	var lastID uint32
+	if params.PageToken != nil {
+		lastID = *params.PageToken
+	} else {
+		lastID = 0
+	}
 
 	groupLimit := min(params.Limit, GroupLimitMax)
 
@@ -162,7 +166,7 @@ func (s Server) GetAPISlotifyGroupsMe(w http.ResponseWriter, r *http.Request, pa
 	if len(slotifyGroups) == int(groupLimit) {
 		nextPageToken = int(slotifyGroups[len(slotifyGroups)-1].ID)
 	} else {
-		nextPageToken = -1
+		nextPageToken = 0
 	}
 
 	response := struct {
@@ -357,8 +361,9 @@ func (s Server) GetAPISlotifyGroupsSlotifyGroupID(w http.ResponseWriter, r *http
 }
 
 // (GET /api/slotify-groups/{slotifyGroupID}/users).
-// nolint: lll // function declaration
-func (s Server) GetAPISlotifyGroupsSlotifyGroupIDUsers(w http.ResponseWriter, r *http.Request, slotifyGroupID uint32, params GetAPISlotifyGroupsSlotifyGroupIDUsersParams) {
+func (s Server) GetAPISlotifyGroupsSlotifyGroupIDUsers(w http.ResponseWriter, r *http.Request,
+	slotifyGroupID uint32, params GetAPISlotifyGroupsSlotifyGroupIDUsersParams,
+) {
 	userID, _ := r.Context().Value(UserIDCtxKey{}).(uint32)
 	reqID, _ := r.Context().Value(RequestIDCtxKey{}).(string)
 
@@ -386,8 +391,12 @@ func (s Server) GetAPISlotifyGroupsSlotifyGroupIDUsers(w http.ResponseWriter, r 
 		return
 	}
 
-	//nolint: gosec // page is unsigned 32 bit int
-	lastID := uint32(*params.PageToken)
+	var lastID uint32
+	if params.PageToken != nil {
+		lastID = *params.PageToken
+	} else {
+		lastID = 0
+	}
 
 	groupLimit := min(params.Limit, GroupLimitMax)
 
@@ -410,7 +419,7 @@ func (s Server) GetAPISlotifyGroupsSlotifyGroupIDUsers(w http.ResponseWriter, r 
 	if len(users) == int(groupLimit) {
 		nextPageToken = int(users[len(users)-1].ID)
 	} else {
-		nextPageToken = -1
+		nextPageToken = 0
 	}
 
 	response := struct {

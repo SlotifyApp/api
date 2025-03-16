@@ -141,8 +141,12 @@ func (s Server) GetAPIInvitesMe(w http.ResponseWriter, r *http.Request, params G
 
 	invitesLimit := min(params.Limit, InvitesLimitMax)
 
-	//nolint: gosec // page is unsigned 32 bit int
-	lastID := uint32(*params.PageToken)
+	var lastID uint32
+	if params.PageToken != nil {
+		lastID = *params.PageToken
+	} else {
+		lastID = 0
+	}
 
 	invites, err := s.DB.ListInvitesMe(ctx, database.ListInvitesMeParams{
 		Status:   params.Status,
@@ -160,7 +164,7 @@ func (s Server) GetAPIInvitesMe(w http.ResponseWriter, r *http.Request, params G
 	if len(invites) == int(invitesLimit) {
 		nextPageToken = int(invites[len(invites)-1].InviteID)
 	} else {
-		nextPageToken = -1
+		nextPageToken = 0
 	}
 
 	response := struct {
@@ -397,8 +401,12 @@ func (s Server) GetAPISlotifyGroupsSlotifyGroupIDInvites(w http.ResponseWriter,
 
 	invitesLimit := min(InvitesLimitMax, params.Limit)
 
-	//nolint: gosec // page is unsigned 32 bit int
-	lastID := uint32(*params.PageToken)
+	var lastID uint32
+	if params.PageToken != nil {
+		lastID = *params.PageToken
+	} else {
+		lastID = 0
+	}
 
 	invites, err := s.DB.ListInvitesByGroup(ctx,
 		database.ListInvitesByGroupParams{
@@ -428,7 +436,7 @@ func (s Server) GetAPISlotifyGroupsSlotifyGroupIDInvites(w http.ResponseWriter,
 	if len(invites) == int(invitesLimit) {
 		nextPageToken = int(invites[len(invites)-1].InviteID)
 	} else {
-		nextPageToken = -1
+		nextPageToken = 0
 	}
 
 	response := struct {

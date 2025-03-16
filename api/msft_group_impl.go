@@ -92,10 +92,7 @@ func (s Server) GetAPIMSFTGroupsMe(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var outs []string
-	outs = append(outs, gets.GetValue()...)
-
-	SetHeaderAndWriteResponse(w, http.StatusOK, outs)
+	SetHeaderAndWriteResponse(w, http.StatusOK, gets.GetValue())
 }
 
 // (GET /api/msft-groups/{groupID}).
@@ -127,7 +124,7 @@ func (s Server) GetAPIMSFTGroupsGroupID(w http.ResponseWriter, r *http.Request, 
 	if groupable != nil && groupable.GetId() != nil && groupable.GetDisplayName() != nil {
 		group, err = GroupableToMSFTGroup(groupable)
 		if err != nil {
-			logger.Errorf("error converting groupable: %v", err)
+			logger.Error("error converting groupable", zap.Error(err))
 			sendError(w, http.StatusInternalServerError, "Failed to convert groupable")
 			return
 		}
@@ -141,8 +138,9 @@ func (s Server) GetAPIMSFTGroupsGroupID(w http.ResponseWriter, r *http.Request, 
 }
 
 // (GET /api/msft-groups/{groupID}/users).
-// nolint: lll // function declaration
-func (s Server) GetAPIMSFTGroupsGroupIDUsers(w http.ResponseWriter, r *http.Request, groupID string, params GetAPIMSFTGroupsGroupIDUsersParams) {
+func (s Server) GetAPIMSFTGroupsGroupIDUsers(w http.ResponseWriter, r *http.Request, groupID string,
+	params GetAPIMSFTGroupsGroupIDUsersParams,
+) {
 	userID, _ := r.Context().Value(UserIDCtxKey{}).(uint32)
 	reqID, _ := r.Context().Value(RequestIDCtxKey{}).(string)
 
@@ -160,11 +158,8 @@ func (s Server) GetAPIMSFTGroupsGroupIDUsers(w http.ResponseWriter, r *http.Requ
 
 	var users []MSFTUser
 
-	//nolint: gosec // limit is unsigned 32 bit int
-	limit := int32(params.Limit)
-
 	requestParameters := &graphgroups.ItemMembersRequestBuilderGetQueryParameters{
-		Top: &limit,
+		Top: &params.Limit,
 	}
 	configuration := &graphgroups.ItemMembersRequestBuilderGetRequestConfiguration{
 		QueryParameters: requestParameters,
@@ -199,11 +194,7 @@ func (s Server) GetAPIMSFTGroupsGroupIDUsers(w http.ResponseWriter, r *http.Requ
 		}
 	}
 
-	var nextLink *string
-	if gets.GetOdataNextLink() != nil {
-		value := *gets.GetOdataNextLink()
-		nextLink = &value
-	}
+	nextLink := gets.GetOdataNextLink()
 
 	resp := struct {
 		Users    []MSFTUser `json:"users"`
