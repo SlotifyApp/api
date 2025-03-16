@@ -10,6 +10,7 @@ import (
 	graphcore "github.com/microsoftgraph/msgraph-sdk-go-core"
 	graphgroups "github.com/microsoftgraph/msgraph-sdk-go/groups"
 	"github.com/microsoftgraph/msgraph-sdk-go/models"
+	graphusers "github.com/microsoftgraph/msgraph-sdk-go/users"
 	"go.uber.org/zap"
 )
 
@@ -62,7 +63,7 @@ func (s Server) GetAPIMSFTGroups(w http.ResponseWriter, r *http.Request, params 
 }
 
 // (GET  /api/msft-groups/me).
-func (s Server) GetAPIMSFTGroupsMe(w http.ResponseWriter, r *http.Request, _ GetAPIMSFTGroupsMeParams) {
+func (s Server) GetAPIMSFTGroupsMe(w http.ResponseWriter, r *http.Request) {
 	userID, _ := r.Context().Value(UserIDCtxKey{}).(uint32)
 	reqID, _ := r.Context().Value(RequestIDCtxKey{}).(string)
 
@@ -78,44 +79,22 @@ func (s Server) GetAPIMSFTGroupsMe(w http.ResponseWriter, r *http.Request, _ Get
 		return
 	}
 
-	userIDStr := strconv.FormatUint(uint64(userID), 10)
+	requestBody := graphusers.NewItemGetMemberGroupsPostRequestBody()
+	securityEnabledOnly := true
+	requestBody.SetSecurityEnabledOnly(&securityEnabledOnly)
 
-	gets, err := graph.Users().ByUserId(userIDStr).MemberOf().Get(ctx, nil)
-	if err != nil {
-		logger.Error("failed to retrieve memberof of user")
-		sendError(w, http.StatusInternalServerError, "Failed to get from microsoft")
-		return
-	}
-
-	pageIterator, err := graphcore.NewPageIterator[*models.Group](
-		gets,
-		graph.GetAdapter(),
-		models.CreateGroupCollectionResponseFromDiscriminatorValue,
+	gets, err := graph.Me().GetMemberGroups().PostAsGetMemberGroupsPostResponse(
+		ctx,
+		requestBody,
+		nil,
 	)
-	if err != nil {
-		logger.Error("failed to initiate page iterator", zap.Error(err))
-		sendError(w, http.StatusInternalServerError, "Failed to initiate page iterator")
-		return
+
+	var outs []string
+	for _, st := range gets.GetValue() {
+		outs = append(outs, st)
 	}
 
-	var groups []*models.Group
-	err = pageIterator.Iterate(ctx, func(g *models.Group) bool {
-		groups = append(groups, g)
-		return true
-	})
-	if err != nil {
-		logger.Error("failed to iterate pages", zap.Error(err))
-		sendError(w, http.StatusInternalServerError, "Failed retrieving groups")
-		return
-	}
-
-	// groups, err := GetsToMSFTGroups(gets)
-	// if err != nil {
-	// 	logger.Error("failed to retrieve groups", zap.Error(err))
-	// 	sendError(w, http.StatusInternalServerError, fmt.Sprintf("failed retrieving groups: %v", err))
-	// 	return
-	// }
-	SetHeaderAndWriteResponse(w, http.StatusOK, groups)
+	SetHeaderAndWriteResponse(w, http.StatusOK, outs)
 }
 
 // (GET /api/msft-groups/{groupID}).
