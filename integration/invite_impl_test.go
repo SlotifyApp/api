@@ -149,8 +149,9 @@ func TestAPIInvitesMe(t *testing.T) {
 	testGroup := testutil.InsertSlotifyGroup(t, db)
 	testutil.AddUserToSlotifyGroup(t, db, testUser.Id, testGroup.Id)
 	testutil.AddUserToSlotifyGroup(t, db, testUser2.Id, testGroup.Id)
-	zerothPage := 0
+	var zerothPage uint32
 	t.Run("no invites", func(t *testing.T) {
+		t.Log("TestAPIInvitesMe no invites test")
 		rr := httptest.NewRecorder()
 		req := httptest.NewRequest(http.MethodGet,
 			fmt.Sprintf("/api/invites/me?pageToken=%d&limit=%d", zerothPage, testutil.PageLimit),
@@ -172,10 +173,11 @@ func TestAPIInvitesMe(t *testing.T) {
 		err = json.NewDecoder(rr.Result().Body).Decode(&resp)
 		require.NoError(t, err)
 		require.Empty(t, resp.Invites, "should return no invites")
-		require.Equal(t, -1, resp.NextPageToken, "nextPageToken should be -1 when no invites")
+		require.Equal(t, 0, resp.NextPageToken, "nextPageToken should be 0 when no invites")
 	})
 
 	t.Run("less than limit invites", func(t *testing.T) {
+		t.Log("TestAPIInvitesMe less than limit invites")
 		for range 5 {
 			testutil.InsertInvite(t, db, testUser2, testUser, testGroup.Id)
 		}
@@ -200,10 +202,11 @@ func TestAPIInvitesMe(t *testing.T) {
 		err = json.NewDecoder(rr.Result().Body).Decode(&resp)
 		require.NoError(t, err)
 		require.Len(t, resp.Invites, 5, "should return 5 invites")
-		require.Equal(t, -1, resp.NextPageToken, "nextPageToken should be -1 when invites are less than limit")
+		require.Equal(t, 0, resp.NextPageToken, "nextPageToken should be 0 when invites are less than limit")
 	})
 
 	t.Run("pagination", func(t *testing.T) {
+		t.Log("TestAPIInvitesMe pagination")
 		// add 6 more invites to make 11 total invites
 		for range 6 {
 			testutil.InsertInvite(t, db, testUser2, testUser, testGroup.Id)
@@ -243,8 +246,10 @@ func TestAPIInvitesMe(t *testing.T) {
 		req2.Header.Add("Content-Type", "application/json")
 		req2.Header.Set(api.ReqHeader, uuid.NewString())
 		req2 = req2.WithContext(context.WithValue(req.Context(), api.UserIDCtxKey{}, testUser.Id))
+
+		nextToken := uint32(resp.NextPageToken)
 		server.GetAPIInvitesMe(rr2, req2, api.GetAPIInvitesMeParams{
-			PageToken: &resp.NextPageToken,
+			PageToken: &nextToken,
 			Limit:     testutil.PageLimit,
 		})
 		require.Equal(t, http.StatusOK, rr2.Result().StatusCode)
@@ -279,9 +284,10 @@ func TestAPISlotifyGroupsSlotifyGroupIDInvites(t *testing.T) {
 	testGroup := testutil.InsertSlotifyGroup(t, db)
 	testutil.AddUserToSlotifyGroup(t, db, testUser.Id, testGroup.Id)
 	testutil.AddUserToSlotifyGroup(t, db, testUser2.Id, testGroup.Id)
-	zerothPage := 0
+	var zerothPage uint32
 
 	t.Run("no invites", func(t *testing.T) {
+		t.Log("TestAPISlotifyGroupsSlotifyGroupIDInvites no invites")
 		rr := httptest.NewRecorder()
 		req := httptest.NewRequest(
 			http.MethodGet,
@@ -309,10 +315,11 @@ func TestAPISlotifyGroupsSlotifyGroupIDInvites(t *testing.T) {
 		err = json.NewDecoder(rr.Result().Body).Decode(&resp)
 		require.NoError(t, err)
 		require.Empty(t, resp.Invites, "should return no invites")
-		require.Equal(t, -1, resp.NextPageToken, "nextPageToken should be -1 when no invites")
+		require.Equal(t, 0, resp.NextPageToken, "nextPageToken should be 0 when no invites")
 	})
 
 	t.Run("less than limit invites", func(t *testing.T) {
+		t.Log("TestAPISlotifyGroupsSlotifyGroupIDInvites less than limit invites")
 		for range 5 {
 			testutil.InsertInvite(t, db, testUser2, testUser, testGroup.Id)
 		}
@@ -343,10 +350,11 @@ func TestAPISlotifyGroupsSlotifyGroupIDInvites(t *testing.T) {
 		err = json.NewDecoder(rr.Result().Body).Decode(&resp)
 		require.NoError(t, err)
 		require.Len(t, resp.Invites, 5, "should return 5 invites")
-		require.Equal(t, -1, resp.NextPageToken, "nextPageToken should be -1 when invites are less than limit")
+		require.Equal(t, 0, resp.NextPageToken, "nextPageToken should be 0 when invites are less than limit")
 	})
 
 	t.Run("pagination", func(t *testing.T) {
+		t.Log("TestAPISlotifyGroupsSlotifyGroupIDInvites pagination")
 		for range 6 {
 			testutil.InsertInvite(t, db, testUser2, testUser, testGroup.Id)
 		}
@@ -395,12 +403,14 @@ func TestAPISlotifyGroupsSlotifyGroupIDInvites(t *testing.T) {
 		req2.Header.Add("Content-Type", "application/json")
 		req2.Header.Set(api.ReqHeader, uuid.NewString())
 		req2 = req2.WithContext(context.WithValue(req2.Context(), api.UserIDCtxKey{}, testUser.Id))
+
+		nextToken := uint32(resp.NextPageToken)
 		server.GetAPISlotifyGroupsSlotifyGroupIDInvites(
 			rr2,
 			req2,
 			testGroup.Id,
 			api.GetAPISlotifyGroupsSlotifyGroupIDInvitesParams{
-				PageToken: &resp.NextPageToken,
+				PageToken: &nextToken,
 				Limit:     testutil.PageLimit,
 			},
 		)

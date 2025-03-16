@@ -179,7 +179,7 @@ func TestUser_GetUsers(t *testing.T) {
 	insertedUser2 := testutil.InsertUser(t, db, testutil.WithFirstName(insertedUser.FirstName))
 	insertedUser3 := testutil.InsertUser(t, db, testutil.WithLastName(insertedUser.LastName))
 
-	zerothPage := 0
+	var zerothPage uint32
 
 	tests := map[string]struct {
 		httpStatus   int
@@ -256,6 +256,7 @@ func TestUser_GetUsers(t *testing.T) {
 
 	for testName, tt := range tests {
 		t.Run(testName, func(t *testing.T) {
+			t.Log("TestUser_GetUsers ranges")
 			rr := httptest.NewRecorder()
 
 			req := httptest.NewRequest(
@@ -294,6 +295,7 @@ func TestUser_GetUsers(t *testing.T) {
 
 	// Don't want to assert every user in a var, so separate test
 	t.Run("route with no query params gets all users", func(t *testing.T) {
+		t.Log("TestUser_GetUsers no query all users")
 		var tx *sql.Tx
 		tx, err = db.Begin()
 		require.NoError(t, err, "could not begin transaction")
@@ -310,7 +312,7 @@ func TestUser_GetUsers(t *testing.T) {
 		count := testutil.GetCount(t, db, "User")
 
 		allUsers := api.Users{}
-		pageToken := 0
+		var pageToken uint32
 		for {
 			rr = httptest.NewRecorder()
 			server.GetAPIUsers(rr, req, api.GetAPIUsersParams{
@@ -326,10 +328,11 @@ func TestUser_GetUsers(t *testing.T) {
 			err = json.NewDecoder(rr.Result().Body).Decode(&resp)
 			require.NoError(t, err, "response body can be decoded")
 			allUsers = append(allUsers, resp.Users...)
-			if resp.NextPageToken == -1 {
+			if resp.NextPageToken == 0 {
 				break
 			}
-			pageToken = resp.NextPageToken
+
+			pageToken = uint32(resp.NextPageToken)
 		}
 		err = tx.Commit()
 		require.NoError(t, err, "failed to commit transaction")
@@ -337,6 +340,7 @@ func TestUser_GetUsers(t *testing.T) {
 		require.Len(t, allUsers, count, "got all users from the User table")
 	})
 	t.Run("Pagination", func(t *testing.T) {
+		t.Log("TestUser_GetUsers pagination")
 		for range 11 {
 			testutil.InsertUser(t, db)
 		}
@@ -364,8 +368,10 @@ func TestUser_GetUsers(t *testing.T) {
 			rr2 := httptest.NewRecorder()
 			req2 := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/users&pageToken=%d", response.NextPageToken), nil)
 			req2.Header.Set(api.ReqHeader, uuid.NewString())
+
+			nextToken := uint32(response.NextPageToken)
 			params2 := api.GetAPIUsersParams{
-				PageToken: &response.NextPageToken,
+				PageToken: &nextToken,
 				Limit:     testutil.PageLimit,
 			}
 			server.GetAPIUsers(rr2, req2, params2)
