@@ -9,7 +9,6 @@ import (
 	"net/http"
 
 	"github.com/SlotifyApp/slotify-backend/database"
-	graphcore "github.com/microsoftgraph/msgraph-sdk-go-core"
 	"github.com/microsoftgraph/msgraph-sdk-go/models"
 	graphusers "github.com/microsoftgraph/msgraph-sdk-go/users"
 	openapi_types "github.com/oapi-codegen/runtime/types"
@@ -42,7 +41,7 @@ func (s Server) GetAPIUsers(w http.ResponseWriter, r *http.Request, params GetAP
 			database.SearchUsersByNameParams{
 				Name:   *params.Name,
 				Limit:  SearchUserLim,
-				LastID: uint32(params.PageToken),
+				LastID: uint32(*params.PageToken),
 			})
 		if err != nil {
 			logger.Error("failed to search user by name", zap.Error(err),
@@ -65,7 +64,7 @@ func (s Server) GetAPIUsers(w http.ResponseWriter, r *http.Request, params GetAP
 			database.SearchUsersByEmailParams{
 				Email:  string(*params.Email),
 				Limit:  SearchUserLim,
-				LastID: uint32(params.PageToken),
+				LastID: uint32(*params.PageToken),
 			})
 		if err != nil {
 			logger.Error("failed to search user by email", zap.Error(err),
@@ -87,7 +86,7 @@ func (s Server) GetAPIUsers(w http.ResponseWriter, r *http.Request, params GetAP
 			//nolint: gosec // page is unsigned 32 bit int
 			database.ListUsersParams{
 				Limit:  SearchUserLim,
-				LastID: uint32(params.PageToken),
+				LastID: uint32(*params.PageToken),
 			})
 		if err != nil {
 			logger.Error("failed to list all users", zap.Error(err))
@@ -317,7 +316,7 @@ func (s Server) PostAPIUsersMeLogout(w http.ResponseWriter, r *http.Request) {
 }
 
 // (GET /api/msft-users/).
-func (s Server) GetAPIMSFTUsers(w http.ResponseWriter, r *http.Request) {
+func (s Server) GetAPIMSFTUsers(w http.ResponseWriter, r *http.Request, params GetAPIMSFTUsersParams) {
 	userID, _ := r.Context().Value(UserIDCtxKey{}).(uint32)
 	reqID, _ := r.Context().Value(RequestIDCtxKey{}).(string)
 
@@ -333,55 +332,59 @@ func (s Server) GetAPIMSFTUsers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	groupable, err := graph.Users().Get(ctx, nil)
+	//nolint: gosec // limit is unsigned 32 bit int
+	limit := int32(params.Limit)
+
+	requestParameters := &graphusers.UsersRequestBuilderGetQueryParameters{
+		Top: &limit,
+	}
+	configuration := &graphusers.UsersRequestBuilderGetRequestConfiguration{
+		QueryParameters: requestParameters,
+	}
+
+	var groupable models.UserCollectionResponseable
+	// initial, when there is no nextLink url
+	if params.NextLink == nil {
+		groupable, err = graph.Users().Get(ctx, configuration)
+	} else {
+		groupable, err = graph.Users().WithUrl(*params.NextLink).Get(ctx, configuration)
+	}
 	if err != nil {
 		logger.Errorf("failed to get users from microsoft: %v", err)
 		sendError(w, http.StatusNotFound, fmt.Sprintf("Failed to find users: %v", err))
 		return
 	}
-
-	pageIterator, err := graphcore.NewPageIterator[models.Userable](
-		groupable,
-		graph.GetAdapter(),
-		models.CreateUserCollectionResponseFromDiscriminatorValue,
-	)
-	if err != nil {
-		logger.Error("failed to initiate page iterator", zap.Error(err))
-		sendError(w, http.StatusInternalServerError, "Failed to initiate page iterator")
-		return
-	}
-
 	var users []MSFTUser
 
-	err = pageIterator.Iterate(ctx, func(u models.Userable) bool {
-		user, convErr := UserableToMSFTUser(u)
-		if convErr != nil {
-			logger.Errorf("failed to conver userable to user: %v", convErr)
-			return false
+	if groupable.GetValue() != nil {
+		for _, usr := range groupable.GetValue() {
+			var user MSFTUser
+			user, err = UserableToMSFTUser(usr)
+			if err != nil {
+				logger.Errorf("failed to convert userable to user: %v", err)
+				sendError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to convert userable to user: %v", err))
+				return
+			}
+			users = append(users, user)
 		}
-		users = append(users, user)
-		return true
-	})
-	if err != nil {
-		logger.Errorf("failed to iterate pages: %v", err)
-		sendError(w, http.StatusInternalServerError, "Failed retrieving users")
-		return
 	}
-	// if groupable.GetValue() != nil {
-	// 	for _, usr := range groupable.GetValue() {
-	// 		var user MSFTUser
-	// 		user, err = UserableToMSFTUser(usr)
-	// 		if err != nil {
-	// 			logger.Errorf("failed to convert userable to user: %v", err)
-	// 			sendError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to convert userable to user: %v", err))
-	// 			return
-	// 		}
-	// 		users = append(users, user)
-	// 	}
-	// }
 	// no error 204 since we got an array
 
-	SetHeaderAndWriteResponse(w, http.StatusOK, users)
+	var nextLink *string
+	if groupable.GetOdataNextLink() != nil {
+		value := *groupable.GetOdataNextLink()
+		nextLink = &value
+	}
+
+	resp := struct {
+		Users    []MSFTUser `json:"users"`
+		NextLink *string    `json:"nextLink,omitempty"`
+	}{
+		Users:    users,
+		NextLink: nextLink,
+	}
+
+	SetHeaderAndWriteResponse(w, http.StatusOK, resp)
 }
 
 // if param is empty then calls GetAPIMSFTUsers.
@@ -392,7 +395,10 @@ func (s Server) GetAPIMSFTUsersSearch(w http.ResponseWriter, r *http.Request, pa
 	logger := s.Logger.With(zap.String("request_id", reqID), zap.Uint32("user_id", userID))
 
 	if params.Search == nil {
-		s.GetAPIMSFTUsers(w, r)
+		s.GetAPIMSFTUsers(w, r, GetAPIMSFTUsersParams{
+			Limit:    params.Limit,
+			NextLink: params.NextLink,
+		})
 		return
 	}
 
@@ -406,64 +412,62 @@ func (s Server) GetAPIMSFTUsersSearch(w http.ResponseWriter, r *http.Request, pa
 		return
 	}
 
+	//nolint: gosec // limit is unsigned 32 bit int
+	limit := int32(params.Limit)
+
 	var requestParameters *graphusers.ItemPeopleRequestBuilderGetQueryParameters
 
 	requestSearch := fmt.Sprintf("\"%s\"", *params.Search)
 	requestParameters = &graphusers.ItemPeopleRequestBuilderGetQueryParameters{
 		Search: &requestSearch,
+		Top:    &limit,
 	}
 
 	configuration := &graphusers.ItemPeopleRequestBuilderGetRequestConfiguration{
 		QueryParameters: requestParameters,
 	}
 
-	groupable, err := graph.Me().People().Get(ctx, configuration)
+	var groupable models.PersonCollectionResponseable
+	// initial, when there is no nextLink url
+	if params.NextLink == nil {
+		groupable, err = graph.Me().People().Get(ctx, configuration)
+	} else {
+		groupable, err = graph.Me().People().WithUrl(*params.NextLink).Get(ctx, configuration)
+	}
 	if err != nil {
 		logger.Errorf("failed to get persons from microsoft: %v", err)
 		sendError(w, http.StatusNotFound, "Failed to find person")
 		return
 	}
 
-	pageIterator, err := graphcore.NewPageIterator[models.Personable](
-		groupable,
-		graph.GetAdapter(),
-		models.CreatePersonCollectionResponseFromDiscriminatorValue,
-	)
-	if err != nil {
-		logger.Error("failed to initiate page iterator", zap.Error(err))
-		sendError(w, http.StatusInternalServerError, "Failed to initiate page iterator")
-		return
-	}
-
 	var users []MSFTUser
 
-	err = pageIterator.Iterate(ctx, func(p models.Personable) bool {
-		user, convErr := PersonableToMSFTUser(p)
-		if convErr != nil {
-			logger.Error("failed to convert personable to user", zap.Error(convErr))
-			return false
+	if groupable.GetValue() != nil {
+		for _, usr := range groupable.GetValue() {
+			var user MSFTUser
+			user, err = PersonableToMSFTUser(usr)
+			if err != nil {
+				logger.Errorf("failed to convert personable to user: %v", err)
+				sendError(w, http.StatusInternalServerError, "Failed to convert userable to user")
+				return
+			}
+			users = append(users, user)
 		}
-		users = append(users, user)
-		return true
-	})
-	if err != nil {
-		logger.Error("failed to iterate persons", zap.Error(err))
-		sendError(w, http.StatusInternalServerError, "Failed to retrieve persons")
-		return
 	}
 
-	// if groupable.GetValue() != nil {
-	// 	for _, usr := range groupable.GetValue() {
-	// 		var user MSFTUser
-	// 		user, err = PersonableToMSFTUser(usr)
-	// 		if err != nil {
-	// 			logger.Error("failed to convert userable to user")
-	// 			sendError(w, http.StatusInternalServerError, "Failed to convert userable to user")
-	// 			return
-	// 		}
-	// 		users = append(users, user)
-	// 	}
-	// }
+	var nextLink *string
+	if groupable.GetOdataNextLink() != nil {
+		value := *groupable.GetOdataNextLink()
+		nextLink = &value
+	}
 
-	SetHeaderAndWriteResponse(w, http.StatusOK, users)
+	resp := struct {
+		Users    []MSFTUser `json:"users"`
+		NextLink *string    `json:"nextLink,omitempty"`
+	}{
+		Users:    users,
+		NextLink: nextLink,
+	}
+
+	SetHeaderAndWriteResponse(w, http.StatusOK, resp)
 }

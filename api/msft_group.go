@@ -2,8 +2,6 @@ package api
 
 import (
 	"errors"
-	"fmt"
-	"strconv"
 
 	"github.com/microsoftgraph/msgraph-sdk-go/models"
 	"github.com/oapi-codegen/runtime/types"
@@ -14,12 +12,8 @@ func GroupableToMSFTGroup(g models.Groupable) (MSFTGroup, error) {
 		return MSFTGroup{}, errors.New("no id or name for microsoft group")
 	}
 
-	id, err := strconv.ParseUint(*g.GetId(), 10, 32)
-	if err != nil {
-		return MSFTGroup{}, fmt.Errorf("error converting microsoft group id '%s' to uint32: %w", *g.GetId(), err)
-	}
 	return MSFTGroup{
-		Id:   uint32(id),
+		Id:   *g.GetId(),
 		Name: *g.GetDisplayName(),
 	}, nil
 }
@@ -52,8 +46,19 @@ func UserableToMSFTUser(u models.Userable) (MSFTUser, error) {
 }
 
 func PersonableToMSFTUser(u models.Personable) (MSFTUser, error) {
-	if u.GetId() == nil || u.GetScoredEmailAddresses() == nil || u.GetGivenName() == nil || u.GetSurname() == nil {
+	var firstName, lastName string
+	if u.GetId() == nil || u.GetScoredEmailAddresses() == nil {
 		return MSFTUser{}, errors.New("missing required fields")
+	}
+	if u.GetGivenName() != nil {
+		firstName = *u.GetGivenName()
+	} else {
+		firstName = "No First Name Found"
+	}
+	if u.GetSurname() != nil {
+		lastName = *u.GetGivenName()
+	} else {
+		lastName = "No Last Name Found"
 	}
 	var email string
 	if len(u.GetScoredEmailAddresses()) == 0 {
@@ -67,8 +72,8 @@ func PersonableToMSFTUser(u models.Personable) (MSFTUser, error) {
 	}
 	return MSFTUser{
 		Email:     types.Email(email),
-		FirstName: *u.GetGivenName(),
-		LastName:  *u.GetSurname(),
+		FirstName: firstName,
+		LastName:  lastName,
 	}, nil
 }
 
