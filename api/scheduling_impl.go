@@ -43,5 +43,9 @@ func (s Server) PostAPISchedulingSlots(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	SetHeaderAndWriteResponse(w, http.StatusOK, respBody)
+	// Enter data for rating function
+	// nolint: revive // asks to remove var declaration but am not using var declaration
+	newRespBody := generateRatingsForSlots(ctx, s, userID, respBody, body)
+
+	SetHeaderAndWriteResponse(w, http.StatusOK, newRespBody)
 }
