@@ -256,7 +256,6 @@ func TestUser_GetUsers(t *testing.T) {
 
 	for testName, tt := range tests {
 		t.Run(testName, func(t *testing.T) {
-			t.Log("TestUser_GetUsers ranges")
 			rr := httptest.NewRecorder()
 
 			req := httptest.NewRequest(
@@ -295,7 +294,6 @@ func TestUser_GetUsers(t *testing.T) {
 
 	// Don't want to assert every user in a var, so separate test
 	t.Run("route with no query params gets all users", func(t *testing.T) {
-		t.Log("TestUser_GetUsers no query all users")
 		var tx *sql.Tx
 		tx, err = db.Begin()
 		require.NoError(t, err, "could not begin transaction")
@@ -340,7 +338,6 @@ func TestUser_GetUsers(t *testing.T) {
 		require.Len(t, allUsers, count, "got all users from the User table")
 	})
 	t.Run("Pagination", func(t *testing.T) {
-		t.Log("TestUser_GetUsers pagination")
 		for range 11 {
 			testutil.InsertUser(t, db)
 		}

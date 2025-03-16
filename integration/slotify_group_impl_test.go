@@ -270,7 +270,6 @@ func TestSlotifyGroup_GetSlotifyGroupsSlotifyGroupIDUsers(t *testing.T) {
 	}
 
 	for testName, tt := range tests {
-		t.Log("TestSlotifyGroup_GetSlotifyGroupsSlotifyGroupIDUsers range tests")
 		t.Run(testName, func(t *testing.T) {
 			t.Parallel()
 
@@ -318,7 +317,6 @@ func TestSlotifyGroup_GetSlotifyGroupsSlotifyGroupIDUsers(t *testing.T) {
 		})
 	}
 	t.Run("pagination", func(t *testing.T) {
-		t.Log("TestSlotifyGroup_GetSlotifyGroupsSlotifyGroupIDUsers pagination")
 		groupForPagination := testutil.InsertSlotifyGroup(t, db)
 		for range 11 {
 			newUser := testutil.InsertUser(t, db)
@@ -439,7 +437,6 @@ func TestSlotifyGroup_GetAPISlotifyGroupsMe(t *testing.T) {
 	}
 
 	for testName, tt := range tests {
-		t.Log("TestSlotifyGroup_GetAPISlotifyGroupsMe range tests")
 		t.Run(testName, func(t *testing.T) {
 			t.Parallel()
 
@@ -484,7 +481,6 @@ func TestSlotifyGroup_GetAPISlotifyGroupsMe(t *testing.T) {
 	}
 
 	t.Run("pagination", func(t *testing.T) {
-		t.Log("TestSlotifyGroup_GetAPISlotifyGroupsMe pagination")
 		// new user to prevent interference with previous tests
 		user3 := testutil.InsertUser(t, db)
 		for range 11 {

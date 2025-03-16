@@ -151,7 +151,6 @@ func TestAPIInvitesMe(t *testing.T) {
 	testutil.AddUserToSlotifyGroup(t, db, testUser2.Id, testGroup.Id)
 	var zerothPage uint32
 	t.Run("no invites", func(t *testing.T) {
-		t.Log("TestAPIInvitesMe no invites test")
 		rr := httptest.NewRecorder()
 		req := httptest.NewRequest(http.MethodGet,
 			fmt.Sprintf("/api/invites/me?pageToken=%d&limit=%d", zerothPage, testutil.PageLimit),
@@ -177,7 +176,6 @@ func TestAPIInvitesMe(t *testing.T) {
 	})
 
 	t.Run("less than limit invites", func(t *testing.T) {
-		t.Log("TestAPIInvitesMe less than limit invites")
 		for range 5 {
 			testutil.InsertInvite(t, db, testUser2, testUser, testGroup.Id)
 		}
@@ -206,7 +204,6 @@ func TestAPIInvitesMe(t *testing.T) {
 	})
 
 	t.Run("pagination", func(t *testing.T) {
-		t.Log("TestAPIInvitesMe pagination")
 		// add 6 more invites to make 11 total invites
 		for range 6 {
 			testutil.InsertInvite(t, db, testUser2, testUser, testGroup.Id)
@@ -287,7 +284,6 @@ func TestAPISlotifyGroupsSlotifyGroupIDInvites(t *testing.T) {
 	var zerothPage uint32
 
 	t.Run("no invites", func(t *testing.T) {
-		t.Log("TestAPISlotifyGroupsSlotifyGroupIDInvites no invites")
 		rr := httptest.NewRecorder()
 		req := httptest.NewRequest(
 			http.MethodGet,
@@ -319,7 +315,6 @@ func TestAPISlotifyGroupsSlotifyGroupIDInvites(t *testing.T) {
 	})
 
 	t.Run("less than limit invites", func(t *testing.T) {
-		t.Log("TestAPISlotifyGroupsSlotifyGroupIDInvites less than limit invites")
 		for range 5 {
 			testutil.InsertInvite(t, db, testUser2, testUser, testGroup.Id)
 		}
@@ -354,7 +349,6 @@ func TestAPISlotifyGroupsSlotifyGroupIDInvites(t *testing.T) {
 	})
 
 	t.Run("pagination", func(t *testing.T) {
-		t.Log("TestAPISlotifyGroupsSlotifyGroupIDInvites pagination")
 		for range 6 {
 			testutil.InsertInvite(t, db, testUser2, testUser, testGroup.Id)
 		}
