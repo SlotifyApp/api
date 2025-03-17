@@ -38,21 +38,21 @@ func (s Server) GetAPIUsers(w http.ResponseWriter, r *http.Request, params GetAP
 				zap.String("name", *params.Name))
 			sendError(w, http.StatusInternalServerError,
 				fmt.Sprintf("failed to search users by name: %s", *params.Name))
-			return
 		}
 		SetHeaderAndWriteResponse(w, http.StatusOK, users)
+		return
 	}
 
 	if params.Email != nil {
 		var users []database.SearchUsersByEmailRow
 		if users, err = s.DB.SearchUsersByEmail(ctx, *params.Email); err != nil {
 			logger.Error("failed to search users by email", zap.Error(err),
-				zap.String("email", string(*params.Email)))
+				zap.String("email", *params.Email))
 			sendError(w, http.StatusInternalServerError,
 				fmt.Sprintf("failed to search users by email: %s", *params.Email))
-			return
 		}
 		SetHeaderAndWriteResponse(w, http.StatusOK, users)
+		return
 	}
 
 	// email and name were empty

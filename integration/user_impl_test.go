@@ -176,6 +176,7 @@ func TestUser_GetUsers(t *testing.T) {
 	// Setup
 	fakeLastName := gofakeit.LastName() + "blah"
 	insertedUser := testutil.InsertUser(t, db)
+	insertedUserEmail := string(insertedUser.Email)
 	insertedUser2 := testutil.InsertUser(t, db, testutil.WithFirstName(insertedUser.FirstName))
 	insertedUser3 := testutil.InsertUser(t, db, testutil.WithLastName(insertedUser.LastName))
 
@@ -195,7 +196,7 @@ func TestUser_GetUsers(t *testing.T) {
 				url.QueryEscape(string(insertedUser.Email)),
 			),
 			params: api.GetAPIUsersParams{
-				Email: &insertedUser.Email,
+				Email: &insertedUserEmail,
 			},
 		},
 		"get existing user by first name": {
