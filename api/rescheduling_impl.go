@@ -419,7 +419,47 @@ func (s Server) GetAPIRescheduleRequestsMe(w http.ResponseWriter, r *http.Reques
 		})
 	}
 
-	SetHeaderAndWriteResponse(w, http.StatusOK, response)
+	respondedReqs, err := s.DB.GetAllRequestsResponsesForUserID(ctx, userID)
+	if err != nil {
+		logger.Error("failed to get requests", zap.Error(err))
+		sendError(w, http.StatusBadGateway, "Failed to get requests")
+		return
+	}
+
+	// Parse results to response
+	respondedReqsResponses := []RescheduleRequest{}
+
+	for _, req := range respondedReqs {
+		newMeeting := ReschedulingRequestNewMeeting{}
+
+		if req.MeetingID.Valid {
+			newMeeting.EndTime = req.EndTime.Time
+			newMeeting.Location = req.Location.String
+
+			dur := req.Duration.Time.Format(time.RFC3339Nano)
+			newMeeting.MeetingDuration = dur
+
+			newMeeting.StartTime = req.StartTime.Time
+			newMeeting.Title = req.Title.String
+		}
+
+		respondedReqsResponses = append(respondedReqsResponses, RescheduleRequest{
+			RequestId:   req.RequestID,
+			RequestedAt: req.CreatedAt,
+			RequestedBy: req.RequestedBy,
+			Status:      string(req.Status),
+			NewMeeting:  &newMeeting,
+			OldMeeting: ReschedulingRequestOldMeeting{
+				MeetingId:     req.ID,
+				MsftMeetingID: req.MsftMeetingID,
+			},
+		})
+	}
+
+	SetHeaderAndWriteResponse(w, http.StatusOK, RescheduleRequests{
+		Pending:   response,
+		Responses: respondedReqsResponses,
+	})
 }
 
 // (GET /api/reschedule/request/{requestID}).

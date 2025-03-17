@@ -111,6 +111,9 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.getAllRequestsForOwnerStmt, err = db.PrepareContext(ctx, getAllRequestsForOwner); err != nil {
 		return nil, fmt.Errorf("error preparing query GetAllRequestsForOwner: %w", err)
 	}
+	if q.getAllRequestsResponsesForUserIDStmt, err = db.PrepareContext(ctx, getAllRequestsResponsesForUserID); err != nil {
+		return nil, fmt.Errorf("error preparing query GetAllRequestsResponsesForUserID: %w", err)
+	}
 	if q.getAllSlotifyGroupMembersStmt, err = db.PrepareContext(ctx, getAllSlotifyGroupMembers); err != nil {
 		return nil, fmt.Errorf("error preparing query GetAllSlotifyGroupMembers: %w", err)
 	}
@@ -348,6 +351,11 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing getAllRequestsForOwnerStmt: %w", cerr)
 		}
 	}
+	if q.getAllRequestsResponsesForUserIDStmt != nil {
+		if cerr := q.getAllRequestsResponsesForUserIDStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getAllRequestsResponsesForUserIDStmt: %w", cerr)
+		}
+	}
 	if q.getAllSlotifyGroupMembersStmt != nil {
 		if cerr := q.getAllSlotifyGroupMembersStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing getAllSlotifyGroupMembersStmt: %w", cerr)
@@ -561,6 +569,7 @@ type Queries struct {
 	deleteSlotifyGroupByIDStmt           *sql.Stmt
 	deleteUserByIDStmt                   *sql.Stmt
 	getAllRequestsForOwnerStmt           *sql.Stmt
+	getAllRequestsResponsesForUserIDStmt *sql.Stmt
 	getAllSlotifyGroupMembersStmt        *sql.Stmt
 	getAllSlotifyGroupMembersExceptStmt  *sql.Stmt
 	getInviteByIDStmt                    *sql.Stmt
@@ -625,6 +634,7 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		deleteSlotifyGroupByIDStmt:           q.deleteSlotifyGroupByIDStmt,
 		deleteUserByIDStmt:                   q.deleteUserByIDStmt,
 		getAllRequestsForOwnerStmt:           q.getAllRequestsForOwnerStmt,
+		getAllRequestsResponsesForUserIDStmt: q.getAllRequestsResponsesForUserIDStmt,
 		getAllSlotifyGroupMembersStmt:        q.getAllSlotifyGroupMembersStmt,
 		getAllSlotifyGroupMembersExceptStmt:  q.getAllSlotifyGroupMembersExceptStmt,
 		getInviteByIDStmt:                    q.getInviteByIDStmt,
