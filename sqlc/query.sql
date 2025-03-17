@@ -273,3 +273,8 @@ UPDATE MeetingPreferences mp SET mp.meeting_start_time=?
 WHERE mp.id IN (
   SELECT m.meeting_pref_id FROM Meeting m WHERE m.id = ?
 );
+
+-- name: GetPlaceholderMeetingAttendeesByMeetingID :many
+SELECT pma.user_id
+FROM PlaceholderMeetingAttendee pma
+WHERE pma.meeting_id=?;
