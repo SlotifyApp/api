@@ -234,13 +234,13 @@ INSERT INTO PlaceholderMeetingAttendee (meeting_id, user_id) VALUES (?,?);
 -- name: CreateRequestToMeeting :execlastid
 INSERT INTO RequestToMeeting (request_id, meeting_id) VALUES (?,?);
 
--- name: GetAllRequestsForUser :many
+-- name: GetAllRequestsForOwner :many
 SELECT rr.*, m.msft_meeting_id, m.id, pm.meeting_id, pm.title, pm.start_time, pm.end_time, pm.duration, pm.location  
 FROM ReschedulingRequest rr 
 JOIN RequestToMeeting rtm ON rr.request_id = rtm.request_id 
 JOIN Meeting m ON rtm.meeting_id = m.id 
-LEFT JOIN PlaceholderMeeting pm ON rr.request_id = pm.request_id 
-WHERE m.owner_email = ?;
+LEFT JOIN PlaceholderMeeting pm ON rr.request_id = pm.request_id
+WHERE m.owner_email = ? AND rr.status="pending";
 
 -- name: GetRequestByID :one
 SELECT rr.*, m.msft_meeting_id, m.id, pm.meeting_id, pm.title, pm.start_time, pm.end_time, pm.duration, pm.location 
