@@ -382,7 +382,7 @@ func (s Server) GetAPIRescheduleRequestsMe(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	requests, err := s.DB.GetAllRequestsForUser(ctx, userObj.Email)
+	requests, err := s.DB.GetAllRequestsForOwner(ctx, userObj.Email)
 	if err != nil {
 		logger.Error("failed to get requests", zap.Error(err))
 		sendError(w, http.StatusBadGateway, "Failed to get requests")
