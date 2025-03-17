@@ -2,7 +2,7 @@ package api_test
 
 import (
 	"bytes"
-	"database/sql"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -179,8 +179,6 @@ func TestUser_GetUsers(t *testing.T) {
 	insertedUser2 := testutil.InsertUser(t, db, testutil.WithFirstName(insertedUser.FirstName))
 	insertedUser3 := testutil.InsertUser(t, db, testutil.WithLastName(insertedUser.LastName))
 
-	var zerothPage uint32
-
 	tests := map[string]struct {
 		httpStatus   int
 		expectedBody any
@@ -193,15 +191,11 @@ func TestUser_GetUsers(t *testing.T) {
 			expectedBody: api.Users{insertedUser},
 			testMsg:      "successfully got user by email",
 			route: fmt.Sprintf(
-				"?email=%s&pageToken=%d&limit=%d",
+				"email=%s",
 				url.QueryEscape(string(insertedUser.Email)),
-				zerothPage,
-				testutil.PageLimit,
 			),
 			params: api.GetAPIUsersParams{
-				Email:     &insertedUser.Email,
-				PageToken: &zerothPage,
-				Limit:     testutil.PageLimit,
+				Email: &insertedUser.Email,
 			},
 		},
 		"get existing user by first name": {
@@ -209,15 +203,11 @@ func TestUser_GetUsers(t *testing.T) {
 			expectedBody: api.Users{insertedUser, insertedUser2},
 			testMsg:      "successfully got users by first name",
 			route: fmt.Sprintf(
-				"?firstName=%s&pageToken=%d&limit=%d",
+				"name=%s",
 				url.QueryEscape(insertedUser.FirstName),
-				zerothPage,
-				testutil.PageLimit,
 			),
 			params: api.GetAPIUsersParams{
-				Name:      &insertedUser.FirstName,
-				PageToken: &zerothPage,
-				Limit:     testutil.PageLimit,
+				Name: &insertedUser.FirstName,
 			},
 		},
 		"get existing user by last name": {
@@ -225,15 +215,11 @@ func TestUser_GetUsers(t *testing.T) {
 			expectedBody: api.Users{insertedUser, insertedUser3},
 			testMsg:      "successfully got users by last name",
 			route: fmt.Sprintf(
-				"?lastName=%s&pageToken=%d&limit=%d",
+				"name=%s",
 				url.QueryEscape(insertedUser.LastName),
-				zerothPage,
-				testutil.PageLimit,
 			),
 			params: api.GetAPIUsersParams{
-				Name:      &insertedUser.LastName,
-				PageToken: &zerothPage,
-				Limit:     testutil.PageLimit,
+				Name: &insertedUser.LastName,
 			},
 		},
 		"get users by non-existent query params": {
@@ -241,15 +227,11 @@ func TestUser_GetUsers(t *testing.T) {
 			expectedBody: api.Users{},
 			testMsg:      "successfully got empty array of users when users don't exist by query params",
 			route: fmt.Sprintf(
-				"?lastName=%s&pageToken=%d&limit=%d",
+				"name=%s",
 				url.QueryEscape(fakeLastName),
-				zerothPage,
-				testutil.PageLimit,
 			),
 			params: api.GetAPIUsersParams{
-				Name:      &fakeLastName,
-				PageToken: &zerothPage,
-				Limit:     testutil.PageLimit,
+				Name: &fakeLastName,
 			},
 		},
 	}
@@ -260,133 +242,62 @@ func TestUser_GetUsers(t *testing.T) {
 
 			req := httptest.NewRequest(
 				http.MethodGet,
-				fmt.Sprintf("/api/users?%s&pageToken=%d&limit=%d", tt.route, zerothPage, testutil.PageLimit),
+				fmt.Sprintf("/api/users?%s", tt.route),
 				nil,
 			)
-			req.Header.Add("Content-Type", "application/json")
+			ctx := context.WithValue(req.Context(), api.RequestIDCtxKey{}, uuid.NewString())
+			req = req.WithContext(ctx)
 
-			req.Header.Set(api.ReqHeader, uuid.NewString())
+			req.Header.Add("Content-Type", "application/json")
 
 			server.GetAPIUsers(rr, req, tt.params)
 
 			testutil.OpenAPIValidateTest(t, rr, req)
 
 			if tt.httpStatus == http.StatusOK {
-				var respUsers struct {
-					Users         api.Users `json:"users"`
-					NextPageToken int       `json:"nextPageToken,omitempty"`
-				}
+				var respUsers api.Users
 				require.Equal(t, tt.httpStatus, rr.Result().StatusCode)
 				err = json.NewDecoder(rr.Result().Body).Decode(&respUsers)
 				require.NoError(t, err, "response body can be decoded into a User")
 
-				require.Equal(t, tt.expectedBody, respUsers.Users, tt.testMsg)
+				require.Equal(t, tt.expectedBody, respUsers, tt.testMsg)
 			} else {
 				var errMsg string
 				require.Equal(t, tt.httpStatus, rr.Result().StatusCode)
 				err = json.NewDecoder(rr.Result().Body).Decode(&errMsg)
 				require.NoError(t, err, "response body can be decoded into a string")
-
 				require.Equal(t, tt.expectedBody, errMsg, tt.testMsg)
 			}
 		})
 	}
 
 	// Don't want to assert every user in a var, so separate test
-	t.Run("route with no query params gets all users", func(t *testing.T) {
-		var tx *sql.Tx
-		tx, err = db.Begin()
+	t.Run("route with no query params returns error", func(t *testing.T) {
 		require.NoError(t, err, "could not begin transaction")
 
-		var rr *httptest.ResponseRecorder
+		rr := httptest.NewRecorder()
 
 		req := httptest.NewRequest(
 			http.MethodGet,
-			fmt.Sprintf("/api/users?pageToken=%d&limit=%d", zerothPage, testutil.PageLimit),
+			"/api/users",
 			nil,
 		)
 		req.Header.Add("Content-Type", "application/json")
 
-		count := testutil.GetCount(t, db, "User")
-
-		allUsers := api.Users{}
-		var pageToken uint32
-		for {
-			rr = httptest.NewRecorder()
-			server.GetAPIUsers(rr, req, api.GetAPIUsersParams{
-				PageToken: &pageToken,
-				Limit:     testutil.PageLimit,
-			},
-			)
-			require.Equal(t, http.StatusOK, rr.Result().StatusCode)
-			var resp struct {
-				Users         api.Users `json:"users"`
-				NextPageToken int       `json:"nextPageToken"`
-			}
-			err = json.NewDecoder(rr.Result().Body).Decode(&resp)
-			require.NoError(t, err, "response body can be decoded")
-			allUsers = append(allUsers, resp.Users...)
-			if resp.NextPageToken == 0 {
-				break
-			}
-
-			pageToken = uint32(resp.NextPageToken)
-		}
-		err = tx.Commit()
+		ctx := context.WithValue(req.Context(), api.RequestIDCtxKey{}, uuid.NewString())
+		req = req.WithContext(ctx)
 		require.NoError(t, err, "failed to commit transaction")
-		testutil.OpenAPIValidateTest(t, rr, req)
-		require.Len(t, allUsers, count, "got all users from the User table")
-	})
-	t.Run("Pagination", func(t *testing.T) {
-		for range 11 {
-			testutil.InsertUser(t, db)
-		}
-		rr := httptest.NewRecorder()
-		req := httptest.NewRequest(
-			http.MethodGet,
-			fmt.Sprintf("/api/users?pageToken=%d&limit=%d", zerothPage, testutil.PageLimit),
-			nil,
-		)
-		req.Header.Set(api.ReqHeader, uuid.NewString())
-		params := api.GetAPIUsersParams{
-			PageToken: &zerothPage,
-			Limit:     testutil.PageLimit,
-		}
-		server.GetAPIUsers(rr, req, params)
-		require.Equal(t, http.StatusOK, rr.Result().StatusCode)
-		var response struct {
-			Users         api.Users `json:"users"`
-			NextPageToken int       `json:"nextPageToken,omitempty"`
-		}
-		err = json.NewDecoder(rr.Result().Body).Decode(&response)
-		require.NoError(t, err, "failed to decode first page response")
-		require.Len(t, response.Users, 10, "first page should have 10 users")
-		if response.NextPageToken != 0 {
-			rr2 := httptest.NewRecorder()
-			req2 := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/users&pageToken=%d", response.NextPageToken), nil)
-			req2.Header.Set(api.ReqHeader, uuid.NewString())
 
-			nextToken := uint32(response.NextPageToken)
-			params2 := api.GetAPIUsersParams{
-				PageToken: &nextToken,
-				Limit:     testutil.PageLimit,
-			}
-			server.GetAPIUsers(rr2, req2, params2)
-			require.Equal(t, http.StatusOK, rr2.Result().StatusCode)
-			var response2 struct {
-				Users         api.Users `json:"users"`
-				NextPageToken int       `json:"nextPageToken,omitempty"`
-			}
-			err = json.NewDecoder(rr2.Result().Body).Decode(&response2)
-			require.NoError(t, err, "failed to decode second page response")
-			firstPageUserIDs := map[uint32]bool{}
-			for _, u := range response.Users {
-				firstPageUserIDs[u.Id] = true
-			}
-			for _, u := range response2.Users {
-				require.False(t, firstPageUserIDs[u.Id], "user id %d appears twice", u.Id)
-			}
-		}
+		server.GetAPIUsers(rr, req, api.GetAPIUsersParams{})
+		testutil.OpenAPIValidateTest(t, rr, req)
+
+		var body string
+		require.Equal(t, http.StatusBadRequest, rr.Result().StatusCode)
+		err = json.NewDecoder(rr.Result().Body).Decode(&body)
+		require.NoError(t, err, "response body can be decoded into a string")
+
+		require.Equal(t, "please provide at least email or name",
+			body, "get api users with no query params returns error")
 	})
 }
 

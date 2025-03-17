@@ -30,100 +30,34 @@ func (s Server) GetAPIUsers(w http.ResponseWriter, r *http.Request, params GetAP
 	ctx, cancel := context.WithTimeout(r.Context(), database.DatabaseTimeout)
 	defer cancel()
 
-	users := make([]database.User, 0)
-
-	searchUserLim := min(SearchUserLimMax, params.Limit)
-
-	var lastID uint32
-	if params.PageToken != nil {
-		lastID = *params.PageToken
-	} else {
-		lastID = 0
-	}
-
-	// searches by name first if both name and email params are given a value
-	switch {
-	// search users by name
-	case params.Name != nil:
-		usersByName, err := s.DB.SearchUsersByName(ctx,
-			database.SearchUsersByNameParams{
-				Name:   *params.Name,
-				Limit:  searchUserLim,
-				LastID: lastID,
-			})
-		if err != nil {
+	var err error
+	if params.Name != nil {
+		var users []database.SearchUsersByNameRow
+		if users, err = s.DB.SearchUsersByName(ctx, *params.Name); err != nil {
 			logger.Error("failed to search user by name", zap.Error(err),
 				zap.String("name", *params.Name))
-			sendError(w, http.StatusInternalServerError, "failed to search users by name")
+			sendError(w, http.StatusInternalServerError,
+				fmt.Sprintf("failed to search users by name: %s", *params.Name))
 			return
 		}
-		for _, row := range usersByName {
-			users = append(users, database.User{
-				ID:        row.ID,
-				Email:     row.Email,
-				FirstName: row.FirstName,
-				LastName:  row.LastName,
-			})
-		}
-	// search users by email
-	case params.Email != nil:
-		usersByEmail, err := s.DB.SearchUsersByEmail(ctx,
-			database.SearchUsersByEmailParams{
-				Email:  string(*params.Email),
-				Limit:  searchUserLim,
-				LastID: lastID,
-			})
-		if err != nil {
-			logger.Error("failed to search user by email", zap.Error(err),
-				zap.String("email", string(*params.Email)))
-			sendError(w, http.StatusInternalServerError, "failed to search users by email")
-			return
-		}
-		for _, row := range usersByEmail {
-			users = append(users, database.User{
-				ID:        row.ID,
-				Email:     row.Email,
-				FirstName: row.FirstName,
-				LastName:  row.LastName,
-			})
-		}
-	// Default, just list all users
-	default:
-		usersAll, err := s.DB.ListUsers(ctx,
-			database.ListUsersParams{
-				Limit:  searchUserLim,
-				LastID: lastID,
-			})
-		if err != nil {
-			logger.Error("failed to list all users", zap.Error(err))
-			sendError(w, http.StatusInternalServerError, "failed to list all users")
-			return
-		}
-		for _, row := range usersAll {
-			users = append(users, database.User{
-				ID:        row.ID,
-				Email:     row.Email,
-				FirstName: row.FirstName,
-				LastName:  row.LastName,
-			})
-		}
-	}
-	var nextPageToken int
-	if len(users) == int(searchUserLim) {
-		// id of the last user gotten here
-		nextPageToken = int(users[len(users)-1].ID)
-	} else {
-		nextPageToken = 0
+		SetHeaderAndWriteResponse(w, http.StatusOK, users)
 	}
 
-	response := struct {
-		Users         []database.User
-		NextPageToken int
-	}{
-		Users:         users,
-		NextPageToken: nextPageToken,
+	if params.Email != nil {
+		var users []database.SearchUsersByEmailRow
+		if users, err = s.DB.SearchUsersByEmail(ctx, *params.Email); err != nil {
+			logger.Error("failed to search users by email", zap.Error(err),
+				zap.String("email", string(*params.Email)))
+			sendError(w, http.StatusInternalServerError,
+				fmt.Sprintf("failed to search users by email: %s", *params.Email))
+			return
+		}
+		SetHeaderAndWriteResponse(w, http.StatusOK, users)
 	}
-	SetHeaderAndWriteResponse(w, http.StatusOK, response)
+
+	// email and name were empty
+	logger.Error("email and name were not provided")
+	sendError(w, http.StatusBadRequest, "please provide at least email or name")
 }
 
 // (POST /users) Create a new user.

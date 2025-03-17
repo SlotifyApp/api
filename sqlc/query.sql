@@ -30,24 +30,12 @@ LIMIT ?;
 -- name: SearchUsersByName :many
 SELECT id, email, first_name, last_name FROM User
 WHERE LOWER(CONCAT(first_name, ' ', last_name)) LIKE LOWER(CONCAT('%', sqlc.arg('name'), '%'))
-  AND id > sqlc.arg('last_id')
-ORDER BY id
-LIMIT ?;
+LIMIT 10;
 
 -- name: SearchUsersByEmail :many
 SELECT id, email, first_name, last_name FROM User
 WHERE LOWER(email) LIKE LOWER(CONCAT('%', sqlc.arg('email'), '%'))
-  and id > sqlc.arg('last_id')
-ORDER BY id
-LIMIT ?;
-
--- name: ListUsers :many
-SELECT id, email, first_name, last_name FROM User
-WHERE id > sqlc.arg('last_id')
-ORDER BY id
-LIMIT ?;
-
-
+LIMIT 10;
 
 
 

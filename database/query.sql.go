@@ -1045,53 +1045,6 @@ func (q *Queries) ListSlotifyGroups(ctx context.Context, name interface{}) ([]Sl
 	return items, nil
 }
 
-const listUsers = `-- name: ListUsers :many
-SELECT id, email, first_name, last_name FROM User
-WHERE id > ?
-ORDER BY id
-LIMIT ?
-`
-
-type ListUsersParams struct {
-	LastID uint32 `json:"lastID"`
-	Limit  int32  `json:"limit"`
-}
-
-type ListUsersRow struct {
-	ID        uint32 `json:"id"`
-	Email     string `json:"email"`
-	FirstName string `json:"firstName"`
-	LastName  string `json:"lastName"`
-}
-
-func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]ListUsersRow, error) {
-	rows, err := q.query(ctx, q.listUsersStmt, listUsers, arg.LastID, arg.Limit)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []ListUsersRow{}
-	for rows.Next() {
-		var i ListUsersRow
-		if err := rows.Scan(
-			&i.ID,
-			&i.Email,
-			&i.FirstName,
-			&i.LastName,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const markNotificationAsRead = `-- name: MarkNotificationAsRead :execrows
 UPDATE UserToNotification SET is_read=TRUE
 WHERE user_id=? AND notification_id=?
@@ -1144,16 +1097,8 @@ func (q *Queries) RemoveSlotifyGroupMember(ctx context.Context, arg RemoveSlotif
 const searchUsersByEmail = `-- name: SearchUsersByEmail :many
 SELECT id, email, first_name, last_name FROM User
 WHERE LOWER(email) LIKE LOWER(CONCAT('%', ?, '%'))
-  and id > ?
-ORDER BY id
-LIMIT ?
+LIMIT 10
 `
-
-type SearchUsersByEmailParams struct {
-	Email  interface{} `json:"email"`
-	LastID uint32      `json:"lastID"`
-	Limit  int32       `json:"limit"`
-}
 
 type SearchUsersByEmailRow struct {
 	ID        uint32 `json:"id"`
@@ -1162,8 +1107,8 @@ type SearchUsersByEmailRow struct {
 	LastName  string `json:"lastName"`
 }
 
-func (q *Queries) SearchUsersByEmail(ctx context.Context, arg SearchUsersByEmailParams) ([]SearchUsersByEmailRow, error) {
-	rows, err := q.query(ctx, q.searchUsersByEmailStmt, searchUsersByEmail, arg.Email, arg.LastID, arg.Limit)
+func (q *Queries) SearchUsersByEmail(ctx context.Context, email interface{}) ([]SearchUsersByEmailRow, error) {
+	rows, err := q.query(ctx, q.searchUsersByEmailStmt, searchUsersByEmail, email)
 	if err != nil {
 		return nil, err
 	}
@@ -1193,16 +1138,8 @@ func (q *Queries) SearchUsersByEmail(ctx context.Context, arg SearchUsersByEmail
 const searchUsersByName = `-- name: SearchUsersByName :many
 SELECT id, email, first_name, last_name FROM User
 WHERE LOWER(CONCAT(first_name, ' ', last_name)) LIKE LOWER(CONCAT('%', ?, '%'))
-  AND id > ?
-ORDER BY id
-LIMIT ?
+LIMIT 10
 `
-
-type SearchUsersByNameParams struct {
-	Name   interface{} `json:"name"`
-	LastID uint32      `json:"lastID"`
-	Limit  int32       `json:"limit"`
-}
 
 type SearchUsersByNameRow struct {
 	ID        uint32 `json:"id"`
@@ -1211,8 +1148,8 @@ type SearchUsersByNameRow struct {
 	LastName  string `json:"lastName"`
 }
 
-func (q *Queries) SearchUsersByName(ctx context.Context, arg SearchUsersByNameParams) ([]SearchUsersByNameRow, error) {
-	rows, err := q.query(ctx, q.searchUsersByNameStmt, searchUsersByName, arg.Name, arg.LastID, arg.Limit)
+func (q *Queries) SearchUsersByName(ctx context.Context, name interface{}) ([]SearchUsersByNameRow, error) {
+	rows, err := q.query(ctx, q.searchUsersByNameStmt, searchUsersByName, name)
 	if err != nil {
 		return nil, err
 	}

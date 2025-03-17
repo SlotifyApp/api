@@ -165,9 +165,6 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.listSlotifyGroupsStmt, err = db.PrepareContext(ctx, listSlotifyGroups); err != nil {
 		return nil, fmt.Errorf("error preparing query ListSlotifyGroups: %w", err)
 	}
-	if q.listUsersStmt, err = db.PrepareContext(ctx, listUsers); err != nil {
-		return nil, fmt.Errorf("error preparing query ListUsers: %w", err)
-	}
 	if q.markNotificationAsReadStmt, err = db.PrepareContext(ctx, markNotificationAsRead); err != nil {
 		return nil, fmt.Errorf("error preparing query MarkNotificationAsRead: %w", err)
 	}
@@ -441,11 +438,6 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing listSlotifyGroupsStmt: %w", cerr)
 		}
 	}
-	if q.listUsersStmt != nil {
-		if cerr := q.listUsersStmt.Close(); cerr != nil {
-			err = fmt.Errorf("error closing listUsersStmt: %w", cerr)
-		}
-	}
 	if q.markNotificationAsReadStmt != nil {
 		if cerr := q.markNotificationAsReadStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing markNotificationAsReadStmt: %w", cerr)
@@ -587,7 +579,6 @@ type Queries struct {
 	listInvitesByGroupStmt               *sql.Stmt
 	listInvitesMeStmt                    *sql.Stmt
 	listSlotifyGroupsStmt                *sql.Stmt
-	listUsersStmt                        *sql.Stmt
 	markNotificationAsReadStmt           *sql.Stmt
 	removeSlotifyGroupStmt               *sql.Stmt
 	removeSlotifyGroupMemberStmt         *sql.Stmt
@@ -652,7 +643,6 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		listInvitesByGroupStmt:               q.listInvitesByGroupStmt,
 		listInvitesMeStmt:                    q.listInvitesMeStmt,
 		listSlotifyGroupsStmt:                q.listSlotifyGroupsStmt,
-		listUsersStmt:                        q.listUsersStmt,
 		markNotificationAsReadStmt:           q.markNotificationAsReadStmt,
 		removeSlotifyGroupStmt:               q.removeSlotifyGroupStmt,
 		removeSlotifyGroupMemberStmt:         q.removeSlotifyGroupMemberStmt,
