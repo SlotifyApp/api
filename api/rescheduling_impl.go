@@ -514,6 +514,17 @@ func (s Server) GetAPIRescheduleRequestRequestID(w http.ResponseWriter, r *http.
 
 		newMeeting.StartTime = req.StartTime.Time
 		newMeeting.Title = req.Title.String
+
+		var attendeeIDs []uint32
+		// nolint: gosec // int to uint
+		attendeeIDs, err = s.DB.GetPlaceholderMeetingAttendeesByMeetingID(ctx, uint32(req.MeetingID.Int32))
+		if err != nil {
+			logger.Error("failed to get requests", zap.Error(err))
+			sendError(w, http.StatusBadGateway, "Failed to get requests")
+			return
+		}
+
+		newMeeting.Attendees = attendeeIDs
 	}
 
 	response := RescheduleRequest{
