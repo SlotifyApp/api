@@ -425,8 +425,11 @@ func (s Server) GetAPIRescheduleRequestsMe(w http.ResponseWriter, r *http.Reques
 			Status:      string(req.Status),
 			NewMeeting:  &newMeeting,
 			OldMeeting: ReschedulingRequestOldMeeting{
-				MeetingId:     req.ID,
-				MsftMeetingID: req.MsftMeetingID,
+				MeetingId:        req.ID,
+				MsftMeetingID:    req.MsftMeetingID,
+				MeetingStartTime: req.MeetingStartTime,
+				TimeRangeStart:   req.StartDateRange,
+				TimeRangeEnd:     req.EndDateRange,
 			},
 		})
 	}
@@ -453,6 +456,7 @@ func (s Server) GetAPIRescheduleRequestsMe(w http.ResponseWriter, r *http.Reques
 
 			newMeeting.StartTime = req.StartTime.Time
 			newMeeting.Title = req.Title.String
+
 			var attendeeIDs []uint32
 			// nolint: gosec // int to uint
 			attendeeIDs, err = s.DB.GetPlaceholderMeetingAttendeesByMeetingID(ctx, uint32(req.MeetingID.Int32))
@@ -472,8 +476,11 @@ func (s Server) GetAPIRescheduleRequestsMe(w http.ResponseWriter, r *http.Reques
 			Status:      string(req.Status),
 			NewMeeting:  &newMeeting,
 			OldMeeting: ReschedulingRequestOldMeeting{
-				MeetingId:     req.ID,
-				MsftMeetingID: req.MsftMeetingID,
+				MeetingId:        req.ID,
+				MsftMeetingID:    req.MsftMeetingID,
+				MeetingStartTime: req.MeetingStartTime,
+				TimeRangeStart:   req.StartDateRange,
+				TimeRangeEnd:     req.EndDateRange,
 			},
 		})
 	}
@@ -534,8 +541,11 @@ func (s Server) GetAPIRescheduleRequestRequestID(w http.ResponseWriter, r *http.
 		Status:      string(req.Status),
 		NewMeeting:  &newMeeting,
 		OldMeeting: ReschedulingRequestOldMeeting{
-			MeetingId:     req.ID,
-			MsftMeetingID: req.MsftMeetingID,
+			MeetingId:        req.ID,
+			MsftMeetingID:    req.MsftMeetingID,
+			MeetingStartTime: req.MeetingStartTime,
+			TimeRangeStart:   req.StartDateRange,
+			TimeRangeEnd:     req.EndDateRange,
 		},
 	}
 
