@@ -168,8 +168,8 @@ func (s Server) GetAPIInvitesMe(w http.ResponseWriter, r *http.Request, params G
 	}
 
 	response := struct {
-		Invites       []database.ListInvitesMeRow
-		NextPageToken int
+		Invites       []database.ListInvitesMeRow `json:"invites"`
+		NextPageToken int                         `json:"nextPageToken"`
 	}{
 		Invites:       invites,
 		NextPageToken: nextPageToken,
@@ -441,7 +441,7 @@ func (s Server) GetAPISlotifyGroupsSlotifyGroupIDInvites(w http.ResponseWriter,
 
 	response := struct {
 		Invites       []database.ListInvitesByGroupRow `json:"invites"`
-		NextPageToken int                              `json:"nextpageToken"`
+		NextPageToken int                              `json:"nextPageToken"`
 	}{
 		Invites:       invites,
 		NextPageToken: nextPageToken,
