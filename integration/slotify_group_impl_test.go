@@ -262,7 +262,7 @@ func TestSlotifyGroup_GetSlotifyGroupsSlotifyGroupIDUsers(t *testing.T) {
 			testMsg:          "correct error returns when slotifyGroup doesn't exist",
 		},
 		"get members of an existing slotifyGroup": {
-			expectedRespBody: api.Users{userInserted, userInserted2},
+			expectedRespBody: []api.User{userInserted, userInserted2},
 			httpStatus:       http.StatusOK,
 			slotifyGroupID:   slotifyGroupInserted.Id,
 			testMsg:          "correctly get members of a slotifyGroup",
@@ -299,10 +299,8 @@ func TestSlotifyGroup_GetSlotifyGroupsSlotifyGroupIDUsers(t *testing.T) {
 			testutil.OpenAPIValidateTest(t, rr, req)
 
 			if tt.httpStatus == http.StatusOK {
-				var respBody struct {
-					Users         api.Users `json:"users"`
-					NextPageToken int       `json:"nextPageToken"`
-				}
+				var respBody api.UsersAndPagination
+
 				require.Equal(t, tt.httpStatus, rr.Result().StatusCode)
 				err = json.NewDecoder(rr.Result().Body).Decode(&respBody)
 				require.NoError(t, err, "response cannot be decoded into Users struct")
@@ -344,10 +342,8 @@ func TestSlotifyGroup_GetSlotifyGroupsSlotifyGroupIDUsers(t *testing.T) {
 			},
 		)
 		require.Equal(t, http.StatusOK, rr.Result().StatusCode)
-		var firstPageResp struct {
-			Users         api.Users `json:"users"`
-			NextPageToken int       `json:"nextPageToken"`
-		}
+		var firstPageResp api.UsersAndPagination
+
 		err = json.NewDecoder(rr.Result().Body).Decode(&firstPageResp)
 		require.NoError(t, err)
 		require.Len(t, firstPageResp.Users, 10, "first page should return 10 users")
@@ -377,10 +373,8 @@ func TestSlotifyGroup_GetSlotifyGroupsSlotifyGroupIDUsers(t *testing.T) {
 			},
 		)
 		require.Equal(t, http.StatusOK, rr2.Result().StatusCode)
-		var secondPageResp struct {
-			Users         api.Users `json:"users"`
-			NextPageToken int       `json:"nextPageToken"`
-		}
+		var secondPageResp api.UsersAndPagination
+
 		err = json.NewDecoder(rr2.Result().Body).Decode(&secondPageResp)
 		require.NoError(t, err)
 		require.Len(t, secondPageResp.Users, 1, "second page should return 1 user")
