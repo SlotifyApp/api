@@ -102,6 +102,9 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.deleteRefreshTokenByUserIDStmt, err = db.PrepareContext(ctx, deleteRefreshTokenByUserID); err != nil {
 		return nil, fmt.Errorf("error preparing query DeleteRefreshTokenByUserID: %w", err)
 	}
+	if q.deleteRequestStmt, err = db.PrepareContext(ctx, deleteRequest); err != nil {
+		return nil, fmt.Errorf("error preparing query DeleteRequest: %w", err)
+	}
 	if q.deleteSlotifyGroupByIDStmt, err = db.PrepareContext(ctx, deleteSlotifyGroupByID); err != nil {
 		return nil, fmt.Errorf("error preparing query DeleteSlotifyGroupByID: %w", err)
 	}
@@ -343,6 +346,11 @@ func (q *Queries) Close() error {
 	if q.deleteRefreshTokenByUserIDStmt != nil {
 		if cerr := q.deleteRefreshTokenByUserIDStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing deleteRefreshTokenByUserIDStmt: %w", cerr)
+		}
+	}
+	if q.deleteRequestStmt != nil {
+		if cerr := q.deleteRequestStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing deleteRequestStmt: %w", cerr)
 		}
 	}
 	if q.deleteSlotifyGroupByIDStmt != nil {
@@ -590,6 +598,7 @@ type Queries struct {
 	createUserNotificationStmt                    *sql.Stmt
 	deleteInviteByIDStmt                          *sql.Stmt
 	deleteRefreshTokenByUserIDStmt                *sql.Stmt
+	deleteRequestStmt                             *sql.Stmt
 	deleteSlotifyGroupByIDStmt                    *sql.Stmt
 	deleteUserByIDStmt                            *sql.Stmt
 	getAllRequestsForOwnerStmt                    *sql.Stmt
@@ -658,6 +667,7 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		createUserNotificationStmt:                    q.createUserNotificationStmt,
 		deleteInviteByIDStmt:                          q.deleteInviteByIDStmt,
 		deleteRefreshTokenByUserIDStmt:                q.deleteRefreshTokenByUserIDStmt,
+		deleteRequestStmt:                             q.deleteRequestStmt,
 		deleteSlotifyGroupByIDStmt:                    q.deleteSlotifyGroupByIDStmt,
 		deleteUserByIDStmt:                            q.deleteUserByIDStmt,
 		getAllRequestsForOwnerStmt:                    q.getAllRequestsForOwnerStmt,

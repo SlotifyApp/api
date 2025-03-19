@@ -432,6 +432,16 @@ func (q *Queries) DeleteRefreshTokenByUserID(ctx context.Context, userID uint32)
 	return result.RowsAffected()
 }
 
+const deleteRequest = `-- name: DeleteRequest :exec
+DELETE FROM ReschedulingRequest
+WHERE request_id = ?
+`
+
+func (q *Queries) DeleteRequest(ctx context.Context, requestID uint32) error {
+	_, err := q.exec(ctx, q.deleteRequestStmt, deleteRequest, requestID)
+	return err
+}
+
 const deleteSlotifyGroupByID = `-- name: DeleteSlotifyGroupByID :execrows
 DELETE FROM SlotifyGroup WHERE id=?
 `

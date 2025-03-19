@@ -740,3 +740,43 @@ func (s Server) PatchAPIRescheduleRequestRequestIDAccept(w http.ResponseWriter, 
 
 	SetHeaderAndWriteResponse(w, http.StatusOK, "Successfully accepted rescheduling request")
 }
+
+// (POST /api/reschedule/request/{requesteID}/complete).
+func (s Server) PostAPIRescheduleRequestRequestIDComplete(w http.ResponseWriter, r *http.Request, parRequestID uint32) {
+	ctx, cancel := context.WithTimeout(r.Context(), time.Minute*3)
+	defer cancel()
+
+	userID, _ := r.Context().Value(UserIDCtxKey{}).(uint32)
+	reqID, _ := r.Context().Value(RequestIDCtxKey{}).(string)
+	logger := s.Logger.With(zap.String("request_id", reqID), zap.Uint32("userID", userID))
+
+	s.PostAPICalendarMe(w, r)
+
+	if r.Response.StatusCode == http.StatusOK {
+		// Delete request as event has been created for it
+		err := s.DB.DeleteRequest(ctx, parRequestID)
+		if err != nil {
+			logger.Error("failed to delete request after creating new event", zap.Error(err))
+		}
+	}
+}
+
+// (GET /api/reschedule/request/{requesteID}/close).
+func (s Server) GetAPIRescheduleRequestRequestIDClose(w http.ResponseWriter, r *http.Request, parRequestID uint32) {
+	ctx, cancel := context.WithTimeout(r.Context(), time.Minute*3)
+	defer cancel()
+
+	userID, _ := r.Context().Value(UserIDCtxKey{}).(uint32)
+	reqID, _ := r.Context().Value(RequestIDCtxKey{}).(string)
+	logger := s.Logger.With(zap.String("request_id", reqID), zap.Uint32("userID", userID))
+
+	// Delete request as event has been created for it
+	err := s.DB.DeleteRequest(ctx, parRequestID)
+	if err != nil {
+		logger.Error("failed to delete request after creating new event", zap.Error(err))
+		sendError(w, http.StatusBadGateway, "Failed to delete request")
+		return
+	}
+
+	SetHeaderAndWriteResponse(w, http.StatusOK, "Successfully deleted request")
+}

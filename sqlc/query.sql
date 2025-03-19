@@ -304,3 +304,7 @@ WHERE mp.id IN (
 SELECT pma.user_id
 FROM PlaceholderMeetingAttendee pma
 WHERE pma.meeting_id=?;
+
+-- name: DeleteRequest :exec
+DELETE FROM ReschedulingRequest
+WHERE request_id = ?;
