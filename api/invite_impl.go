@@ -132,27 +132,9 @@ func (s Server) GetAPIInvitesMe(w http.ResponseWriter, r *http.Request, params G
 	ctx, cancel := context.WithTimeout(r.Context(), 4*database.DatabaseTimeout)
 	defer cancel()
 
-	userID, ok := r.Context().Value(UserIDCtxKey{}).(uint32)
-	if !ok {
-		logger.Error("failed to get userid from request context")
-		sendError(w, http.StatusUnauthorized, "Try again later.")
-		return
-	}
-
-	invitesLimit := min(params.Limit, InvitesLimitMax)
-
-	var lastID uint32
-	if params.PageToken != nil {
-		lastID = *params.PageToken
-	} else {
-		lastID = 0
-	}
-
 	invites, err := s.DB.ListInvitesMe(ctx, database.ListInvitesMeParams{
 		Status:   params.Status,
 		ToUserID: userID,
-		LastID:   lastID,
-		Limit:    invitesLimit,
 	})
 	if err != nil {
 		logger.Error("invite api: failed to get invites", zap.Error(err))
@@ -160,22 +142,22 @@ func (s Server) GetAPIInvitesMe(w http.ResponseWriter, r *http.Request, params G
 		return
 	}
 
-	var nextPageToken int
-	if len(invites) == int(invitesLimit) {
-		nextPageToken = int(invites[len(invites)-1].InviteID)
-	} else {
-		nextPageToken = 0
+	parsedInvites := make([]InvitesMe, 0)
+	for _, i := range invites {
+		parsedInvites = append(parsedInvites, InvitesMe{
+			CreatedAt:         i.CreatedAt,
+			ExpiryDate:        openapi_types.Date{Time: i.ExpiryDate},
+			FromUserEmail:     openapi_types.Email(i.FromUserEmail),
+			FromUserFirstName: i.FromUserFirstName,
+			FromUserLastName:  i.FromUserLastName,
+			InviteID:          i.InviteID,
+			Message:           i.Message,
+			SlotifyGroupName:  i.SlotifyGroupName,
+			Status:            InviteStatus(i.Status),
+		})
 	}
 
-	response := struct {
-		Invites       []database.ListInvitesMeRow `json:"invites"`
-		NextPageToken int                         `json:"nextPageToken"`
-	}{
-		Invites:       invites,
-		NextPageToken: nextPageToken,
-	}
-
-	SetHeaderAndWriteResponse(w, http.StatusOK, response)
+	SetHeaderAndWriteResponse(w, http.StatusOK, parsedInvites)
 }
 
 // (DELETE /api/invites/{inviteID} Delete an invite).
