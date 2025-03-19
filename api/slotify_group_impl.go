@@ -131,8 +131,6 @@ func (s Server) GetAPISlotifyGroupsMe(w http.ResponseWriter, r *http.Request, pa
 	var lastID uint32
 	if params.PageToken != nil {
 		lastID = *params.PageToken
-	} else {
-		lastID = 0
 	}
 
 	groupLimit := min(params.Limit, GroupLimitMax)
@@ -167,8 +165,6 @@ func (s Server) GetAPISlotifyGroupsMe(w http.ResponseWriter, r *http.Request, pa
 	var nextPageToken int
 	if len(slotifyGroups) == int(groupLimit) {
 		nextPageToken = int(slotifyGroups[len(slotifyGroups)-1].ID)
-	} else {
-		nextPageToken = 0
 	}
 
 	response := struct {
@@ -395,7 +391,7 @@ func (s Server) GetAPISlotifyGroupsSlotifyGroupIDUsers(w http.ResponseWriter,
 		return
 	}
 
-	var lastID uint32 = 0
+	var lastID uint32
 	if params.PageToken != nil {
 		lastID = *params.PageToken
 	}
@@ -483,7 +479,7 @@ func (s Server) GetAPISlotifyGroupsSlotifyGroupIDUsers(w http.ResponseWriter,
 		}
 	}
 
-	var nextPageToken uint32 = 0
+	var nextPageToken uint32
 	if len(users) == int(groupLimit) {
 		nextPageToken = users[len(users)-1].Id
 	}
