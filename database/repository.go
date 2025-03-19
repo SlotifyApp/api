@@ -180,6 +180,12 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.removeSlotifyGroupMemberStmt, err = db.PrepareContext(ctx, removeSlotifyGroupMember); err != nil {
 		return nil, fmt.Errorf("error preparing query RemoveSlotifyGroupMember: %w", err)
 	}
+	if q.searchSlotifyGroupMembersByEmailStmt, err = db.PrepareContext(ctx, searchSlotifyGroupMembersByEmail); err != nil {
+		return nil, fmt.Errorf("error preparing query SearchSlotifyGroupMembersByEmail: %w", err)
+	}
+	if q.searchSlotifyGroupMembersByNameStmt, err = db.PrepareContext(ctx, searchSlotifyGroupMembersByName); err != nil {
+		return nil, fmt.Errorf("error preparing query SearchSlotifyGroupMembersByName: %w", err)
+	}
 	if q.searchUsersByEmailStmt, err = db.PrepareContext(ctx, searchUsersByEmail); err != nil {
 		return nil, fmt.Errorf("error preparing query SearchUsersByEmail: %w", err)
 	}
@@ -469,6 +475,16 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing removeSlotifyGroupMemberStmt: %w", cerr)
 		}
 	}
+	if q.searchSlotifyGroupMembersByEmailStmt != nil {
+		if cerr := q.searchSlotifyGroupMembersByEmailStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing searchSlotifyGroupMembersByEmailStmt: %w", cerr)
+		}
+	}
+	if q.searchSlotifyGroupMembersByNameStmt != nil {
+		if cerr := q.searchSlotifyGroupMembersByNameStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing searchSlotifyGroupMembersByNameStmt: %w", cerr)
+		}
+	}
 	if q.searchUsersByEmailStmt != nil {
 		if cerr := q.searchUsersByEmailStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing searchUsersByEmailStmt: %w", cerr)
@@ -600,6 +616,8 @@ type Queries struct {
 	markNotificationAsReadStmt                    *sql.Stmt
 	removeSlotifyGroupStmt                        *sql.Stmt
 	removeSlotifyGroupMemberStmt                  *sql.Stmt
+	searchSlotifyGroupMembersByEmailStmt          *sql.Stmt
+	searchSlotifyGroupMembersByNameStmt           *sql.Stmt
 	searchUsersByEmailStmt                        *sql.Stmt
 	searchUsersByNameStmt                         *sql.Stmt
 	updateInviteMessageStmt                       *sql.Stmt
@@ -666,6 +684,8 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		markNotificationAsReadStmt:                    q.markNotificationAsReadStmt,
 		removeSlotifyGroupStmt:                        q.removeSlotifyGroupStmt,
 		removeSlotifyGroupMemberStmt:                  q.removeSlotifyGroupMemberStmt,
+		searchSlotifyGroupMembersByEmailStmt:          q.searchSlotifyGroupMembersByEmailStmt,
+		searchSlotifyGroupMembersByNameStmt:           q.searchSlotifyGroupMembersByNameStmt,
 		searchUsersByEmailStmt:                        q.searchUsersByEmailStmt,
 		searchUsersByNameStmt:                         q.searchUsersByNameStmt,
 		updateInviteMessageStmt:                       q.updateInviteMessageStmt,
