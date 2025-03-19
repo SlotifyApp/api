@@ -56,7 +56,7 @@ func parseEventableResp(events []graphmodels.Eventable) ([]CalendarEvent, error)
 			Body:        body,
 			Created:     e.GetCreatedDateTime(),
 			EndTime:     endTime,
-			Id:          e.GetICalUId(),
+			Id:          e.GetId(),
 			IsCancelled: e.GetIsCancelled(),
 			JoinURL:     joinURL,
 			Locations:   locations,
