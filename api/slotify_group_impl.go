@@ -395,11 +395,9 @@ func (s Server) GetAPISlotifyGroupsSlotifyGroupIDUsers(w http.ResponseWriter,
 		return
 	}
 
-	var lastID uint32
+	var lastID uint32 = 0
 	if params.PageToken != nil {
 		lastID = *params.PageToken
-	} else {
-		lastID = 0
 	}
 	groupLimit := min(params.Limit, GroupLimitMax)
 
@@ -435,14 +433,14 @@ func (s Server) GetAPISlotifyGroupsSlotifyGroupIDUsers(w http.ResponseWriter,
 
 	case params.Email != nil:
 		var rows []database.SearchSlotifyGroupMembersByEmailRow
-		rows, err = s.DB.SearchSlotifyGroupMembersByEmail(ctx,
-			database.SearchSlotifyGroupMembersByEmailParams{
-				ID:     slotifyGroupID,
-				LastID: lastID,
-				Limit:  groupLimit,
-				Email:  params.Email,
-			})
-		if err != nil {
+
+		p := database.SearchSlotifyGroupMembersByEmailParams{
+			ID:     slotifyGroupID,
+			LastID: lastID,
+			Limit:  groupLimit,
+			Email:  params.Email,
+		}
+		if rows, err = s.DB.SearchSlotifyGroupMembersByEmail(ctx, p); err != nil {
 			logger.Error("slotifyGroup api: failed to get users of a group when searching by email",
 				zap.Uint32("slotifyGroupID",
 					slotifyGroupID),
@@ -461,16 +459,15 @@ func (s Server) GetAPISlotifyGroupsSlotifyGroupIDUsers(w http.ResponseWriter,
 		}
 	default:
 		var rows []database.GetAllSlotifyGroupMembersRow
-		rows, err = s.DB.GetAllSlotifyGroupMembers(ctx,
-			database.GetAllSlotifyGroupMembersParams{
-				ID:     slotifyGroupID,
-				LastID: lastID,
-				Limit:  groupLimit,
-			})
-		if err != nil {
+
+		p := database.GetAllSlotifyGroupMembersParams{
+			ID:     slotifyGroupID,
+			LastID: lastID,
+			Limit:  groupLimit,
+		}
+		if rows, err = s.DB.GetAllSlotifyGroupMembers(ctx, p); err != nil {
 			logger.Error("slotifyGroup api: failed to get users of a group",
-				zap.Uint32("slotifyGroupID",
-					slotifyGroupID),
+				zap.Uint32("slotifyGroupID", slotifyGroupID),
 				zap.Error(err),
 			)
 			sendError(w, http.StatusInternalServerError, "failed to get all slotify group members")
@@ -486,20 +483,15 @@ func (s Server) GetAPISlotifyGroupsSlotifyGroupIDUsers(w http.ResponseWriter,
 		}
 	}
 
-	var nextPageToken int
+	var nextPageToken uint32 = 0
 	if len(users) == int(groupLimit) {
-		nextPageToken = int(users[len(users)-1].Id)
-	} else {
-		nextPageToken = 0
+		nextPageToken = users[len(users)-1].Id
 	}
 
-	response := struct {
-		Users         []User `json:"users"`
-		NextPageToken int    `json:"nextPageToken"`
-	}{
+	resp := UsersAndPagination{
 		Users:         users,
 		NextPageToken: nextPageToken,
 	}
 
-	SetHeaderAndWriteResponse(w, http.StatusOK, response)
+	SetHeaderAndWriteResponse(w, http.StatusOK, resp)
 }
