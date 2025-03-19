@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/SlotifyApp/slotify-backend/api"
-	"github.com/SlotifyApp/slotify-backend/database"
 	"github.com/SlotifyApp/slotify-backend/mocks"
 	"github.com/SlotifyApp/slotify-backend/testutil"
 	"github.com/google/uuid"
@@ -172,14 +171,11 @@ func TestAPISlotifyGroupsSlotifyGroupIDInvites(t *testing.T) {
 		)
 		require.Equal(t, http.StatusOK, rr.Result().StatusCode)
 
-		var resp struct {
-			Invites       []database.ListInvitesByGroupRow `json:"invites"`
-			NextPageToken int                              `json:"nextPageToken,omitempty"`
-		}
+		var resp api.InvitesGroupsAndPagination
 		err = json.NewDecoder(rr.Result().Body).Decode(&resp)
 		require.NoError(t, err)
 		require.Empty(t, resp.Invites, "should return no invites")
-		require.Equal(t, 0, resp.NextPageToken, "nextPageToken should be 0 when no invites")
+		require.Equal(t, uint32(0), resp.NextPageToken, "nextPageToken should be 0 when no invites")
 	})
 
 	t.Run("less than limit invites", func(t *testing.T) {
@@ -206,14 +202,12 @@ func TestAPISlotifyGroupsSlotifyGroupIDInvites(t *testing.T) {
 		)
 		require.Equal(t, http.StatusOK, rr.Result().StatusCode)
 
-		var resp struct {
-			Invites       []database.ListInvitesByGroupRow `json:"invites"`
-			NextPageToken int                              `json:"nextPageToken,omitempty"`
-		}
+		var resp api.InvitesGroupsAndPagination
 		err = json.NewDecoder(rr.Result().Body).Decode(&resp)
 		require.NoError(t, err)
 		require.Len(t, resp.Invites, 5, "should return 5 invites")
-		require.Equal(t, 0, resp.NextPageToken, "nextPageToken should be 0 when invites are less than limit")
+		require.Equal(t, uint32(0), resp.NextPageToken,
+			"nextPageToken should be 0 when invites are less than limit")
 	})
 
 	t.Run("pagination", func(t *testing.T) {
@@ -241,10 +235,7 @@ func TestAPISlotifyGroupsSlotifyGroupIDInvites(t *testing.T) {
 		)
 		require.Equal(t, http.StatusOK, rr.Result().StatusCode)
 
-		var resp struct {
-			Invites       []database.ListInvitesByGroupRow `json:"invites"`
-			NextPageToken int                              `json:"nextPageToken,omitempty"`
-		}
+		var resp api.InvitesGroupsAndPagination
 		err = json.NewDecoder(rr.Result().Body).Decode(&resp)
 		require.NoError(t, err)
 		require.Len(t, resp.Invites, 10, "first page should return 10 invites")
@@ -266,22 +257,18 @@ func TestAPISlotifyGroupsSlotifyGroupIDInvites(t *testing.T) {
 		req2.Header.Set(api.ReqHeader, uuid.NewString())
 		req2 = req2.WithContext(context.WithValue(req2.Context(), api.UserIDCtxKey{}, testUser.Id))
 
-		nextToken := uint32(resp.NextPageToken)
 		server.GetAPISlotifyGroupsSlotifyGroupIDInvites(
 			rr2,
 			req2,
 			testGroup.Id,
 			api.GetAPISlotifyGroupsSlotifyGroupIDInvitesParams{
-				PageToken: &nextToken,
+				PageToken: &resp.NextPageToken,
 				Limit:     testutil.PageLimit,
 			},
 		)
 		require.Equal(t, http.StatusOK, rr2.Result().StatusCode)
 
-		var resp2 struct {
-			Invites       []database.ListInvitesByGroupRow `json:"invites"`
-			NextPageToken int                              `json:"nextPageToken,omitempty"`
-		}
+		var resp2 api.InvitesGroupsAndPagination
 		err = json.NewDecoder(rr2.Result().Body).Decode(&resp2)
 		require.NoError(t, err)
 		require.Len(t, resp2.Invites, 1, "second page should return the remaining invite")

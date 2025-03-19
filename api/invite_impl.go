@@ -412,18 +412,31 @@ func (s Server) GetAPISlotifyGroupsSlotifyGroupIDInvites(w http.ResponseWriter,
 		}
 	}
 
-	var nextPageToken int
+	var nextPageToken uint32
 	if len(invites) == int(invitesLimit) {
-		nextPageToken = int(invites[len(invites)-1].InviteID)
+		nextPageToken = invites[len(invites)-1].InviteID
 	}
 
-	response := struct {
-		Invites       []database.ListInvitesByGroupRow `json:"invites"`
-		NextPageToken int                              `json:"nextPageToken"`
-	}{
-		Invites:       invites,
+	parsedInvites := make([]InvitesGroup, 0)
+	for _, i := range invites {
+		parsedInvites = append(parsedInvites, InvitesGroup{
+			CreatedAt:         i.CreatedAt,
+			ExpiryDate:        openapi_types.Date{Time: i.ExpiryDate},
+			FromUserEmail:     openapi_types.Email(i.FromUserEmail),
+			FromUserFirstName: i.FromUserFirstName,
+			FromUserLastName:  i.FromUserLastName,
+			InviteID:          i.InviteID,
+			Status:            InviteStatus(i.Status),
+			ToUserEmail:       openapi_types.Email(i.ToUserEmail),
+			ToUserFirstName:   i.ToUserFirstName,
+			ToUserLastName:    i.ToUserLastName,
+		})
+	}
+
+	resp := InvitesGroupsAndPagination{
+		Invites:       parsedInvites,
 		NextPageToken: nextPageToken,
 	}
 
-	SetHeaderAndWriteResponse(w, http.StatusOK, response)
+	SetHeaderAndWriteResponse(w, http.StatusOK, resp)
 }
