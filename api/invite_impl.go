@@ -386,8 +386,6 @@ func (s Server) GetAPISlotifyGroupsSlotifyGroupIDInvites(w http.ResponseWriter,
 	var lastID uint32
 	if params.PageToken != nil {
 		lastID = *params.PageToken
-	} else {
-		lastID = 0
 	}
 
 	invites, err := s.DB.ListInvitesByGroup(ctx,
@@ -417,8 +415,6 @@ func (s Server) GetAPISlotifyGroupsSlotifyGroupIDInvites(w http.ResponseWriter,
 	var nextPageToken int
 	if len(invites) == int(invitesLimit) {
 		nextPageToken = int(invites[len(invites)-1].InviteID)
-	} else {
-		nextPageToken = 0
 	}
 
 	response := struct {

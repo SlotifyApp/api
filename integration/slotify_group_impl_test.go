@@ -362,7 +362,7 @@ func TestSlotifyGroup_GetSlotifyGroupsSlotifyGroupIDUsers(t *testing.T) {
 		)
 		req2.Header.Set(api.ReqHeader, uuid.NewString())
 
-		nextToken := uint32(firstPageResp.NextPageToken)
+		nextToken := firstPageResp.NextPageToken
 		server.GetAPISlotifyGroupsSlotifyGroupIDUsers(
 			rr2,
 			req2,
