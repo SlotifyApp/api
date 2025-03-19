@@ -456,39 +456,43 @@ func (q *Queries) DeleteUserByID(ctx context.Context, id uint32) (int64, error) 
 	return result.RowsAffected()
 }
 
-const getAllRequestsForUser = `-- name: GetAllRequestsForUser :many
-SELECT rr.request_id, rr.requested_by, rr.status, rr.created_at, m.msft_meeting_id, m.id, pm.meeting_id, pm.title, pm.start_time, pm.end_time, pm.duration, pm.location  
+const getAllRequestsForOwner = `-- name: GetAllRequestsForOwner :many
+SELECT rr.request_id, rr.requested_by, rr.status, rr.created_at, m.msft_meeting_id, m.id, mp.start_date_range, mp.end_date_range, mp.meeting_start_time, pm.meeting_id, pm.title, pm.start_time, pm.end_time, pm.duration, pm.location  
 FROM ReschedulingRequest rr 
 JOIN RequestToMeeting rtm ON rr.request_id = rtm.request_id 
 JOIN Meeting m ON rtm.meeting_id = m.id 
-LEFT JOIN PlaceholderMeeting pm ON rr.request_id = pm.request_id 
-WHERE m.owner_email = ?
+JOIN MeetingPreferences mp ON m.meeting_pref_id = mp.id
+LEFT JOIN PlaceholderMeeting pm ON rr.request_id = pm.request_id
+WHERE m.owner_email = ? AND rr.status="pending"
 `
 
-type GetAllRequestsForUserRow struct {
-	RequestID     uint32                    `json:"requestID"`
-	RequestedBy   uint32                    `json:"requestedBy"`
-	Status        ReschedulingrequestStatus `json:"status"`
-	CreatedAt     time.Time                 `json:"createdAt"`
-	MsftMeetingID string                    `json:"msftMeetingID"`
-	ID            uint32                    `json:"id"`
-	MeetingID     sql.NullInt32             `json:"meetingID"`
-	Title         sql.NullString            `json:"title"`
-	StartTime     sql.NullTime              `json:"startTime"`
-	EndTime       sql.NullTime              `json:"endTime"`
-	Duration      sql.NullTime              `json:"duration"`
-	Location      sql.NullString            `json:"location"`
+type GetAllRequestsForOwnerRow struct {
+	RequestID        uint32                    `json:"requestID"`
+	RequestedBy      uint32                    `json:"requestedBy"`
+	Status           ReschedulingrequestStatus `json:"status"`
+	CreatedAt        time.Time                 `json:"createdAt"`
+	MsftMeetingID    string                    `json:"msftMeetingID"`
+	ID               uint32                    `json:"id"`
+	StartDateRange   time.Time                 `json:"startDateRange"`
+	EndDateRange     time.Time                 `json:"endDateRange"`
+	MeetingStartTime time.Time                 `json:"meetingStartTime"`
+	MeetingID        sql.NullInt32             `json:"meetingID"`
+	Title            sql.NullString            `json:"title"`
+	StartTime        sql.NullTime              `json:"startTime"`
+	EndTime          sql.NullTime              `json:"endTime"`
+	Duration         sql.NullTime              `json:"duration"`
+	Location         sql.NullString            `json:"location"`
 }
 
-func (q *Queries) GetAllRequestsForUser(ctx context.Context, ownerEmail string) ([]GetAllRequestsForUserRow, error) {
-	rows, err := q.query(ctx, q.getAllRequestsForUserStmt, getAllRequestsForUser, ownerEmail)
+func (q *Queries) GetAllRequestsForOwner(ctx context.Context, ownerEmail string) ([]GetAllRequestsForOwnerRow, error) {
+	rows, err := q.query(ctx, q.getAllRequestsForOwnerStmt, getAllRequestsForOwner, ownerEmail)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []GetAllRequestsForUserRow{}
+	items := []GetAllRequestsForOwnerRow{}
 	for rows.Next() {
-		var i GetAllRequestsForUserRow
+		var i GetAllRequestsForOwnerRow
 		if err := rows.Scan(
 			&i.RequestID,
 			&i.RequestedBy,
@@ -496,6 +500,76 @@ func (q *Queries) GetAllRequestsForUser(ctx context.Context, ownerEmail string) 
 			&i.CreatedAt,
 			&i.MsftMeetingID,
 			&i.ID,
+			&i.StartDateRange,
+			&i.EndDateRange,
+			&i.MeetingStartTime,
+			&i.MeetingID,
+			&i.Title,
+			&i.StartTime,
+			&i.EndTime,
+			&i.Duration,
+			&i.Location,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getAllRequestsResponsesForUserID = `-- name: GetAllRequestsResponsesForUserID :many
+SELECT rr.request_id, rr.requested_by, rr.status, rr.created_at, m.msft_meeting_id, m.id, mp.start_date_range, mp.end_date_range, mp.meeting_start_time, pm.meeting_id, pm.title, pm.start_time, pm.end_time, pm.duration, pm.location  
+FROM ReschedulingRequest rr 
+JOIN RequestToMeeting rtm ON rr.request_id = rtm.request_id 
+JOIN Meeting m ON rtm.meeting_id = m.id 
+JOIN MeetingPreferences mp ON m.meeting_pref_id = mp.id
+LEFT JOIN PlaceholderMeeting pm ON rr.request_id = pm.request_id
+WHERE rr.requested_by = ? AND rr.status!="pending"
+`
+
+type GetAllRequestsResponsesForUserIDRow struct {
+	RequestID        uint32                    `json:"requestID"`
+	RequestedBy      uint32                    `json:"requestedBy"`
+	Status           ReschedulingrequestStatus `json:"status"`
+	CreatedAt        time.Time                 `json:"createdAt"`
+	MsftMeetingID    string                    `json:"msftMeetingID"`
+	ID               uint32                    `json:"id"`
+	StartDateRange   time.Time                 `json:"startDateRange"`
+	EndDateRange     time.Time                 `json:"endDateRange"`
+	MeetingStartTime time.Time                 `json:"meetingStartTime"`
+	MeetingID        sql.NullInt32             `json:"meetingID"`
+	Title            sql.NullString            `json:"title"`
+	StartTime        sql.NullTime              `json:"startTime"`
+	EndTime          sql.NullTime              `json:"endTime"`
+	Duration         sql.NullTime              `json:"duration"`
+	Location         sql.NullString            `json:"location"`
+}
+
+func (q *Queries) GetAllRequestsResponsesForUserID(ctx context.Context, requestedBy uint32) ([]GetAllRequestsResponsesForUserIDRow, error) {
+	rows, err := q.query(ctx, q.getAllRequestsResponsesForUserIDStmt, getAllRequestsResponsesForUserID, requestedBy)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetAllRequestsResponsesForUserIDRow{}
+	for rows.Next() {
+		var i GetAllRequestsResponsesForUserIDRow
+		if err := rows.Scan(
+			&i.RequestID,
+			&i.RequestedBy,
+			&i.Status,
+			&i.CreatedAt,
+			&i.MsftMeetingID,
+			&i.ID,
+			&i.StartDateRange,
+			&i.EndDateRange,
+			&i.MeetingStartTime,
 			&i.MeetingID,
 			&i.Title,
 			&i.StartTime,
@@ -703,6 +777,35 @@ func (q *Queries) GetOnlyRequestByID(ctx context.Context, requestID uint32) (Res
 	return i, err
 }
 
+const getPlaceholderMeetingAttendeesByMeetingID = `-- name: GetPlaceholderMeetingAttendeesByMeetingID :many
+SELECT pma.user_id
+FROM PlaceholderMeetingAttendee pma
+WHERE pma.meeting_id=?
+`
+
+func (q *Queries) GetPlaceholderMeetingAttendeesByMeetingID(ctx context.Context, meetingID uint32) ([]uint32, error) {
+	rows, err := q.query(ctx, q.getPlaceholderMeetingAttendeesByMeetingIDStmt, getPlaceholderMeetingAttendeesByMeetingID, meetingID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []uint32{}
+	for rows.Next() {
+		var user_id uint32
+		if err := rows.Scan(&user_id); err != nil {
+			return nil, err
+		}
+		items = append(items, user_id)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getRefreshTokenByUserID = `-- name: GetRefreshTokenByUserID :one
 SELECT id, user_id, token, revoked FROM RefreshToken WHERE user_id=?
 `
@@ -720,27 +823,31 @@ func (q *Queries) GetRefreshTokenByUserID(ctx context.Context, userID uint32) (R
 }
 
 const getRequestByID = `-- name: GetRequestByID :one
-SELECT rr.request_id, rr.requested_by, rr.status, rr.created_at, m.msft_meeting_id, m.id, pm.meeting_id, pm.title, pm.start_time, pm.end_time, pm.duration, pm.location 
+SELECT rr.request_id, rr.requested_by, rr.status, rr.created_at, m.msft_meeting_id, m.id, mp.start_date_range, mp.end_date_range, mp.meeting_start_time, pm.meeting_id, pm.title, pm.start_time, pm.end_time, pm.duration, pm.location 
 FROM ReschedulingRequest rr 
 JOIN RequestToMeeting rtm ON rr.request_id = rtm.request_id 
 JOIN Meeting m ON rtm.meeting_id = m.id 
+JOIN MeetingPreferences mp ON m.meeting_pref_id = mp.id
 LEFT JOIN PlaceholderMeeting pm ON rr.request_id = pm.request_id 
 WHERE rr.request_id = ?
 `
 
 type GetRequestByIDRow struct {
-	RequestID     uint32                    `json:"requestID"`
-	RequestedBy   uint32                    `json:"requestedBy"`
-	Status        ReschedulingrequestStatus `json:"status"`
-	CreatedAt     time.Time                 `json:"createdAt"`
-	MsftMeetingID string                    `json:"msftMeetingID"`
-	ID            uint32                    `json:"id"`
-	MeetingID     sql.NullInt32             `json:"meetingID"`
-	Title         sql.NullString            `json:"title"`
-	StartTime     sql.NullTime              `json:"startTime"`
-	EndTime       sql.NullTime              `json:"endTime"`
-	Duration      sql.NullTime              `json:"duration"`
-	Location      sql.NullString            `json:"location"`
+	RequestID        uint32                    `json:"requestID"`
+	RequestedBy      uint32                    `json:"requestedBy"`
+	Status           ReschedulingrequestStatus `json:"status"`
+	CreatedAt        time.Time                 `json:"createdAt"`
+	MsftMeetingID    string                    `json:"msftMeetingID"`
+	ID               uint32                    `json:"id"`
+	StartDateRange   time.Time                 `json:"startDateRange"`
+	EndDateRange     time.Time                 `json:"endDateRange"`
+	MeetingStartTime time.Time                 `json:"meetingStartTime"`
+	MeetingID        sql.NullInt32             `json:"meetingID"`
+	Title            sql.NullString            `json:"title"`
+	StartTime        sql.NullTime              `json:"startTime"`
+	EndTime          sql.NullTime              `json:"endTime"`
+	Duration         sql.NullTime              `json:"duration"`
+	Location         sql.NullString            `json:"location"`
 }
 
 func (q *Queries) GetRequestByID(ctx context.Context, requestID uint32) (GetRequestByIDRow, error) {
@@ -753,6 +860,9 @@ func (q *Queries) GetRequestByID(ctx context.Context, requestID uint32) (GetRequ
 		&i.CreatedAt,
 		&i.MsftMeetingID,
 		&i.ID,
+		&i.StartDateRange,
+		&i.EndDateRange,
+		&i.MeetingStartTime,
 		&i.MeetingID,
 		&i.Title,
 		&i.StartTime,
