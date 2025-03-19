@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/oapi-codegen/runtime/types"
+
 	"github.com/SlotifyApp/slotify-backend/database"
 	"go.uber.org/zap"
 )
@@ -361,8 +363,10 @@ func (s Server) GetAPISlotifyGroupsSlotifyGroupID(w http.ResponseWriter, r *http
 }
 
 // (GET /api/slotify-groups/{slotifyGroupID}/users).
-func (s Server) GetAPISlotifyGroupsSlotifyGroupIDUsers(w http.ResponseWriter, r *http.Request,
-	slotifyGroupID uint32, params GetAPISlotifyGroupsSlotifyGroupIDUsersParams,
+// nolint: funlen
+func (s Server) GetAPISlotifyGroupsSlotifyGroupIDUsers(w http.ResponseWriter,
+	r *http.Request, slotifyGroupID uint32,
+	params GetAPISlotifyGroupsSlotifyGroupIDUsersParams,
 ) {
 	userID, _ := r.Context().Value(UserIDCtxKey{}).(uint32)
 	reqID, _ := r.Context().Value(RequestIDCtxKey{}).(string)
@@ -397,34 +401,101 @@ func (s Server) GetAPISlotifyGroupsSlotifyGroupIDUsers(w http.ResponseWriter, r 
 	} else {
 		lastID = 0
 	}
-
 	groupLimit := min(params.Limit, GroupLimitMax)
 
-	users, err := s.DB.GetAllSlotifyGroupMembers(ctx, database.GetAllSlotifyGroupMembersParams{
-		ID:     slotifyGroupID,
-		LastID: lastID,
-		Limit:  groupLimit,
-	})
-	if err != nil {
-		logger.Error("slotifyGroup api: failed to get users of a group",
-			zap.Uint32("slotifyGroupID",
-				slotifyGroupID),
-			zap.Error(err),
-		)
-		sendError(w, http.StatusInternalServerError, "failed to get all slotify group members")
-		return
+	var users []User
+
+	switch {
+	case params.Name != nil:
+		var rows []database.SearchSlotifyGroupMembersByNameRow
+		rows, err = s.DB.SearchSlotifyGroupMembersByName(ctx,
+			database.SearchSlotifyGroupMembersByNameParams{
+				ID:     slotifyGroupID,
+				LastID: lastID,
+				Limit:  groupLimit,
+				Name:   params.Name,
+			})
+		if err != nil {
+			logger.Error("slotifyGroup api: failed to get users of a group when searching by name",
+				zap.Uint32("slotifyGroupID",
+					slotifyGroupID),
+				zap.Error(err),
+			)
+			sendError(w, http.StatusInternalServerError, "failed to get slotify group members when searching by name")
+			return
+		}
+		for _, row := range rows {
+			users = append(users, User{
+				Id:        row.ID,
+				Email:     types.Email(row.Email),
+				FirstName: row.FirstName,
+				LastName:  row.LastName,
+			})
+		}
+
+	case params.Email != nil:
+		var rows []database.SearchSlotifyGroupMembersByEmailRow
+		rows, err = s.DB.SearchSlotifyGroupMembersByEmail(ctx,
+			database.SearchSlotifyGroupMembersByEmailParams{
+				ID:     slotifyGroupID,
+				LastID: lastID,
+				Limit:  groupLimit,
+				Email:  params.Email,
+			})
+		if err != nil {
+			logger.Error("slotifyGroup api: failed to get users of a group when searching by email",
+				zap.Uint32("slotifyGroupID",
+					slotifyGroupID),
+				zap.Error(err),
+			)
+			sendError(w, http.StatusInternalServerError, "failed to get all slotify group members when searching by email")
+			return
+		}
+		for _, row := range rows {
+			users = append(users, User{
+				Id:        row.ID,
+				Email:     types.Email(row.Email),
+				FirstName: row.FirstName,
+				LastName:  row.LastName,
+			})
+		}
+	default:
+		var rows []database.GetAllSlotifyGroupMembersRow
+		rows, err = s.DB.GetAllSlotifyGroupMembers(ctx,
+			database.GetAllSlotifyGroupMembersParams{
+				ID:     slotifyGroupID,
+				LastID: lastID,
+				Limit:  groupLimit,
+			})
+		if err != nil {
+			logger.Error("slotifyGroup api: failed to get users of a group",
+				zap.Uint32("slotifyGroupID",
+					slotifyGroupID),
+				zap.Error(err),
+			)
+			sendError(w, http.StatusInternalServerError, "failed to get all slotify group members")
+			return
+		}
+		for _, row := range rows {
+			users = append(users, User{
+				Id:        row.ID,
+				Email:     types.Email(row.Email),
+				FirstName: row.FirstName,
+				LastName:  row.LastName,
+			})
+		}
 	}
 
 	var nextPageToken int
 	if len(users) == int(groupLimit) {
-		nextPageToken = int(users[len(users)-1].ID)
+		nextPageToken = int(users[len(users)-1].Id)
 	} else {
 		nextPageToken = 0
 	}
 
 	response := struct {
-		Users         []database.GetAllSlotifyGroupMembersRow `json:"users"` // adjust the type as appropriate
-		NextPageToken int                                     `json:"nextPageToken"`
+		Users         []User `json:"users"`
+		NextPageToken int    `json:"nextPageToken"`
 	}{
 		Users:         users,
 		NextPageToken: nextPageToken,

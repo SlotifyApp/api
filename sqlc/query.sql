@@ -54,6 +54,29 @@ AND u.id > sqlc.arg('last_id')
 ORDER BY u.id
 LIMIT ?;
 
+-- name: SearchSlotifyGroupMembersByName :many
+SELECT u.id, u.email, u.first_name, u.last_name
+FROM SlotifyGroup sg
+JOIN UserToSlotifyGroup utsg ON sg.id = utsg.slotify_group_id
+JOIN User u ON u.id = utsg.user_id
+WHERE sg.id = sqlc.arg('id')
+  AND LOWER(CONCAT(u.first_name, ' ', u.last_name)) LIKE LOWER(CONCAT('%', sqlc.arg('name'), '%'))
+  AND u.id > sqlc.arg('last_id')
+ORDER BY u.id
+LIMIT ?;
+
+-- name: SearchSlotifyGroupMembersByEmail :many
+SELECT u.id, u.email, u.first_name, u.last_name
+FROM SlotifyGroup sg
+JOIN UserToSlotifyGroup utsg ON sg.id = utsg.slotify_group_id
+JOIN User u ON u.id = utsg.user_id
+WHERE sg.id = sqlc.arg('id')
+  AND LOWER(u.email) LIKE LOWER(CONCAT('%', sqlc.arg('email'), '%'))
+  AND u.id > sqlc.arg('last_id')
+ORDER BY u.id
+LIMIT ?;
+
+
 -- name: CountSlotifyGroupMembers :one
 SELECT COUNT(*) FROM SlotifyGroup sg
 JOIN UserToSlotifyGroup utsg ON sg.id=utsg.slotify_group_id
