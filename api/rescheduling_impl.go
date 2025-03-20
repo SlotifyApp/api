@@ -415,7 +415,7 @@ func (s Server) GetAPIRescheduleRequestsMe(w http.ResponseWriter, r *http.Reques
 				return
 			}
 
-			newMeeting.Attendees = attendeeIDs
+			newMeeting.Attendees = &attendeeIDs
 		}
 
 		response = append(response, RescheduleRequest{
@@ -466,7 +466,7 @@ func (s Server) GetAPIRescheduleRequestsMe(w http.ResponseWriter, r *http.Reques
 				return
 			}
 
-			newMeeting.Attendees = attendeeIDs
+			newMeeting.Attendees = &attendeeIDs
 		}
 
 		respondedReqsResponses = append(respondedReqsResponses, RescheduleRequest{
@@ -531,7 +531,7 @@ func (s Server) GetAPIRescheduleRequestRequestID(w http.ResponseWriter, r *http.
 			return
 		}
 
-		newMeeting.Attendees = attendeeIDs
+		newMeeting.Attendees = &attendeeIDs
 	}
 
 	response := RescheduleRequest{
