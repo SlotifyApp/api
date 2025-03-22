@@ -102,7 +102,34 @@ func (s Server) PostAPIRescheduleCheck(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	respBody, err := performReschedulingCheckProcess(ctx, graph, logger, body, msftMeeting, meetingPref)
+	// Default to 30 minutes
+	const halfAnHour = 30
+	dur := halfAnHour
+
+	endTime, err := time.Parse(time.RFC3339Nano, *msftMeeting.GetEnd().GetDateTime()+"Z")
+
+	if err != nil {
+		logger.Error("failed to parse end time", zap.Error(err))
+	} else {
+		startTime, err := time.Parse(time.RFC3339Nano, *msftMeeting.GetStart().GetDateTime()+"Z")
+
+		if err != nil {
+			logger.Error("failed to parse start time", zap.Error(err))
+		} else {
+			dur = int(endTime.Sub(startTime).Minutes())
+		}
+	}
+
+	endpointRequest := EndpointRequestParams{
+		newMeetingTitle:     body.NewMeeting.Title,
+		newMeetingAttendees: len(body.NewMeeting.Attendees),
+		newMeetingDuration:  body.NewMeeting.MeetingDuration,
+		oldMeetingTitle:     *msftMeeting.GetSubject(),
+		oldMeetingAttendees: len(msftMeeting.GetAttendees()),
+		oldMeetingDuration:  fmt.Sprintf("%d minutes", dur),
+	}
+
+	respBody, err := performReschedulingCheckProcess(ctx, graph, logger, body, endpointRequest, msftMeeting, meetingPref)
 	if err != nil {
 		logger.Error("failed to make msgraph api call to findMeetings", zap.Error(err))
 		sendError(w, http.StatusBadGateway, "Failed to process/send microsoft graph API request for findMeeting")

@@ -144,6 +144,7 @@ func performReschedulingCheckProcess(ctx context.Context,
 	graph *msgraphsdkgo.GraphServiceClient,
 	logger *zap.SugaredLogger,
 	body ReschedulingCheckBodySchema,
+	endpointParams EndpointRequestParams,
 	msftMeeting graphmodels.Eventable,
 	meetingPref database.Meetingpreferences,
 ) (map[string]bool, error) {
@@ -159,7 +160,7 @@ func performReschedulingCheckProcess(ctx context.Context,
 	// Check if the new meeting is more important
 	// Simply call AWS Sagemaker AI Endpoint
 
-	moreImportant, err := checkEndpointForMeetingImportance(ctx, body)
+	moreImportant, err := checkEndpointForMeetingImportance(ctx, endpointParams)
 
 	if err != nil {
 		moreImportant = false
