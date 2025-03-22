@@ -142,6 +142,7 @@ func checkValidReschedulingSlotExists(ctx context.Context,
 
 func performReschedulingCheckProcess(ctx context.Context,
 	graph *msgraphsdkgo.GraphServiceClient,
+	logger *zap.SugaredLogger,
 	body ReschedulingCheckBodySchema,
 	msftMeeting graphmodels.Eventable,
 	meetingPref database.Meetingpreferences,
@@ -158,8 +159,15 @@ func performReschedulingCheckProcess(ctx context.Context,
 	// Check if the new meeting is more important
 	// Simply call AWS Sagemaker AI Endpoint
 
+	moreImportant, err := checkEndpointForMeetingImportance(ctx, body)
+
+	if err != nil {
+		moreImportant = false
+		logger.Error("failed to check endpoint for meeting importance", zap.Error(err))
+	}
+
 	response := map[string]bool{
-		"isNewMeetingMoreImportant": true,
+		"isNewMeetingMoreImportant": moreImportant,
 		"canBeRescheduled":          validSlots,
 	}
 

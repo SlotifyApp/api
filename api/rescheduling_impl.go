@@ -102,7 +102,7 @@ func (s Server) PostAPIRescheduleCheck(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	respBody, err := performReschedulingCheckProcess(ctx, graph, body, msftMeeting, meetingPref)
+	respBody, err := performReschedulingCheckProcess(ctx, graph, logger, body, msftMeeting, meetingPref)
 	if err != nil {
 		logger.Error("failed to make msgraph api call to findMeetings", zap.Error(err))
 		sendError(w, http.StatusBadGateway, "Failed to process/send microsoft graph API request for findMeeting")
