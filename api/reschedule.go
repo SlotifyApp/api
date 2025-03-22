@@ -175,6 +175,7 @@ type NewMeetingAndPrefsParams struct {
 func createNewMeetingsAndPrefs(ctx context.Context,
 	body NewMeetingAndPrefsParams,
 	s Server,
+	msftID string,
 ) (database.Meeting, error) {
 	// Meeting Info does not exist so create a new one
 	// Check valid user id
@@ -198,11 +199,12 @@ func createNewMeetingsAndPrefs(ctx context.Context,
 	}
 
 	// Create Meeting
+
 	meetingParams := database.CreateMeetingParams{
 		//nolint: gosec // id is unsigned 32 bit int
 		MeetingPrefID: uint32(meetingPrefID),
 		OwnerEmail:    body.OwnerEmail,
-		MsftMeetingID: body.MsftMeetingID,
+		MsftMeetingID: msftID,
 	}
 
 	err = retry.Do(func() error {
@@ -257,7 +259,12 @@ func processNewMeetingInfo(ctx context.Context,
 		MsftMeetingID:    msftMeetingID,
 	}
 
-	meeting, err := createNewMeetingsAndPrefs(ctx, newMeetingParams, s)
+	icalUID := ""
+	if msftMeeting.GetICalUId() != nil {
+		icalUID = *msftMeeting.GetICalUId()
+	}
+
+	meeting, err := createNewMeetingsAndPrefs(ctx, newMeetingParams, s, icalUID)
 	if err != nil {
 		logger.Error("failed to get data from new db.Meeting", zap.Error(err))
 		return database.Meeting{}, err

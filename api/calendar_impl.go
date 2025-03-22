@@ -12,6 +12,7 @@ import (
 	"go.uber.org/zap"
 
 	graphmodels "github.com/microsoftgraph/msgraph-sdk-go/models"
+	"github.com/microsoftgraph/msgraph-sdk-go/users"
 )
 
 // (GET /api/calendar/{userID}).
@@ -135,11 +136,39 @@ func (s Server) GetAPICalendarEvent(w http.ResponseWriter, r *http.Request, para
 
 	// Make call to API route and parse events
 	// Get old meeting data from microsoft
-	msftMeeting, err := graph.Me().Events().ByEventId(params.MsftID).Get(ctx, nil)
-	if err != nil {
-		logger.Error("failed to get meeting data from microsoft", zap.Error(err))
-		sendError(w, http.StatusBadGateway, "Failed to get meeting data from microsoft")
-		return
+	var msftMeeting graphmodels.Eventable
+	if params.IsICalUId == true {
+		queryFilter := "$filter=ICalUId eq '" + params.MsftID + "'"
+
+		// Get old meeting data from microsoft
+		requestConfig := users.ItemEventsRequestBuilderGetRequestConfiguration{
+			QueryParameters: &users.ItemEventsRequestBuilderGetQueryParameters{
+				Filter: &queryFilter,
+			},
+		}
+		msftMeetingRes, err := graph.Me().Events().Get(ctx, &requestConfig)
+
+		if err != nil {
+			logger.Error("failed to get meeting data from microsoft", zap.Error(err))
+			sendError(w, http.StatusBadGateway, "Failed to get meeting data from microsoft")
+			return
+		}
+
+		if msftMeetingRes != nil && msftMeetingRes.GetValue() != nil &&
+			len(msftMeetingRes.GetValue()) > 0 {
+			msftMeeting = msftMeetingRes.GetValue()[0]
+		} else {
+			logger.Error("failed to get meeting data from microsoft", zap.Error(err))
+			sendError(w, http.StatusBadGateway, "Failed to get meeting data from microsoft")
+			return
+		}
+	} else {
+		msftMeeting, err = graph.Me().Events().ByEventId(params.MsftID).Get(ctx, nil)
+		if err != nil {
+			logger.Error("failed to get meeting data from microsoft", zap.Error(err))
+			sendError(w, http.StatusBadGateway, "Failed to get meeting data from microsoft")
+			return
+		}
 	}
 
 	var parsedEvents []CalendarEvent
