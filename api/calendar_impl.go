@@ -147,7 +147,6 @@ func (s Server) GetAPICalendarEvent(w http.ResponseWriter, r *http.Request, para
 			},
 		}
 		msftMeetingRes, err := graph.Me().Events().Get(ctx, &requestConfig)
-
 		if err != nil {
 			logger.Error("failed to get meeting data from microsoft", zap.Error(err))
 			sendError(w, http.StatusBadGateway, "Failed to get meeting data from microsoft")
