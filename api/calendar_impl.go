@@ -137,6 +137,7 @@ func (s Server) GetAPICalendarEvent(w http.ResponseWriter, r *http.Request, para
 	// Make call to API route and parse events
 	// Get old meeting data from microsoft
 	var msftMeeting graphmodels.Eventable
+	//nolint: nestif // nesting complexity is not too much
 	if params.IsICalUId {
 		queryFilter := "iCalUId eq '" + params.MsftID + "'"
 
@@ -146,7 +147,9 @@ func (s Server) GetAPICalendarEvent(w http.ResponseWriter, r *http.Request, para
 				Filter: &queryFilter,
 			},
 		}
-		msftMeetingRes, err := graph.Me().Events().Get(ctx, &requestConfig)
+
+		var msftMeetingRes graphmodels.EventCollectionResponseable
+		msftMeetingRes, err = graph.Me().Events().Get(ctx, &requestConfig)
 		if err != nil {
 			logger.Error("failed to get meeting data from microsoft", zap.Error(err))
 			sendError(w, http.StatusBadGateway, "Failed to get meeting data from microsoft")
