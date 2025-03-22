@@ -18,6 +18,7 @@ import (
 const hoursInAWeek = 168
 
 // (POST /api/reschedule/check).
+// nolint: funlen // 1 statement too long
 func (s Server) PostAPIRescheduleCheck(w http.ResponseWriter, r *http.Request) {
 	// Get userid from access token
 	ctx, cancel := context.WithTimeout(r.Context(), time.Minute*3)
@@ -111,7 +112,8 @@ func (s Server) PostAPIRescheduleCheck(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		logger.Error("failed to parse end time", zap.Error(err))
 	} else {
-		startTime, err := time.Parse(time.RFC3339Nano, *msftMeeting.GetStart().GetDateTime()+"Z")
+		var startTime time.Time
+		startTime, err = time.Parse(time.RFC3339Nano, *msftMeeting.GetStart().GetDateTime()+"Z")
 
 		if err != nil {
 			logger.Error("failed to parse start time", zap.Error(err))

@@ -161,7 +161,6 @@ func performReschedulingCheckProcess(ctx context.Context,
 	// Simply call AWS Sagemaker AI Endpoint
 
 	moreImportant, err := checkEndpointForMeetingImportance(ctx, endpointParams)
-
 	if err != nil {
 		moreImportant = false
 		logger.Error("failed to check endpoint for meeting importance", zap.Error(err))

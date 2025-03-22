@@ -19,14 +19,14 @@ type EndpointRequestParams struct {
 }
 
 func checkEndpointForMeetingImportance(ctx context.Context, body EndpointRequestParams) (bool, error) {
-
 	cfg, err := config.LoadDefaultConfig(ctx, config.WithRegion("eu-west-2"))
-
 	if err != nil {
 		return false, fmt.Errorf("failed to load configuation %w", err)
 	}
 	// "[1,('Weekly Meeting', 2,'90 minutes'),('Daily', 2,'90 minutes')]"
-	modelInput := fmt.Sprintf("[1,('%s',%d,'%s'),('%s',%d,'%s')]", body.newMeetingTitle, body.newMeetingAttendees, body.newMeetingDuration, body.oldMeetingTitle, body.oldMeetingAttendees, body.oldMeetingDuration)
+	modelInput := fmt.Sprintf("[1,('%s',%d,'%s'),('%s',%d,'%s')]", body.newMeetingTitle,
+		body.newMeetingAttendees, body.newMeetingDuration, body.oldMeetingTitle,
+		body.oldMeetingAttendees, body.oldMeetingDuration)
 
 	// Create a new SageMaker client
 	client := sagemakerruntime.NewFromConfig(cfg)
@@ -39,12 +39,16 @@ func checkEndpointForMeetingImportance(ctx context.Context, body EndpointRequest
 	}
 
 	res, err := client.InvokeEndpoint(ctx, &params)
-
 	if err != nil {
 		return false, fmt.Errorf("failed to invoke endpoint %w", err)
 	}
 
-	println(res)
+	//nolint: forbidigo // need it for debugging
+	println(res.Body)
+
+	if res.Body != nil {
+		return true, nil
+	}
 
 	return false, nil
 }
