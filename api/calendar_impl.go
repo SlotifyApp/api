@@ -137,8 +137,8 @@ func (s Server) GetAPICalendarEvent(w http.ResponseWriter, r *http.Request, para
 	// Make call to API route and parse events
 	// Get old meeting data from microsoft
 	var msftMeeting graphmodels.Eventable
-	if params.IsICalUId == true {
-		queryFilter := "$filter=ICalUId eq '" + params.MsftID + "'"
+	if params.IsICalUId {
+		queryFilter := "iCalUId eq '" + params.MsftID + "'"
 
 		// Get old meeting data from microsoft
 		requestConfig := users.ItemEventsRequestBuilderGetRequestConfiguration{

@@ -218,7 +218,7 @@ func createNewMeetingsAndPrefs(ctx context.Context,
 	}
 
 	var meeting database.Meeting
-	meeting, err = s.DB.GetMeetingByMSFTID(ctx, body.MsftMeetingID)
+	meeting, err = s.DB.GetMeetingByMSFTID(ctx, msftID)
 	if err != nil {
 		return database.Meeting{}, err
 	}

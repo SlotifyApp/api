@@ -126,7 +126,6 @@ func (s Server) PostAPIRescheduleRequestReplace(w http.ResponseWriter, r *http.R
 	var body ReschedulingRequestBodySchema
 	var err error
 	if err = json.NewDecoder(r.Body).Decode(&body); err != nil {
-		// TODO: Add zap log for body
 		logger.Error(ErrUnmarshalBody, zap.Error(err))
 		sendError(w, http.StatusBadRequest, ErrUnmarshalBody.Error())
 		return
