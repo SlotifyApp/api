@@ -274,14 +274,12 @@ func (q *Queries) CreateNotification(ctx context.Context, arg CreateNotification
 }
 
 const createPlaceholderMeeting = `-- name: CreatePlaceholderMeeting :execlastid
-INSERT INTO PlaceholderMeeting (request_id, title, start_time, end_time, location, duration, start_date_range, end_date_range) VALUES (?,?,?,?,?,?,?,?)
+INSERT INTO PlaceholderMeeting (request_id, title, location, duration, start_date_range, end_date_range) VALUES (?,?,?,?,?,?)
 `
 
 type CreatePlaceholderMeetingParams struct {
 	RequestID      uint32    `json:"requestID"`
 	Title          string    `json:"title"`
-	StartTime      time.Time `json:"startTime"`
-	EndTime        time.Time `json:"endTime"`
 	Location       string    `json:"location"`
 	Duration       time.Time `json:"duration"`
 	StartDateRange time.Time `json:"startDateRange"`
@@ -292,8 +290,6 @@ func (q *Queries) CreatePlaceholderMeeting(ctx context.Context, arg CreatePlaceh
 	result, err := q.exec(ctx, q.createPlaceholderMeetingStmt, createPlaceholderMeeting,
 		arg.RequestID,
 		arg.Title,
-		arg.StartTime,
-		arg.EndTime,
 		arg.Location,
 		arg.Duration,
 		arg.StartDateRange,
@@ -467,7 +463,7 @@ func (q *Queries) DeleteUserByID(ctx context.Context, id uint32) (int64, error) 
 }
 
 const getAllRequestsForOwner = `-- name: GetAllRequestsForOwner :many
-SELECT rr.request_id, rr.requested_by, rr.status, rr.created_at, m.msft_meeting_id, m.id, mp.start_date_range, mp.end_date_range, mp.meeting_start_time, pm.meeting_id, pm.title, pm.start_time, pm.end_time, pm.duration, pm.location  
+SELECT rr.request_id, rr.requested_by, rr.status, rr.created_at, m.msft_meeting_id, m.id, mp.start_date_range, mp.end_date_range, mp.meeting_start_time, pm.meeting_id, pm.title, pm.start_date_range, pm.end_date_range, pm.duration, pm.location  
 FROM ReschedulingRequest rr 
 JOIN RequestToMeeting rtm ON rr.request_id = rtm.request_id 
 JOIN Meeting m ON rtm.meeting_id = m.id 
@@ -488,8 +484,8 @@ type GetAllRequestsForOwnerRow struct {
 	MeetingStartTime time.Time                 `json:"meetingStartTime"`
 	MeetingID        sql.NullInt32             `json:"meetingID"`
 	Title            sql.NullString            `json:"title"`
-	StartTime        sql.NullTime              `json:"startTime"`
-	EndTime          sql.NullTime              `json:"endTime"`
+	StartDateRange_2 sql.NullTime              `json:"startDateRange2"`
+	EndDateRange_2   sql.NullTime              `json:"endDateRange2"`
 	Duration         sql.NullTime              `json:"duration"`
 	Location         sql.NullString            `json:"location"`
 }
@@ -515,8 +511,8 @@ func (q *Queries) GetAllRequestsForOwner(ctx context.Context, ownerEmail string)
 			&i.MeetingStartTime,
 			&i.MeetingID,
 			&i.Title,
-			&i.StartTime,
-			&i.EndTime,
+			&i.StartDateRange_2,
+			&i.EndDateRange_2,
 			&i.Duration,
 			&i.Location,
 		); err != nil {
@@ -534,7 +530,7 @@ func (q *Queries) GetAllRequestsForOwner(ctx context.Context, ownerEmail string)
 }
 
 const getAllRequestsResponsesForUserID = `-- name: GetAllRequestsResponsesForUserID :many
-SELECT rr.request_id, rr.requested_by, rr.status, rr.created_at, m.msft_meeting_id, m.id, mp.start_date_range, mp.end_date_range, mp.meeting_start_time, pm.meeting_id, pm.title, pm.start_time, pm.end_time, pm.duration, pm.location  
+SELECT rr.request_id, rr.requested_by, rr.status, rr.created_at, m.msft_meeting_id, m.id, mp.start_date_range, mp.end_date_range, mp.meeting_start_time, pm.meeting_id, pm.title, pm.start_date_range, pm.end_date_range, pm.duration, pm.location  
 FROM ReschedulingRequest rr 
 JOIN RequestToMeeting rtm ON rr.request_id = rtm.request_id 
 JOIN Meeting m ON rtm.meeting_id = m.id 
@@ -555,8 +551,8 @@ type GetAllRequestsResponsesForUserIDRow struct {
 	MeetingStartTime time.Time                 `json:"meetingStartTime"`
 	MeetingID        sql.NullInt32             `json:"meetingID"`
 	Title            sql.NullString            `json:"title"`
-	StartTime        sql.NullTime              `json:"startTime"`
-	EndTime          sql.NullTime              `json:"endTime"`
+	StartDateRange_2 sql.NullTime              `json:"startDateRange2"`
+	EndDateRange_2   sql.NullTime              `json:"endDateRange2"`
 	Duration         sql.NullTime              `json:"duration"`
 	Location         sql.NullString            `json:"location"`
 }
@@ -582,8 +578,8 @@ func (q *Queries) GetAllRequestsResponsesForUserID(ctx context.Context, requeste
 			&i.MeetingStartTime,
 			&i.MeetingID,
 			&i.Title,
-			&i.StartTime,
-			&i.EndTime,
+			&i.StartDateRange_2,
+			&i.EndDateRange_2,
 			&i.Duration,
 			&i.Location,
 		); err != nil {
@@ -833,7 +829,7 @@ func (q *Queries) GetRefreshTokenByUserID(ctx context.Context, userID uint32) (R
 }
 
 const getRequestByID = `-- name: GetRequestByID :one
-SELECT rr.request_id, rr.requested_by, rr.status, rr.created_at, m.msft_meeting_id, m.id, mp.start_date_range, mp.end_date_range, mp.meeting_start_time, pm.meeting_id, pm.title, pm.start_time, pm.end_time, pm.duration, pm.location 
+SELECT rr.request_id, rr.requested_by, rr.status, rr.created_at, m.msft_meeting_id, m.id, mp.start_date_range, mp.end_date_range, mp.meeting_start_time, pm.meeting_id, pm.title, pm.start_date_range, pm.end_date_range, pm.duration, pm.location 
 FROM ReschedulingRequest rr 
 JOIN RequestToMeeting rtm ON rr.request_id = rtm.request_id 
 JOIN Meeting m ON rtm.meeting_id = m.id 
@@ -854,8 +850,8 @@ type GetRequestByIDRow struct {
 	MeetingStartTime time.Time                 `json:"meetingStartTime"`
 	MeetingID        sql.NullInt32             `json:"meetingID"`
 	Title            sql.NullString            `json:"title"`
-	StartTime        sql.NullTime              `json:"startTime"`
-	EndTime          sql.NullTime              `json:"endTime"`
+	StartDateRange_2 sql.NullTime              `json:"startDateRange2"`
+	EndDateRange_2   sql.NullTime              `json:"endDateRange2"`
 	Duration         sql.NullTime              `json:"duration"`
 	Location         sql.NullString            `json:"location"`
 }
@@ -875,8 +871,8 @@ func (q *Queries) GetRequestByID(ctx context.Context, requestID uint32) (GetRequ
 		&i.MeetingStartTime,
 		&i.MeetingID,
 		&i.Title,
-		&i.StartTime,
-		&i.EndTime,
+		&i.StartDateRange_2,
+		&i.EndDateRange_2,
 		&i.Duration,
 		&i.Location,
 	)
