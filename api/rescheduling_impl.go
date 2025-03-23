@@ -11,6 +11,7 @@ import (
 
 	"github.com/SlotifyApp/slotify-backend/database"
 	"github.com/avast/retry-go"
+	msgraphsdkgo "github.com/microsoftgraph/msgraph-sdk-go"
 	graphmodels "github.com/microsoftgraph/msgraph-sdk-go/models"
 	"go.uber.org/zap"
 )
@@ -43,9 +44,17 @@ func (s Server) PostAPIRescheduleCheck(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var graphForOwner *msgraphsdkgo.GraphServiceClient
+	graphForOwner, err = CreateMSFTGraphClient(ctx, s.MSALClient, s.DB, userID)
+	if err != nil {
+		logger.Error("failed to create msgraph client", zap.Error(err))
+		sendError(w, http.StatusBadGateway, "Failed to connect to microsoft graph API")
+		return
+	}
+
 	// Get old meeting data from microsoft
-	msftMeeting, err := getUsersEvent(ctx, graph, *logger,
-		body.OldMeeting.MsftMeetingID, string(body.OldMeeting.OwnerEmail))
+	msftMeeting, err := getUsersEvent(ctx, graphForOwner,
+		body.OldMeeting.MsftMeetingID)
 	if err != nil {
 		logger.Error("failed to get meeting data from microsoft", zap.Error(err))
 		sendError(w, http.StatusBadGateway, "Failed to get meeting data from microsoft")
@@ -132,18 +141,18 @@ func (s Server) PostAPIRescheduleRequestReplace(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	graph, err := CreateMSFTGraphClient(ctx, s.MSALClient, s.DB, userID)
-	if err != nil {
-		logger.Error("failed to create msgraph client", zap.Error(err))
-		sendError(w, http.StatusBadGateway, "Failed to connect to microsoft graph API")
-		return
-	}
-
 	// Check owner exists
 	ownerObj, err := s.DB.GetUserByEmail(ctx, string(body.OldMeeting.OwnerEmail))
 	if err != nil {
 		logger.Error("failed to get owner obj from db: ", zap.Error(err))
 		sendError(w, http.StatusBadGateway, "owner is not found as a slotify user")
+		return
+	}
+
+	graph, err := CreateMSFTGraphClient(ctx, s.MSALClient, s.DB, ownerObj.ID)
+	if err != nil {
+		logger.Error("failed to create msgraph client with owner id", zap.Error(err))
+		sendError(w, http.StatusBadGateway, "Failed to connect to microsoft graph API")
 		return
 	}
 
@@ -170,7 +179,7 @@ func (s Server) PostAPIRescheduleRequestReplace(w http.ResponseWriter, r *http.R
 	if errors.Is(err, sql.ErrNoRows) {
 		// Meeting info not in db, so create new meeting info
 		meeting, err = processNewMeetingInfo(ctx, graph, s,
-			body.OldMeeting.MsftMeetingID, *logger, string(body.OldMeeting.OwnerEmail))
+			body.OldMeeting.MsftMeetingID, string(body.OldMeeting.OwnerEmail))
 		if err != nil {
 			logger.Error("DB Creation Error: ", zap.Error(err))
 			sendError(w, http.StatusBadGateway, "Failed to create New Meeting Info")
@@ -286,18 +295,18 @@ func (s Server) PostAPIRescheduleRequestSingle(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	graph, err := CreateMSFTGraphClient(ctx, s.MSALClient, s.DB, userID)
-	if err != nil {
-		logger.Error("failed to create msgraph client", zap.Error(err))
-		sendError(w, http.StatusBadGateway, "Failed to connect to microsoft graph API")
-		return
-	}
-
 	// Check owner exists
 	ownerObj, err := s.DB.GetUserByEmail(ctx, string(body.OwnerEmail))
 	if err != nil {
 		logger.Error("failed to get owner obj from db: ", zap.Error(err))
 		sendError(w, http.StatusBadGateway, "owner is not found as a slotify user")
+		return
+	}
+
+	graph, err := CreateMSFTGraphClient(ctx, s.MSALClient, s.DB, ownerObj.ID)
+	if err != nil {
+		logger.Error("failed to create msgraph client", zap.Error(err))
+		sendError(w, http.StatusBadGateway, "Failed to connect to microsoft graph API")
 		return
 	}
 
@@ -325,7 +334,7 @@ func (s Server) PostAPIRescheduleRequestSingle(w http.ResponseWriter, r *http.Re
 	meeting, err = s.DB.GetMeetingByMSFTID(ctx, body.MsftMeetingID)
 
 	if errors.Is(err, sql.ErrNoRows) {
-		meeting, err = processNewMeetingInfo(ctx, graph, s, body.MsftMeetingID, *logger, string(body.OwnerEmail))
+		meeting, err = processNewMeetingInfo(ctx, graph, s, body.MsftMeetingID, string(body.OwnerEmail))
 		if err != nil {
 			logger.Error("failed to make new meeting info", zap.Error(err))
 			sendError(w, http.StatusBadGateway, "Failed to make new meeting info")

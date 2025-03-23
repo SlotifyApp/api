@@ -11,7 +11,6 @@ import (
 	msgraphsdkgo "github.com/microsoftgraph/msgraph-sdk-go"
 	graphmodels "github.com/microsoftgraph/msgraph-sdk-go/models"
 	"github.com/microsoftgraph/msgraph-sdk-go/users"
-	"go.uber.org/zap"
 )
 
 // durationToISO formats a positive duration in the ISO 8601 format.
@@ -231,22 +230,19 @@ func processNewMeetingInfo(ctx context.Context,
 	graph *msgraphsdkgo.GraphServiceClient,
 	s Server,
 	msftMeetingID string,
-	logger zap.SugaredLogger,
 	userEmail string,
 ) (database.Meeting, error) {
 	// Fetch meeting data from microsft
 
-	msftMeeting, err := getUsersEvent(ctx, graph, logger, msftMeetingID, userEmail)
+	msftMeeting, err := getUsersEvent(ctx, graph, msftMeetingID)
 	if err != nil {
-		logger.Error("failed to get meeting data from microsoft", zap.Error(err))
 		return database.Meeting{}, fmt.Errorf("failed to get meeting data from microsoft: %w", err)
 	}
 
 	var startTime time.Time
 	startTime, err = time.Parse(time.RFC3339Nano, *msftMeeting.GetStart().GetDateTime()+"Z")
 	if err != nil {
-		logger.Error("failed to get parse start time", zap.Error(err))
-		return database.Meeting{}, err
+		return database.Meeting{}, fmt.Errorf("failed to get parse start time: %w", err)
 	}
 
 	newMeetingParams := NewMeetingAndPrefsParams{
@@ -257,8 +253,7 @@ func processNewMeetingInfo(ctx context.Context,
 
 	meeting, err := createNewMeetingsAndPrefs(ctx, newMeetingParams, s, msftMeetingID)
 	if err != nil {
-		logger.Error("failed to get data from new db.Meeting", zap.Error(err))
-		return database.Meeting{}, err
+		return database.Meeting{}, fmt.Errorf("failed to get data from new db.Meeting: %w", err)
 	}
 
 	return meeting, nil
@@ -266,9 +261,7 @@ func processNewMeetingInfo(ctx context.Context,
 
 func getUsersEvent(ctx context.Context,
 	graph *msgraphsdkgo.GraphServiceClient,
-	logger zap.SugaredLogger,
 	msftID string,
-	userEmail string,
 ) (graphmodels.Eventable, error) {
 	queryFilter := "iCalUId eq '" + msftID + "'"
 
@@ -279,10 +272,8 @@ func getUsersEvent(ctx context.Context,
 		},
 	}
 
-	// msftMeetingRes, err := graph.Me().Events().Get(ctx, &requestConfig)
-	msftMeetingRes, err := graph.Users().ByUserId(userEmail).Events().Get(ctx, &requestConfig)
+	msftMeetingRes, err := graph.Me().Events().Get(ctx, &requestConfig)
 	if err != nil {
-		logger.Error("failed to get meeting data from microsoft", zap.Error(err))
 		return nil, fmt.Errorf("failed to get meeting data from microsoft: %w", err)
 	}
 
@@ -291,6 +282,5 @@ func getUsersEvent(ctx context.Context,
 		return msftMeetingRes.GetValue()[0], nil
 	}
 
-	logger.Error("failed to get meeting data from microsoft: returned empty array")
 	return nil, errors.New("failed to get meeting data from microsoft: returned empty array")
 }
