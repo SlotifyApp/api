@@ -74,6 +74,7 @@ func parseCalendarEventToMSFTEvent(eventRequest CalendarEvent) *graphmodels.Even
 	// is location required and roomtype is not a property of location in graph
 	var location *graphmodels.Location
 	if len(eventRequest.Locations) > 0 {
+		location = graphmodels.NewLocation()
 		location.SetDisplayName(eventRequest.Locations[0].Name)
 	}
 
