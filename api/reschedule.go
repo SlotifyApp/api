@@ -10,7 +10,7 @@ import (
 	"github.com/avast/retry-go"
 	msgraphsdkgo "github.com/microsoftgraph/msgraph-sdk-go"
 	graphmodels "github.com/microsoftgraph/msgraph-sdk-go/models"
-	"go.uber.org/zap"
+	"github.com/microsoftgraph/msgraph-sdk-go/users"
 )
 
 // durationToISO formats a positive duration in the ISO 8601 format.
@@ -175,6 +175,7 @@ type NewMeetingAndPrefsParams struct {
 func createNewMeetingsAndPrefs(ctx context.Context,
 	body NewMeetingAndPrefsParams,
 	s Server,
+	msftID string,
 ) (database.Meeting, error) {
 	// Meeting Info does not exist so create a new one
 	// Check valid user id
@@ -198,11 +199,12 @@ func createNewMeetingsAndPrefs(ctx context.Context,
 	}
 
 	// Create Meeting
+
 	meetingParams := database.CreateMeetingParams{
 		//nolint: gosec // id is unsigned 32 bit int
 		MeetingPrefID: uint32(meetingPrefID),
 		OwnerEmail:    body.OwnerEmail,
-		MsftMeetingID: body.MsftMeetingID,
+		MsftMeetingID: msftID,
 	}
 
 	err = retry.Do(func() error {
@@ -216,7 +218,7 @@ func createNewMeetingsAndPrefs(ctx context.Context,
 	}
 
 	var meeting database.Meeting
-	meeting, err = s.DB.GetMeetingByMSFTID(ctx, body.MsftMeetingID)
+	meeting, err = s.DB.GetMeetingByMSFTID(ctx, msftID)
 	if err != nil {
 		return database.Meeting{}, err
 	}
@@ -228,40 +230,57 @@ func processNewMeetingInfo(ctx context.Context,
 	graph *msgraphsdkgo.GraphServiceClient,
 	s Server,
 	msftMeetingID string,
-	logger zap.SugaredLogger,
+	userEmail string,
 ) (database.Meeting, error) {
 	// Fetch meeting data from microsft
-	msftMeeting, err := graph.Me().Events().ByEventId(msftMeetingID).Get(ctx, nil)
+
+	msftMeeting, err := getUsersEvent(ctx, graph, msftMeetingID)
 	if err != nil {
-		logger.Error("failed to get meeting data from microsoft", zap.Error(err))
-		return database.Meeting{}, err
+		return database.Meeting{}, fmt.Errorf("failed to get meeting data from microsoft: %w", err)
 	}
 
 	var startTime time.Time
 	startTime, err = time.Parse(time.RFC3339Nano, *msftMeeting.GetStart().GetDateTime()+"Z")
 	if err != nil {
-		logger.Error("failed to get parse start time", zap.Error(err))
-		return database.Meeting{}, err
-	}
-
-	// Parse email
-	var email string
-	if msftMeeting.GetOrganizer().GetEmailAddress() != nil &&
-		msftMeeting.GetOrganizer().GetEmailAddress().GetAddress() != nil {
-		email = *msftMeeting.GetOrganizer().GetEmailAddress().GetAddress()
+		return database.Meeting{}, fmt.Errorf("failed to get parse start time: %w", err)
 	}
 
 	newMeetingParams := NewMeetingAndPrefsParams{
 		MeetingStartTime: startTime,
-		OwnerEmail:       email,
+		OwnerEmail:       userEmail,
 		MsftMeetingID:    msftMeetingID,
 	}
 
-	meeting, err := createNewMeetingsAndPrefs(ctx, newMeetingParams, s)
+	meeting, err := createNewMeetingsAndPrefs(ctx, newMeetingParams, s, msftMeetingID)
 	if err != nil {
-		logger.Error("failed to get data from new db.Meeting", zap.Error(err))
-		return database.Meeting{}, err
+		return database.Meeting{}, fmt.Errorf("failed to get data from new db.Meeting: %w", err)
 	}
 
 	return meeting, nil
+}
+
+func getUsersEvent(ctx context.Context,
+	graph *msgraphsdkgo.GraphServiceClient,
+	msftID string,
+) (graphmodels.Eventable, error) {
+	queryFilter := "iCalUId eq '" + msftID + "'"
+
+	// Get old meeting data from microsoft
+	requestConfig := users.ItemEventsRequestBuilderGetRequestConfiguration{
+		QueryParameters: &users.ItemEventsRequestBuilderGetQueryParameters{
+			Filter: &queryFilter,
+		},
+	}
+
+	msftMeetingRes, err := graph.Me().Events().Get(ctx, &requestConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get meeting data from microsoft: %w", err)
+	}
+
+	if msftMeetingRes != nil && msftMeetingRes.GetValue() != nil &&
+		len(msftMeetingRes.GetValue()) > 0 {
+		return msftMeetingRes.GetValue()[0], nil
+	}
+
+	return nil, errors.New("failed to get meeting data from microsoft: returned empty array")
 }
