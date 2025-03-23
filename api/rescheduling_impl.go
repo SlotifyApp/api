@@ -222,8 +222,6 @@ func (s Server) PostAPIRescheduleRequestReplace(w http.ResponseWriter, r *http.R
 		//nolint: gosec // id is unsigned 32 bit int
 		RequestID: uint32(requestID),
 		Title:     body.NewMeeting.Title,
-		StartTime: body.NewMeeting.StartTime,
-		EndTime:   body.NewMeeting.EndTime,
 		Location:  body.NewMeeting.Location,
 
 		Duration:       parsedTime,
@@ -411,13 +409,13 @@ func (s Server) GetAPIRescheduleRequestsMe(w http.ResponseWriter, r *http.Reques
 		newMeeting := ReschedulingRequestNewMeeting{}
 
 		if req.MeetingID.Valid {
-			newMeeting.EndTime = req.EndTime.Time
+			newMeeting.EndRangeTime = &req.EndDateRange_2.Time
 			newMeeting.Location = req.Location.String
 
 			dur := req.Duration.Time.Format(time.RFC3339Nano)
 			newMeeting.MeetingDuration = dur
 
-			newMeeting.StartTime = req.StartTime.Time
+			newMeeting.StartRangeTime = &req.EndDateRange_2.Time
 			newMeeting.Title = req.Title.String
 
 			var attendeeIDs []uint32
@@ -462,13 +460,13 @@ func (s Server) GetAPIRescheduleRequestsMe(w http.ResponseWriter, r *http.Reques
 		newMeeting := ReschedulingRequestNewMeeting{}
 
 		if req.MeetingID.Valid {
-			newMeeting.EndTime = req.EndTime.Time
+			newMeeting.EndRangeTime = &req.EndDateRange_2.Time
 			newMeeting.Location = req.Location.String
 
 			dur := req.Duration.Time.Format(time.RFC3339Nano)
 			newMeeting.MeetingDuration = dur
 
-			newMeeting.StartTime = req.StartTime.Time
+			newMeeting.StartRangeTime = &req.StartDateRange_2.Time
 			newMeeting.Title = req.Title.String
 
 			var attendeeIDs []uint32
@@ -527,13 +525,13 @@ func (s Server) GetAPIRescheduleRequestRequestID(w http.ResponseWriter, r *http.
 	newMeeting := ReschedulingRequestNewMeeting{}
 
 	if req.MeetingID.Valid {
-		newMeeting.EndTime = req.EndTime.Time
+		newMeeting.EndRangeTime = &req.EndDateRange_2.Time
 		newMeeting.Location = req.Location.String
 
 		dur := req.Duration.Time.Format(time.RFC3339Nano)
 		newMeeting.MeetingDuration = dur
 
-		newMeeting.StartTime = req.StartTime.Time
+		newMeeting.StartRangeTime = &req.StartDateRange_2.Time
 		newMeeting.Title = req.Title.String
 
 		var attendeeIDs []uint32
