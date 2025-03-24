@@ -13,6 +13,7 @@ import (
 	"github.com/avast/retry-go"
 	msgraphsdkgo "github.com/microsoftgraph/msgraph-sdk-go"
 	graphmodels "github.com/microsoftgraph/msgraph-sdk-go/models"
+	"github.com/microsoftgraph/msgraph-sdk-go/users"
 	"go.uber.org/zap"
 )
 
@@ -642,6 +643,33 @@ func (s Server) PatchAPIRescheduleRequestRequestIDAccept(w http.ResponseWriter, 
 		return
 	}
 
+	queryFilter := "iCalUId eq '" + req.MsftMeetingID + "'"
+
+	// Get old meeting data from microsoft
+	requestConfig := users.ItemEventsRequestBuilderGetRequestConfiguration{
+		QueryParameters: &users.ItemEventsRequestBuilderGetQueryParameters{
+			Filter: &queryFilter,
+		},
+	}
+
+	var msftMeetingRes graphmodels.EventCollectionResponseable
+	msftMeetingRes, err = graph.Me().Events().Get(ctx, &requestConfig)
+	if err != nil {
+		logger.Error("failed to get meeting data from microsoft", zap.Error(err))
+		sendError(w, http.StatusBadGateway, "Failed to get meeting data from microsoft")
+		return
+	}
+
+	var msftMeeting graphmodels.Eventable
+	if msftMeetingRes != nil && msftMeetingRes.GetValue() != nil &&
+		len(msftMeetingRes.GetValue()) > 0 {
+		msftMeeting = msftMeetingRes.GetValue()[0]
+	} else {
+		logger.Error("failed to get meeting data from microsoft", zap.Error(err))
+		sendError(w, http.StatusBadGateway, "Failed to get meeting data from microsoft")
+		return
+	}
+
 	// Update time of calendar event in microsoft
 	requestBody := graphmodels.NewEvent()
 
@@ -660,7 +688,7 @@ func (s Server) PatchAPIRescheduleRequestRequestIDAccept(w http.ResponseWriter, 
 	requestBody.SetEnd(end)
 
 	// Make the microsoft API call
-	_, err = graph.Me().Events().ByEventId(req.MsftMeetingID).Patch(ctx, requestBody, nil)
+	_, err = graph.Me().Events().ByEventId(*msftMeeting.GetId()).Patch(ctx, requestBody, nil)
 	if err != nil {
 		logger.Error("failed to update event in microsoft", zap.Error(err))
 		sendError(w, http.StatusBadGateway, "Failed to update event in microsoft")
@@ -708,13 +736,8 @@ func (s Server) PatchAPIRescheduleRequestRequestIDAccept(w http.ResponseWriter, 
 
 	// Notify all attendees
 
-	meetingData, err := graph.Me().Events().ByEventId(req.MsftMeetingID).Get(ctx, nil)
-	if err != nil {
-		logger.Error("failed to get meeting data from microsoft", zap.Error(err))
-	}
-
 	var attendees []Attendee
-	if attendees, err = parseMSFTAttendees(meetingData); err != nil {
+	if attendees, err = parseMSFTAttendees(msftMeeting); err != nil {
 		logger.Error("failed to parse msft attendees", zap.Error(err))
 		sendError(w, http.StatusBadRequest, "failed to parse the msft attendees received")
 		return
@@ -754,12 +777,10 @@ func (s Server) PostAPIRescheduleRequestRequestIDComplete(w http.ResponseWriter,
 
 	s.PostAPICalendarMe(w, r)
 
-	if r.Response.StatusCode == http.StatusOK {
-		// Delete request as event has been created for it
-		err := s.DB.DeleteRequest(ctx, parRequestID)
-		if err != nil {
-			logger.Error("failed to delete request after creating new event", zap.Error(err))
-		}
+	// Delete request as event has been created for it
+	err := s.DB.DeleteRequest(ctx, parRequestID)
+	if err != nil {
+		logger.Error("failed to delete request after creating new event", zap.Error(err))
 	}
 }
 
