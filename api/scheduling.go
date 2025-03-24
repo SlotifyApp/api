@@ -368,7 +368,7 @@ func generateRatingsForSlots(ctx context.Context,
 			dur := slot.MeetingTimeSlot.End.Sub(slot.MeetingTimeSlot.End)
 			totalTime, ok := userWorkingHours[slot.MeetingTimeSlot.Start.Format("2006-01-02")]
 
-			if ok {
+			if !ok {
 				totalTime = 0
 			}
 
