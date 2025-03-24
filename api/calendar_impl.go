@@ -126,14 +126,6 @@ func (s Server) GetAPICalendarEvent(w http.ResponseWriter, r *http.Request, para
 	ctx, cancel := context.WithTimeout(r.Context(), time.Minute)
 	defer cancel()
 
-	// create graph client for the userID in query params.
-	graph, err := CreateMSFTGraphClient(ctx, s.MSALClient, s.DB, userID)
-	if err != nil {
-		logger.Error("failed to create msgraph client", zap.Error(err))
-		sendError(w, http.StatusBadGateway, "Failed to connect to microsoft graph API")
-		return
-	}
-
 	// Make call to API route and parse events
 	// Get old meeting data from microsoft
 	var msftMeeting graphmodels.Eventable
@@ -146,6 +138,28 @@ func (s Server) GetAPICalendarEvent(w http.ResponseWriter, r *http.Request, para
 			QueryParameters: &users.ItemEventsRequestBuilderGetQueryParameters{
 				Filter: &queryFilter,
 			},
+		}
+
+		meetingObj, err := s.DB.GetMeetingByMSFTID(ctx, params.MsftID)
+		if err != nil {
+			logger.Error("meeting not found in db to find owner of meeting with iCalUID", zap.Error(err))
+			sendError(w, http.StatusBadGateway, "Meeting not found in db to find owner of meeting")
+			return
+		}
+
+		// Get owner's user id
+		ownerObj, err := s.DB.GetUserByEmail(ctx, meetingObj.OwnerEmail)
+		if err != nil {
+			logger.Error("failed to get owner obj from db using email: ", zap.Error(err))
+			sendError(w, http.StatusBadGateway, "owner is not found as a slotify user")
+			return
+		}
+
+		graph, err := CreateMSFTGraphClient(ctx, s.MSALClient, s.DB, ownerObj.ID)
+		if err != nil {
+			logger.Error("failed to create msgraph client with owner id", zap.Error(err))
+			sendError(w, http.StatusBadGateway, "Failed to connect to microsoft graph API")
+			return
 		}
 
 		var msftMeetingRes graphmodels.EventCollectionResponseable
@@ -165,6 +179,14 @@ func (s Server) GetAPICalendarEvent(w http.ResponseWriter, r *http.Request, para
 			return
 		}
 	} else {
+		// create graph client for the userID in query params.
+		graph, err := CreateMSFTGraphClient(ctx, s.MSALClient, s.DB, userID)
+		if err != nil {
+			logger.Error("failed to create msgraph client", zap.Error(err))
+			sendError(w, http.StatusBadGateway, "Failed to connect to microsoft graph API")
+			return
+		}
+
 		msftMeeting, err = graph.Me().Events().ByEventId(params.MsftID).Get(ctx, nil)
 		if err != nil {
 			logger.Error("failed to get meeting data from microsoft", zap.Error(err))
@@ -174,6 +196,7 @@ func (s Server) GetAPICalendarEvent(w http.ResponseWriter, r *http.Request, para
 	}
 
 	var parsedEvents []CalendarEvent
+	var err error
 	if parsedEvents, err = parseEventableResp([]graphmodels.Eventable{msftMeeting}); err != nil {
 		logger.Error("failed to get meeting data from microsoft", zap.Error(err))
 		sendError(w, http.StatusBadGateway, "Failed to get meeting data from microsoft")
