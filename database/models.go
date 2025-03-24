@@ -134,7 +134,7 @@ type Placeholdermeeting struct {
 	RequestID      uint32    `json:"requestID"`
 	Title          string    `json:"title"`
 	Location       string    `json:"location"`
-	Duration       time.Time `json:"duration"`
+	Duration       int32     `json:"duration"`
 	StartDateRange time.Time `json:"startDateRange"`
 	EndDateRange   time.Time `json:"endDateRange"`
 }
