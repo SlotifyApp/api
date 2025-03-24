@@ -281,7 +281,7 @@ type CreatePlaceholderMeetingParams struct {
 	RequestID      uint32    `json:"requestID"`
 	Title          string    `json:"title"`
 	Location       string    `json:"location"`
-	Duration       time.Time `json:"duration"`
+	Duration       int32     `json:"duration"`
 	StartDateRange time.Time `json:"startDateRange"`
 	EndDateRange   time.Time `json:"endDateRange"`
 }
@@ -486,7 +486,7 @@ type GetAllRequestsForOwnerRow struct {
 	Title            sql.NullString            `json:"title"`
 	StartDateRange_2 sql.NullTime              `json:"startDateRange2"`
 	EndDateRange_2   sql.NullTime              `json:"endDateRange2"`
-	Duration         sql.NullTime              `json:"duration"`
+	Duration         sql.NullInt32             `json:"duration"`
 	Location         sql.NullString            `json:"location"`
 }
 
@@ -553,7 +553,7 @@ type GetAllRequestsResponsesForUserIDRow struct {
 	Title            sql.NullString            `json:"title"`
 	StartDateRange_2 sql.NullTime              `json:"startDateRange2"`
 	EndDateRange_2   sql.NullTime              `json:"endDateRange2"`
-	Duration         sql.NullTime              `json:"duration"`
+	Duration         sql.NullInt32             `json:"duration"`
 	Location         sql.NullString            `json:"location"`
 }
 
@@ -852,7 +852,7 @@ type GetRequestByIDRow struct {
 	Title            sql.NullString            `json:"title"`
 	StartDateRange_2 sql.NullTime              `json:"startDateRange2"`
 	EndDateRange_2   sql.NullTime              `json:"endDateRange2"`
-	Duration         sql.NullTime              `json:"duration"`
+	Duration         sql.NullInt32             `json:"duration"`
 	Location         sql.NullString            `json:"location"`
 }
 

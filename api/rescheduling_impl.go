@@ -211,20 +211,13 @@ func (s Server) PostAPIRescheduleRequestReplace(w http.ResponseWriter, r *http.R
 	}
 
 	// Create Placeholder meeting info
-	parsedTime, err := time.Parse(time.RFC3339Nano, body.NewMeeting.MeetingDuration)
-	if err != nil {
-		logger.Error("failed to parse time", zap.Error(err))
-		sendError(w, http.StatusBadGateway, "Failed to parse time")
-		return
-	}
 
 	placeholderParams := database.CreatePlaceholderMeetingParams{
 		//nolint: gosec // id is unsigned 32 bit int
-		RequestID: uint32(requestID),
-		Title:     body.NewMeeting.Title,
-		Location:  body.NewMeeting.Location,
-
-		Duration:       parsedTime,
+		RequestID:      uint32(requestID),
+		Title:          body.NewMeeting.Title,
+		Location:       body.NewMeeting.Location,
+		Duration:       body.NewMeeting.MeetingDuration,
 		StartDateRange: body.NewMeeting.StartRangeTime,
 		EndDateRange:   body.NewMeeting.EndRangeTime,
 	}
@@ -412,8 +405,7 @@ func (s Server) GetAPIRescheduleRequestsMe(w http.ResponseWriter, r *http.Reques
 			newMeeting.EndRangeTime = req.EndDateRange_2.Time
 			newMeeting.Location = req.Location.String
 
-			dur := req.Duration.Time.Format(time.RFC3339Nano)
-			newMeeting.MeetingDuration = dur
+			newMeeting.MeetingDuration = req.Duration.Int32
 
 			newMeeting.StartRangeTime = req.EndDateRange_2.Time
 			newMeeting.Title = req.Title.String
@@ -463,8 +455,7 @@ func (s Server) GetAPIRescheduleRequestsMe(w http.ResponseWriter, r *http.Reques
 			newMeeting.EndRangeTime = req.EndDateRange_2.Time
 			newMeeting.Location = req.Location.String
 
-			dur := req.Duration.Time.Format(time.RFC3339Nano)
-			newMeeting.MeetingDuration = dur
+			newMeeting.MeetingDuration = req.Duration.Int32
 
 			newMeeting.StartRangeTime = req.StartDateRange_2.Time
 			newMeeting.Title = req.Title.String
@@ -528,8 +519,7 @@ func (s Server) GetAPIRescheduleRequestRequestID(w http.ResponseWriter, r *http.
 		newMeeting.EndRangeTime = req.EndDateRange_2.Time
 		newMeeting.Location = req.Location.String
 
-		dur := req.Duration.Time.Format(time.RFC3339Nano)
-		newMeeting.MeetingDuration = dur
+		newMeeting.MeetingDuration = req.Duration.Int32
 
 		newMeeting.StartRangeTime = req.StartDateRange_2.Time
 		newMeeting.Title = req.Title.String
